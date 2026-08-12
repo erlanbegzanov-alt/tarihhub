@@ -165,7 +165,7 @@ function FeaturesArt() {
             >
               <Icon className="h-4 w-4" strokeWidth={2} />
             </span>
-            <span className="truncate text-[12.5px] font-medium text-ink">
+            <span className="min-w-0 flex-1 text-[12.5px] font-medium leading-tight text-ink">
               {t(feature.label)}
             </span>
           </motion.div>
