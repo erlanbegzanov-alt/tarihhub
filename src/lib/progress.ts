@@ -73,7 +73,9 @@ export function normalizeProfile(value: unknown): ProfileState {
         ? parsed.quizzesCompleted
         : DEFAULT_STATE.quizzesCompleted,
     unlockedBadges: Array.isArray(parsed.unlockedBadges)
-      ? parsed.unlockedBadges
+      ? parsed.unlockedBadges.filter(
+          (id): id is string => typeof id === 'string',
+        )
       : DEFAULT_STATE.unlockedBadges,
     totalVisits:
       typeof parsed.totalVisits === 'number'
@@ -84,7 +86,9 @@ export function normalizeProfile(value: unknown): ProfileState {
         ? parsed.lastVisitDate
         : DEFAULT_STATE.lastVisitDate,
     peopleViewed: Array.isArray(parsed.peopleViewed)
-      ? parsed.peopleViewed
+      ? parsed.peopleViewed.filter(
+          (id): id is string => typeof id === 'string',
+        )
       : DEFAULT_STATE.peopleViewed,
     timelineViewed:
       typeof parsed.timelineViewed === 'boolean'

@@ -164,10 +164,10 @@ async function callGemini(
   lang: Lang,
 ): Promise<string> {
   const response = await fetch(
-    `${GEMINI_ENDPOINT}?key=${encodeURIComponent(key)}`,
+    GEMINI_ENDPOINT,
     {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({
         // Persona grounding goes in `systemInstruction`, not the transcript, so
         // it stays out of the conversation the model is continuing.
