@@ -2085,7 +2085,7 @@ export const people: Person[] = [
   {
     id: 'zhoshy-khan',
     eraBadge: { kz: 'XII–XIII ғасыр', ru: 'XII–XIII века' },
-    eraKey: 'golden',
+    eraKey: 'goldenHorde',
     category: 'khans',
     name: { kz: 'Жошы хан', ru: 'Джучи-хан' },
     role: { kz: 'Шыңғысханның үлкен ұлы, Жошы ұлысының иесі', ru: 'Старший сын Чингисхана, владетель улуса Джучи' },
@@ -2131,7 +2131,7 @@ export const people: Person[] = [
   {
     id: 'batu-khan',
     eraBadge: { kz: 'XIII ғасыр', ru: 'XIII век' },
-    eraKey: 'golden',
+    eraKey: 'goldenHorde',
     category: 'khans',
     name: { kz: 'Бату хан', ru: 'Батый (Бату-хан)' },
     role: { kz: 'Алтын Орданың (Ұлы Ұлыстың) негізін салушы', ru: 'Основатель Золотой Орды (Улуса Джучи)' },

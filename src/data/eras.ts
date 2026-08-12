@@ -23,6 +23,11 @@ export const eras: Record<EraKey, EraMeta> = {
     label: { kz: 'Дала ренессансы', ru: 'Ренессанс степи' },
     color: 'var(--color-era-golden)',
   },
+  goldenHorde: {
+    key: 'goldenHorde',
+    label: { kz: 'Алтын Орда', ru: 'Золотая Орда' },
+    color: 'var(--color-era-golden-horde)',
+  },
   khanate: {
     key: 'khanate',
     label: { kz: 'Қазақ хандығы', ru: 'Казахское ханство' },
@@ -59,6 +64,7 @@ export const timelineEraKeys: EraKey[] = [
   'saka',
   'turkic',
   'golden',
+  'goldenHorde',
   'khanate',
   'modern',
   'alash',

@@ -123,7 +123,7 @@ export const timeline: TimelineEntry[] = [
   {
     id: 'otrar-catastrophe',
     year: { kz: '1218–1220', ru: '1218–1220' },
-    eraKey: 'golden',
+    eraKey: 'goldenHorde',
     title: {
       kz: 'Отырар апаты және моңғол шапқыншылығы',
       ru: 'Отрарская катастрофа и монгольское нашествие',
@@ -137,7 +137,7 @@ export const timeline: TimelineEntry[] = [
   {
     id: 'ulus-jochi-1243',
     year: { kz: '1243', ru: '1243' },
-    eraKey: 'golden',
+    eraKey: 'goldenHorde',
     title: { kz: 'Жошы ұлысы (Алтын Орда)', ru: 'Улус Джучи (Золотая Орда)' },
     description: {
       kz: 'Бату Еділдің төменгі ағысында мемлекет құрды. Ертістің жоғарғы ағысынан Алакөлге, батысында Іле мен Сырдарияға дейінгі дала оның құрамына кірді — кейінгі қазақ мемлекеттілігінің іргетасы.',
@@ -148,7 +148,7 @@ export const timeline: TimelineEntry[] = [
   {
     id: 'ak-orda-syganak',
     year: { kz: 'XIV–XV ғ.', ru: 'XIV–XV вв.' },
-    eraKey: 'golden',
+    eraKey: 'goldenHorde',
     title: { kz: 'Ақ Орда және Сығанақ', ru: 'Ак Орда и Сыганак' },
     description: {
       kz: 'Жошы ұлысының шығыс қанаты — Орда Ежен әулетінің мемлекеті. XIV ғасырдың екінші жартысынан Сығанақ астана болды, кейін қазақ хандарының резиденциясына айналды.',

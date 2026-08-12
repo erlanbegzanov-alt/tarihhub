@@ -14,6 +14,7 @@ export type EraKey =
   | 'saka'
   | 'turkic'
   | 'golden'
+  | 'goldenHorde'
   | 'khanate'
   | 'modern'
   | 'alash'

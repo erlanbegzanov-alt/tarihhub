@@ -11,13 +11,17 @@ import type { EraKey, LocalizedText } from './types'
  * actually name for that era, so the outline is indicative only. The UI must
  * always show the "approximate" caption alongside an overlay (see s.map.approx).
  *
- * `golden` deliberately has no entry: this app's `golden` bucket is the 9th–14th c.
- * steppe renaissance (al-Farabi, Yasawi) — a curated cultural grouping, not a
- * polity, so it has no territory to draw. NOTE for whoever reads this next: the
- * Golden Horde / Altyn Orda is a *different* thing — a real 13th–15th c. state
- * that would deserve its own era key and its own polygon. It is deliberately not
- * wedged in here, because labelling the steppe-renaissance bucket with Altyn Orda
- * borders would teach the wrong thing.
+ * `golden` deliberately has no entry: it is the 9th–12th c. steppe renaissance
+ * (al-Farabi, Balasaguni, Kashgari, Yasawi) — a curated cultural grouping, not a
+ * polity, so it has no territory to draw.
+ *
+ * `goldenHorde` (Алтын Орда, 13th–15th c.: the Mongol conquest, Ulus Jochi/Batu,
+ * and the Ak Orda successor state) is a real polity and a separate `EraKey` from
+ * `golden` — see `people.ts` (zhoshy-khan, batu-khan) and `timeline.ts`. It also
+ * has no entry here yet: nobody has drawn a source-checked polygon for it. Add
+ * one the same way the others were built — landmark points a real source names
+ * for the era, not a guessed border — rather than leaving this comment as the
+ * excuse to skip it forever.
  */
 
 /**
