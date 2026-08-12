@@ -1,0 +1,177 @@
+@import "tailwindcss";
+
+/* Class-based dark mode: `src/lib/theme.ts` toggles `.dark` on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* ---- Surfaces & text ---- */
+  --color-cream: #f7f3ea;
+  --color-cream-deep: #f0eade;
+  --color-surface: #ffffff;
+  --color-line: #e7e0d2;
+  --color-line-soft: #f0ebe0;
+  --color-ink: #17211e;
+  --color-ink-soft: #5a6763;
+  --color-ink-faint: #93a09b;
+
+  /* ---- Brand ---- */
+  --color-brand: #158a6e;
+  --color-brand-dark: #0f6b55;
+  --color-brand-tint: #e2f0eb;
+  --color-brand-tint-strong: #c7e3d9;
+
+  /* ---- Reward / XP ---- */
+  --color-gold: #c9a227;
+  --color-gold-tint: #fbf2d9;
+
+  /* ---- Feedback ---- */
+  --color-correct: #2c8a57;
+  --color-correct-tint: #e3f4ea;
+  --color-wrong: #c0483c;
+  --color-wrong-tint: #f9e7e5;
+
+  /* ---- Era accent system ---- */
+  --color-era-saka: #c2703d;
+  --color-era-turkic: #7a5ab8;
+  --color-era-golden: #c9a227;
+  --color-era-khanate: #158a6e;
+  --color-era-modern: #2e7fd4;
+  --color-era-alash: #a63d4c;
+  --color-era-soviet: #55677d;
+  --color-era-independence: #1f9bb3;
+
+  /* ---- Radii ---- */
+  --radius-card: 20px;
+  --radius-tile: 16px;
+
+  /* ---- Shadows ---- */
+  --shadow-soft: 0 1px 2px rgb(23 33 30 / 0.04), 0 6px 20px -8px rgb(23 33 30 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(23 33 30 / 0.05), 0 18px 38px -14px rgb(23 33 30 / 0.22);
+  --shadow-rail: 0 0 0 1px rgb(23 33 30 / 0.04), 0 10px 40px -20px rgb(23 33 30 / 0.35);
+
+  /* ---- Type ---- */
+  --font-sans: "Inter", "Segoe UI", ui-sans-serif, system-ui, -apple-system,
+    "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+}
+
+/*
+ * Night mode. Same identity, lower light: the warm cream surfaces become a
+ * near-black tinted with the ink's own green, and every accent is lifted in
+ * lightness (and slightly desaturated) so it still reads on a dark card.
+ * Redefining the tokens re-themes the whole app — no component knows about it.
+ *
+ * Deliberately unlayered so it outranks the `@layer theme` block above.
+ */
+.dark {
+  /* ---- Surfaces & text ---- */
+  /* Page background: near-black carrying the same green cast as --color-ink. */
+  --color-cream: #121917;
+  /* In light this is a step *down* from the page; on dark a step *up*, so the
+     relationship (a recessed track / muted tile) survives the inversion. */
+  --color-cream-deep: #232e2a;
+  --color-surface: #1b2320;
+  --color-line: #2e3a36;
+  --color-line-soft: #26302d;
+  --color-ink: #e9efec;
+  --color-ink-soft: #a6b3ae;
+  --color-ink-faint: #78867f;
+
+  /* ---- Brand ---- */
+  /* Lifted just far enough to stay legible on #1b2320 while white label text
+     on a brand-filled pill keeps roughly the contrast it has in light mode. */
+  --color-brand: #1fa77f;
+  /* Hover goes brighter on dark, where light mode goes darker. */
+  --color-brand-dark: #2ac194;
+  --color-brand-tint: #12332a;
+  --color-brand-tint-strong: #1d5343;
+
+  /* ---- Reward / XP ---- */
+  --color-gold: #d9b23c;
+  --color-gold-tint: #33290f;
+
+  /* ---- Feedback ---- */
+  --color-correct: #2f9d61;
+  --color-correct-tint: #12301f;
+  --color-wrong: #d95f52;
+  --color-wrong-tint: #351916;
+
+  /* ---- Era accent system ---- */
+  --color-era-saka: #d9915f;
+  --color-era-turkic: #a68ee2;
+  --color-era-golden: #d9b23c;
+  --color-era-khanate: #1fa77f;
+  --color-era-modern: #5ea6ee;
+  --color-era-alash: #d1717f;
+  --color-era-soviet: #91a5bd;
+  --color-era-independence: #45bcd4;
+
+  /* ---- Shadows ---- */
+  /* Tinted shadows vanish on a dark page, so lean on black plus a faint
+     top-light hairline for the rail. */
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px -8px rgb(0 0 0 / 0.55);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.35), 0 18px 38px -14px rgb(0 0 0 / 0.7);
+  --shadow-rail: 0 0 0 1px rgb(255 255 255 / 0.05), 0 10px 40px -20px rgb(0 0 0 / 0.8);
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .dark {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow-x: hidden;
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: var(--color-brand-tint-strong);
+  }
+}
+
+/* Hide scrollbars on horizontal rails while keeping them scrollable. */
+@utility rail-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Standard focus ring used across interactive elements. */
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
