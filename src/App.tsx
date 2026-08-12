@@ -12,6 +12,7 @@ import { completeOnboarding, sessionGate, useSession } from './lib/session'
 import { AIChat } from './screens/AIChat'
 import { Explore } from './screens/Explore'
 import { Home } from './screens/Home'
+import { LessonDetail } from './screens/LessonDetail'
 import { MapScreen } from './screens/MapScreen'
 import { Onboarding } from './screens/Onboarding'
 import { PersonDetail } from './screens/PersonDetail'
@@ -38,6 +39,7 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: '/', element: <Home /> },
   { path: '/explore', element: <Explore /> },
   { path: '/person/:id', element: <PersonDetail /> },
+  { path: '/lesson/:id', element: <LessonDetail /> },
   { path: '/ai', element: <AIChat /> },
   { path: '/ai/:personId', element: <AIChat /> },
   { path: '/quiz', element: <Quiz /> },

@@ -42,6 +42,13 @@ export function mergeProfiles(
   // more recently active copy supplies both.
   const remoteIsNewer = remote.lastVisitDate >= local.lastVisitDate
 
+  // Per lesson, the furthest either device got. A device that only just opened
+  // a lesson must never push a returning user back from a finished one.
+  const lessonProgress: Record<string, number> = { ...remote.lessonProgress }
+  for (const [id, percent] of Object.entries(local.lessonProgress)) {
+    lessonProgress[id] = Math.max(lessonProgress[id] ?? 0, percent)
+  }
+
   return {
     xp: Math.max(remote.xp, local.xp),
     quizzesCompleted: Math.max(remote.quizzesCompleted, local.quizzesCompleted),
@@ -53,6 +60,10 @@ export function mergeProfiles(
     ],
     peopleViewed: [...new Set([...remote.peopleViewed, ...local.peopleViewed])],
     timelineViewed: remote.timelineViewed || local.timelineViewed,
+    lessonProgress,
+    completedLessons: [
+      ...new Set([...remote.completedLessons, ...local.completedLessons]),
+    ],
   }
 }
 

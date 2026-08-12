@@ -48,6 +48,8 @@ export const s = {
     popularFigures: { kz: 'Танымал тұлғалар', ru: 'Популярные личности' },
     continueLearning: { kz: 'Оқуды жалғастыру', ru: 'Продолжить обучение' },
     newLessons: { kz: 'Жаңа сабақтар', ru: 'Новые уроки' },
+    /** Heading used instead of `newLessons` once every lesson has been started. */
+    completedLessons: { kz: 'Аяқталған сабақтар', ru: 'Пройденные уроки' },
     newBadge: { kz: 'Жаңа', ru: 'Новое' },
     greeting: { kz: 'Қайырлы күн', ru: 'Добрый день' },
     complete: { kz: 'аяқталды', ru: 'завершено' },
@@ -77,6 +79,33 @@ export const s = {
       kz: 'Көркем бейне — тұлғаның нақты бейнесі емес',
       ru: 'Художественное изображение — не прижизненный портрет',
     },
+  },
+
+  lesson: {
+    missing: { kz: 'Сабақ табылмады', ru: 'Урок не найден' },
+    progress: { kz: 'Оқылды', ru: 'Пройдено' },
+    /**
+     * Honest footnote: the content comes from the project's checked reference,
+     * and disputed points stay marked as disputed inside the lesson itself.
+     */
+    sourceNote: {
+      kz: 'Сабақ мәтіні жобаның тексерілген тарихи анықтамалығынан жазылған. Даулы деректер сол күйі даулы деп көрсетілген.',
+      ru: 'Текст урока написан по проверенному историческому справочнику проекта. Спорные сведения так и помечены спорными.',
+    },
+    complete: { kz: 'Осы сабақты аяқтадым', ru: 'Я прошёл этот урок' },
+    completedTitle: { kz: 'Сабақ аяқталды', ru: 'Урок пройден' },
+    completedText: {
+      kz: 'Енді білгеніңізді тексеріп көріңіз — викторина осы тақырыпқа сұрақ қояды.',
+      ru: 'Теперь проверьте себя — викторина задаст вопросы по этой теме.',
+    },
+    /** Shown on a lesson finished earlier, so the XP isn't promised twice. */
+    alreadyCompleted: {
+      kz: 'Бұл сабақты бұрын аяқтағансыз — XP қайта берілмейді.',
+      ru: 'Этот урок уже пройден раньше — XP повторно не начисляется.',
+    },
+    toQuiz: { kz: 'Викторинаға өту', ru: 'Перейти к викторине' },
+    toPerson: { kz: 'Тұлғаны ашу', ru: 'Открыть личность' },
+    toHome: { kz: 'Басты бетке', ru: 'На главную' },
   },
 
   quiz: {
@@ -200,7 +229,6 @@ export const s = {
     themeDark: { kz: 'Қараңғы', ru: 'Тёмная' },
     /** Follows the device's own light/dark setting. */
     themeSystem: { kz: 'Жүйе', ru: 'Система' },
-    notifications: { kz: 'Хабарламалар', ru: 'Уведомления' },
     account: { kz: 'Аккаунт', ru: 'Аккаунт' },
     editName: { kz: 'Атын өзгерту', ru: 'Изменить имя' },
     namePlaceholder: { kz: 'Атыңызды жазыңыз', ru: 'Введите имя' },

@@ -121,17 +121,27 @@ export interface QuizQuestion {
   explanation: LocalizedText
 }
 
+/** One readable chunk of a lesson: a heading plus 1–3 short paragraphs. */
+export interface LessonSection {
+  heading: LocalizedText
+  body: LocalizedText
+}
+
 export interface Lesson {
   id: string
   title: LocalizedText
-  /** e.g. "3-сабақ · 7-бөлім" */
+  /** Where the lesson sits in the course, e.g. "4-бөлім · Қазақ хандығы". */
   meta: LocalizedText
   eraKey: EraKey
-  /** 0-100, only meaningful for in-progress lessons. */
-  progress: number
-  /** e.g. "12 мин · 4 бөлім" — used by the "new lessons" list. */
+  /** e.g. "5 тарау · ~9 мин" — honest reading estimate for `sections`. */
   duration: LocalizedText
-  isNew: boolean
+  /**
+   * The lesson itself. Written from `history-reference/*.md`, keeping that
+   * material's hedging: a disputed claim stays marked as disputed.
+   */
+  sections: LessonSection[]
+  /** Person page (and quiz) this lesson leads into, when there is a fitting one. */
+  relatedPersonId?: string
 }
 
 export interface Badge {

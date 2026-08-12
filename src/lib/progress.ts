@@ -7,6 +7,9 @@ const STORAGE_KEY = 'tarihhub_profile_v2'
 
 export const XP_PER_LEVEL = 200
 
+/** Awarded once, the first time a lesson is finished (see `recordLessonProgress`). */
+export const XP_PER_LESSON = 20
+
 export interface ProfileState {
   xp: number
   streak: number
@@ -20,6 +23,10 @@ export interface ProfileState {
   peopleViewed: string[]
   /** Whether the full timeline page has been opened at least once. */
   timelineViewed: boolean
+  /** Real per-lesson progress: lesson id → 0-100. Absent id means "not started". */
+  lessonProgress: Record<string, number>
+  /** Ids of lessons finished at least once — the XP award is keyed off this. */
+  completedLessons: string[]
 }
 
 const DEFAULT_STATE: ProfileState = {
@@ -31,6 +38,23 @@ const DEFAULT_STATE: ProfileState = {
   lastVisitDate: '',
   peopleViewed: [],
   timelineViewed: false,
+  lessonProgress: {},
+  completedLessons: [],
+}
+
+/**
+ * Coerces an untrusted lesson-progress map: only finite numbers survive, and
+ * every one is clamped into 0-100 so a corrupt value can't fake a full bar.
+ */
+function normalizeLessonProgress(value: unknown): Record<string, number> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const result: Record<string, number> = {}
+  for (const [id, percent] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof percent === 'number' && Number.isFinite(percent)) {
+      result[id] = Math.max(0, Math.min(100, Math.round(percent)))
+    }
+  }
+  return result
 }
 
 /**
@@ -66,6 +90,12 @@ export function normalizeProfile(value: unknown): ProfileState {
       typeof parsed.timelineViewed === 'boolean'
         ? parsed.timelineViewed
         : DEFAULT_STATE.timelineViewed,
+    lessonProgress: normalizeLessonProgress(parsed.lessonProgress),
+    completedLessons: Array.isArray(parsed.completedLessons)
+      ? parsed.completedLessons.filter(
+          (id): id is string => typeof id === 'string',
+        )
+      : DEFAULT_STATE.completedLessons,
   }
 }
 
@@ -208,6 +238,34 @@ export function recordPersonView(id: string): void {
   if (peopleViewed.length >= 10) unlocked.add('explorer')
 
   write({ ...state, peopleViewed, unlockedBadges: [...unlocked] })
+}
+
+/**
+ * Records real progress through a lesson. Progress only ever moves forward —
+ * re-opening a finished lesson can't drop it back to "just started". Reaching
+ * 100 marks the lesson completed and pays `XP_PER_LESSON`, but only the first
+ * time: finishing an already-finished lesson again awards nothing.
+ */
+export function recordLessonProgress(id: string, percent: number): void {
+  const clamped = Math.max(0, Math.min(100, Math.round(percent)))
+  const current = state.lessonProgress[id] ?? 0
+  const next = Math.max(current, clamped)
+  const alreadyCompleted = state.completedLessons.includes(id)
+
+  // Nothing new to record: same percentage, and the completion (if any) is
+  // already banked.
+  if (next === current && (next < 100 || alreadyCompleted)) return
+
+  const completes = next >= 100 && !alreadyCompleted
+
+  write({
+    ...state,
+    xp: completes ? state.xp + XP_PER_LESSON : state.xp,
+    lessonProgress: { ...state.lessonProgress, [id]: next },
+    completedLessons: completes
+      ? [...state.completedLessons, id]
+      : state.completedLessons,
+  })
 }
 
 /** Records that the (unpaginated, full) timeline page was opened. */

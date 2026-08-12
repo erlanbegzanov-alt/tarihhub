@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion'
 import {
-  Bell,
   Check,
   Compass,
   Flame,
@@ -115,16 +114,10 @@ export function Profile() {
 
   return (
     <motion.div variants={staggerContainer} initial="initial" animate="animate">
-      <motion.div
-        variants={staggerItem}
-        className="flex items-center justify-between gap-4"
-      >
+      <motion.div variants={staggerItem}>
         <h1 className="text-2xl font-bold tracking-tight text-ink md:text-[28px]">
           {t(s.profile.title)}
         </h1>
-        <IconButton label={t(s.profile.notifications)}>
-          <Bell className="h-[18px] w-[18px]" strokeWidth={2} />
-        </IconButton>
       </motion.div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-start">
