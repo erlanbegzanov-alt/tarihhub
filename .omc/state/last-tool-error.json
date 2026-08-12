@@ -1,7 +1,0 @@
-{
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"/home/malysh/tarihhub/src/data/people.ts\",\"offset\":1347,\"limit\":650}",
-  "error": "File content (30442 tokens) exceeds maximum allowed tokens (25000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
-  "timestamp": "2026-08-02T12:30:59.415Z",
-  "retry_count": 1
-}

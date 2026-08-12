@@ -29,3 +29,7 @@ dist-ssr
 .gstack/
 .vercel
 .env*
+!.env.local.example
+
+# Agent/tool working state — not project source.
+.omc/
