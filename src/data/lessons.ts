@@ -1,3 +1,4 @@
+import { units } from './units'
 import type { Badge, Lesson } from './types'
 
 /**
@@ -12,6 +13,8 @@ import type { Badge, Lesson } from './types'
 export const allLessons: Lesson[] = [
   {
     id: 'khanate-birth',
+    unitId: 'unit-4',
+    order: 1,
     title: {
       kz: 'Қазақ хандығының құрылуы',
       ru: 'Образование Казахского ханства',
@@ -69,6 +72,8 @@ export const allLessons: Lesson[] = [
   },
   {
     id: 'silk-road',
+    unitId: 'unit-3',
+    order: 2,
     title: { kz: 'Ұлы Жібек жолы', ru: 'Великий Шёлковый путь' },
     meta: { kz: '3-бөлім · Дала ренессансы', ru: 'Раздел 3 · Ренессанс степи' },
     eraKey: 'turkic',
@@ -122,6 +127,8 @@ export const allLessons: Lesson[] = [
   },
   {
     id: 'abylai-era',
+    unitId: 'unit-4',
+    order: 7,
     title: { kz: 'Абылай хан дәуірі', ru: 'Эпоха Абылай хана' },
     meta: { kz: '4-бөлім · Қазақ хандығы', ru: 'Раздел 4 · Казахское ханство' },
     eraKey: 'khanate',
@@ -170,6 +177,8 @@ export const allLessons: Lesson[] = [
   },
   {
     id: 'golden-man-lesson',
+    unitId: 'unit-1',
+    order: 3,
     title: {
       kz: 'Алтын адам және сақ мәдениеті',
       ru: '«Золотой человек» и сакская культура',
@@ -224,6 +233,8 @@ export const allLessons: Lesson[] = [
   },
   {
     id: 'otyrar-library',
+    unitId: 'unit-3',
+    order: 3,
     title: {
       kz: 'Әл-Фараби және Отырар кітапханасы',
       ru: 'Аль-Фараби и Отрарская библиотека',
@@ -281,6 +292,8 @@ export const allLessons: Lesson[] = [
   },
   {
     id: 'abai-words',
+    unitId: 'unit-5',
+    order: 7,
     title: { kz: 'Абайдың қара сөздері', ru: 'Слова назидания Абая' },
     meta: { kz: '5-бөлім · Жаңа заман', ru: 'Раздел 5 · Новое время' },
     eraKey: 'modern',
@@ -332,6 +345,8 @@ export const allLessons: Lesson[] = [
   },
   {
     id: 'road-to-1991',
+    unitId: 'unit-8',
+    order: 1,
     title: {
       kz: '1991: Тәуелсіздік жолы',
       ru: '1991: путь к независимости',
@@ -394,6 +409,26 @@ export const allLessons: Lesson[] = [
 /** Lesson lookup for the detail screen. */
 export function getLesson(id?: string): Lesson | undefined {
   return allLessons.find((lesson) => lesson.id === id)
+}
+
+/** Position of a lesson's unit in the course, or last for an unknown unit id. */
+function unitRank(unitId: string): number {
+  const index = units.findIndex((unit) => unit.id === unitId)
+  return index === -1 ? Number.MAX_SAFE_INTEGER : units[index].order
+}
+
+/**
+ * Every lesson in real study order — by unit first, then by its position
+ * inside that unit. `allLessons` itself is kept in authoring order, so this is
+ * what any "what comes next" question should read.
+ */
+export const lessonsInCourseOrder: Lesson[] = [...allLessons].sort(
+  (a, b) => unitRank(a.unitId) - unitRank(b.unitId) || a.order - b.order,
+)
+
+/** Lessons of one unit, in the order they should be studied. */
+export function lessonsOfUnit(unitId: string): Lesson[] {
+  return lessonsInCourseOrder.filter((lesson) => lesson.unitId === unitId)
 }
 
 export const badges: Badge[] = [

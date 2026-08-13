@@ -115,6 +115,12 @@ export interface QuizQuestion {
   id: string
   /** When set, the question is only served for these personas. */
   personIds?: string[]
+  /**
+   * When set, the question belongs to these lessons' gating quizzes
+   * (`buildLessonQuiz`). Parallel to `personIds` — a question may be tagged for
+   * lessons, for personas, or (rarely) for both.
+   */
+  lessonIds?: string[]
   category: LocalizedText
   question: LocalizedText
   options: QuizOption[]
@@ -130,6 +136,10 @@ export interface LessonSection {
 
 export interface Lesson {
   id: string
+  /** Id of the owning course unit — see `src/data/units.ts`. */
+  unitId: string
+  /** 1-based position inside that unit, following CURRICULUM_PLAN.md's numbering. */
+  order: number
   title: LocalizedText
   /** Where the lesson sits in the course, e.g. "4-бөлім · Қазақ хандығы". */
   meta: LocalizedText

@@ -1,3 +1,4 @@
+import { lessonQuestions } from './lessonQuestions'
 import type { QuizQuestion } from './types'
 
 const CATEGORY = {
@@ -11129,4 +11130,16 @@ export function buildQuiz(personId?: string): QuizQuestion[] {
     : []
   if (specific.length >= QUIZ_LENGTH) return shuffled(specific).slice(0, QUIZ_LENGTH)
   return shuffled([...specific, ...general]).slice(0, QUIZ_LENGTH)
+}
+
+/**
+ * Builds the quiz that gates one lesson. Unlike `buildQuiz` this never tops up
+ * from the general pool: passing has to mean the reader knows *this* lesson, so
+ * a lesson with two tagged questions gets a two-question quiz, and a lesson
+ * with none gets an empty array — which the UI must show as "not ready yet"
+ * rather than as a quiz the reader can fail.
+ */
+export function buildLessonQuiz(lessonId: string): QuizQuestion[] {
+  const tagged = lessonQuestions.filter((q) => q.lessonIds?.includes(lessonId))
+  return shuffled(tagged).slice(0, QUIZ_LENGTH)
 }
