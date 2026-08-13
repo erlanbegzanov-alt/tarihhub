@@ -8,6 +8,7 @@ export const s = {
 
   nav: {
     home: { kz: 'Басты бет', ru: 'Главная' },
+    course: { kz: 'Курс', ru: 'Курс' },
     explore: { kz: 'Іздеу', ru: 'Поиск' },
     ai: { kz: 'AI', ru: 'AI' },
     timeline: { kz: 'Тарих', ru: 'История' },

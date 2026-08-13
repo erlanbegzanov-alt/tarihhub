@@ -1,4 +1,4 @@
-import { BookOpen, House, Search, Sparkles, User } from 'lucide-react'
+import { BookOpen, GraduationCap, House, Search, Sparkles, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { LocalizedText } from '../data/types'
 import { s } from '../i18n/strings'
@@ -13,6 +13,12 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
   { to: '/', label: s.nav.home, icon: House, match: [] },
+  {
+    to: '/course',
+    label: s.nav.course,
+    icon: GraduationCap,
+    match: ['/lesson', '/quiz/lesson'],
+  },
   { to: '/explore', label: s.nav.explore, icon: Search, match: ['/person'] },
   { to: '/ai', label: s.nav.ai, icon: Sparkles, match: [] },
   {
