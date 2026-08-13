@@ -1,33 +1,49 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, Check, RotateCcw, Trophy, X, Zap } from 'lucide-react'
+import { ArrowLeft, Check, Lock, RotateCcw, Trophy, X, Zap } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PortraitPanel } from '../components/PortraitPanel'
 import { IconButton, ProgressBar, XpPill } from '../components/ui'
+import { getLesson } from '../data/lessons'
 import { getPerson } from '../data/people'
-import { XP_PER_QUIZ, buildQuiz } from '../data/quiz'
+import { XP_PER_QUIZ, buildLessonQuiz, buildQuiz } from '../data/quiz'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
-import { completeQuiz } from '../lib/progress'
+import {
+  LESSON_PASS_RATIO,
+  completeQuiz,
+  recordLessonQuizResult,
+} from '../lib/progress'
 
 const LETTERS = ['A', 'B', 'C', 'D']
 
 export function Quiz() {
-  const { personId } = useParams()
+  const { personId, lessonId } = useParams()
   const navigate = useNavigate()
   const { t } = useLang()
   const person = getPerson(personId)
+  const lesson = getLesson(lessonId)
 
   /** Bumped on retry so question cards re-enter with a fresh animation key. */
   const [round, setRound] = useState(0)
-  const questions = useMemo(() => buildQuiz(personId), [personId])
+  // Lesson mode serves only that lesson's own questions; everything else keeps
+  // the practice/persona behaviour untouched. `round` is in the deps on
+  // purpose: a retry re-draws and re-shuffles, so passing a lesson can't come
+  // down to memorising which option sat in which slot last time.
+  const questions = useMemo(
+    () => (lessonId ? buildLessonQuiz(lessonId) : buildQuiz(personId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `round` is the retry counter: bumping it is exactly what should re-draw the questions.
+    [lessonId, personId, round],
+  )
 
   const [index, setIndex] = useState(0)
   const [picked, setPicked] = useState<string | null>(null)
   const [correctCount, setCorrectCount] = useState(0)
   const [finished, setFinished] = useState(false)
+  /** Whether the finished attempt reached the lesson pass mark. Lesson mode only. */
+  const [lessonPassed, setLessonPassed] = useState(false)
 
   const question = questions[index]
   const isLast = index === questions.length - 1
@@ -41,7 +57,14 @@ export function Quiz() {
   const advance = () => {
     if (isLast) {
       // `correctCount` already includes the current answer — `choose` runs first.
+      // A lesson quiz is still a quiz: it earns the usual XP, streak and badges…
       completeQuiz(correctCount, questions.length, XP_PER_QUIZ)
+      // …and, on top of that, decides whether the lesson itself is passed.
+      if (lessonId) {
+        setLessonPassed(
+          recordLessonQuizResult(lessonId, correctCount, questions.length),
+        )
+      }
       setFinished(true)
       return
     }
@@ -55,6 +78,48 @@ export function Quiz() {
     setPicked(null)
     setCorrectCount(0)
     setFinished(false)
+    setLessonPassed(false)
+  }
+
+  /* --------------------- no questions written yet --------------------- */
+
+  // A lesson whose questions haven't been authored yet must land here rather
+  // than in an empty quiz that crashes on `questions[0]`.
+  if (questions.length === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={springSoft}
+        className="mx-auto max-w-lg py-6 text-center md:py-12"
+      >
+        <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-surface text-ink-faint ring-1 ring-line/60">
+          <Lock className="h-7 w-7" strokeWidth={1.8} />
+        </span>
+        <h1 className="mt-5 text-xl font-bold tracking-tight text-ink sm:text-2xl">
+          {t(s.quiz.notReadyTitle)}
+        </h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-ink-soft">
+          {t(s.quiz.notReadyText)}
+        </p>
+        <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
+          {lesson && (
+            <Link
+              to={`/lesson/${lesson.id}`}
+              className="focus-ring rounded-full bg-brand px-5 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"
+            >
+              {t(s.quiz.toLesson)}
+            </Link>
+          )}
+          <Link
+            to="/course"
+            className="focus-ring rounded-full bg-surface px-5 py-3.5 text-[15px] font-semibold text-brand ring-[1.5px] ring-brand/45 hover:bg-brand-tint"
+          >
+            {t(s.quiz.toCourse)}
+          </Link>
+        </div>
+      </motion.div>
+    )
   }
 
   /* ------------------------------ result ------------------------------ */
@@ -63,6 +128,11 @@ export function Quiz() {
     const ratio = correctCount / questions.length
     const verdict =
       ratio === 1 ? s.quiz.perfect : ratio >= 0.6 ? s.quiz.good : s.quiz.poor
+    // Lesson mode splits the result in two: a pass confirms the lesson counted,
+    // a miss is framed as "not yet", never as a failure to be ashamed of.
+    const lessonMode = Boolean(lessonId)
+    const missed = lessonMode && !lessonPassed
+    const passMark = Math.ceil(LESSON_PASS_RATIO * questions.length)
 
     return (
       <motion.div
@@ -72,20 +142,40 @@ export function Quiz() {
         className="mx-auto max-w-lg py-6 text-center md:py-12"
       >
         <motion.span
-          initial={{ scale: 0.5, rotate: -12 }}
+          initial={{ scale: 0.5, rotate: missed ? 0 : -12 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ ...springSoft, delay: 0.1 }}
-          className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-gold-tint"
+          className={cn(
+            'mx-auto grid h-20 w-20 place-items-center rounded-full',
+            missed ? 'bg-brand-tint' : 'bg-gold-tint',
+          )}
         >
-          <Trophy className="h-9 w-9 text-gold" strokeWidth={1.8} />
+          {missed ? (
+            <RotateCcw className="h-9 w-9 text-brand" strokeWidth={1.8} />
+          ) : (
+            <Trophy className="h-9 w-9 text-gold" strokeWidth={1.8} />
+          )}
         </motion.span>
 
         <h1 className="mt-5 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          {t(s.quiz.resultTitle)}
+          {missed
+            ? t(s.quiz.lessonFailedTitle)
+            : lessonMode
+              ? t(s.quiz.lessonPassedTitle)
+              : t(s.quiz.resultTitle)}
         </h1>
         <p className="mt-2 text-[15px] leading-relaxed text-ink-soft">
-          {t(verdict)}
+          {missed
+            ? t(s.quiz.lessonFailedText)
+            : lessonMode
+              ? t(s.quiz.lessonPassedText)
+              : t(verdict)}
         </p>
+        {lesson && (
+          <p className="mt-2 text-[13px] font-medium text-ink-faint">
+            {t(lesson.title)}
+          </p>
+        )}
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <div className="rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60">
@@ -105,26 +195,60 @@ export function Quiz() {
           </div>
         </div>
 
+        {lessonMode && (
+          <p className="mt-3 text-[12.5px] text-ink-faint">
+            {t(s.quiz.passMark)}: {passMark}/{questions.length}
+          </p>
+        )}
+
+        {/* A missed pass mark leads with "try again"; nothing else is offered
+            as the celebratory next step. */}
         <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
-          <motion.button
-            type="button"
-            onClick={() => navigate('/profile')}
-            whileTap={{ scale: 0.97 }}
-            transition={springSoft}
-            className="focus-ring flex-1 rounded-full bg-brand px-5 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"
-          >
-            {t(s.quiz.toProfile)}
-          </motion.button>
-          <motion.button
-            type="button"
-            onClick={restart}
-            whileTap={{ scale: 0.97 }}
-            transition={springSoft}
-            className="focus-ring flex flex-1 items-center justify-center gap-2 rounded-full bg-surface px-5 py-3.5 text-[15px] font-semibold text-brand ring-[1.5px] ring-brand/45 hover:bg-brand-tint"
-          >
-            <RotateCcw className="h-[18px] w-[18px]" strokeWidth={2.2} />
-            {t(s.quiz.retry)}
-          </motion.button>
+          {missed ? (
+            <>
+              <motion.button
+                type="button"
+                onClick={restart}
+                whileTap={{ scale: 0.97 }}
+                transition={springSoft}
+                className="focus-ring flex flex-1 items-center justify-center gap-2 rounded-full bg-brand px-5 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"
+              >
+                <RotateCcw className="h-[18px] w-[18px]" strokeWidth={2.2} />
+                {t(s.quiz.retry)}
+              </motion.button>
+              <motion.button
+                type="button"
+                onClick={() => navigate(`/lesson/${lessonId}`)}
+                whileTap={{ scale: 0.97 }}
+                transition={springSoft}
+                className="focus-ring flex-1 rounded-full bg-surface px-5 py-3.5 text-[15px] font-semibold text-brand ring-[1.5px] ring-brand/45 hover:bg-brand-tint"
+              >
+                {t(s.quiz.toLesson)}
+              </motion.button>
+            </>
+          ) : (
+            <>
+              <motion.button
+                type="button"
+                onClick={() => navigate(lessonMode ? '/course' : '/profile')}
+                whileTap={{ scale: 0.97 }}
+                transition={springSoft}
+                className="focus-ring flex-1 rounded-full bg-brand px-5 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"
+              >
+                {lessonMode ? t(s.quiz.toCourse) : t(s.quiz.toProfile)}
+              </motion.button>
+              <motion.button
+                type="button"
+                onClick={restart}
+                whileTap={{ scale: 0.97 }}
+                transition={springSoft}
+                className="focus-ring flex flex-1 items-center justify-center gap-2 rounded-full bg-surface px-5 py-3.5 text-[15px] font-semibold text-brand ring-[1.5px] ring-brand/45 hover:bg-brand-tint"
+              >
+                <RotateCcw className="h-[18px] w-[18px]" strokeWidth={2.2} />
+                {t(s.quiz.retry)}
+              </motion.button>
+            </>
+          )}
         </div>
       </motion.div>
     )
@@ -147,11 +271,11 @@ export function Quiz() {
         </IconButton>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg font-bold tracking-tight text-ink">
-            {t(s.quiz.title)}
+            {lesson ? t(lesson.title) : t(s.quiz.title)}
           </h1>
           <p className="text-[12.5px] text-ink-faint">
             {index + 1}/{questions.length} {t(s.quiz.counter)}
-            {person ? ` · ${t(person.name)}` : ''}
+            {!lesson && person ? ` · ${t(person.name)}` : ''}
           </p>
         </div>
         <XpPill>

@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
+import { CourseOutline } from './screens/CourseOutline'
 import { LanguageProvider } from './i18n/LanguageProvider'
 import { s } from './i18n/strings'
 import { useLang } from './i18n/useLang'
@@ -39,11 +40,13 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: '/', element: <Home /> },
   { path: '/explore', element: <Explore /> },
   { path: '/person/:id', element: <PersonDetail /> },
+  { path: '/course', element: <CourseOutline /> },
   { path: '/lesson/:id', element: <LessonDetail /> },
   { path: '/ai', element: <AIChat /> },
   { path: '/ai/:personId', element: <AIChat /> },
   { path: '/quiz', element: <Quiz /> },
   { path: '/quiz/:personId', element: <Quiz /> },
+  { path: '/quiz/lesson/:lessonId', element: <Quiz /> },
   { path: '/timeline', element: <Timeline /> },
   { path: '/map', element: <MapScreen /> },
   { path: '/profile', element: <Profile /> },

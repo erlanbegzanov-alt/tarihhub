@@ -47,9 +47,15 @@ export const s = {
     },
     popularFigures: { kz: 'Танымал тұлғалар', ru: 'Популярные личности' },
     continueLearning: { kz: 'Оқуды жалғастыру', ru: 'Продолжить обучение' },
-    newLessons: { kz: 'Жаңа сабақтар', ru: 'Новые уроки' },
-    /** Heading used instead of `newLessons` once every lesson has been started. */
-    completedLessons: { kz: 'Аяқталған сабақтар', ru: 'Пройденные уроки' },
+    /** Card leading into the full unit-by-unit course. */
+    courseTitle: { kz: 'Толық курс', ru: 'Весь курс' },
+    courseText: {
+      kz: 'Барлық бөлім мен сабақ — ежелгі дәуірден бүгінге дейін, ретімен.',
+      ru: 'Все разделы и уроки — от древности до наших дней, по порядку.',
+    },
+    courseAction: { kz: 'Курсты ашу', ru: 'Открыть курс' },
+    /** Short list of the next unfinished lessons in course order. */
+    recommended: { kz: 'Келесі сабақтар', ru: 'Следующие уроки' },
     newBadge: { kz: 'Жаңа', ru: 'Новое' },
     greeting: { kz: 'Қайырлы күн', ru: 'Добрый день' },
     complete: { kz: 'аяқталды', ru: 'завершено' },
@@ -92,20 +98,53 @@ export const s = {
       kz: 'Сабақ мәтіні жобаның тексерілген тарихи анықтамалығынан жазылған. Даулы деректер сол күйі даулы деп көрсетілген.',
       ru: 'Текст урока написан по проверенному историческому справочнику проекта. Спорные сведения так и помечены спорными.',
     },
-    complete: { kz: 'Осы сабақты аяқтадым', ru: 'Я прошёл этот урок' },
-    completedTitle: { kz: 'Сабақ аяқталды', ru: 'Урок пройден' },
-    completedText: {
-      kz: 'Енді білгеніңізді тексеріп көріңіз — викторина осы тақырыпқа сұрақ қояды.',
-      ru: 'Теперь проверьте себя — викторина задаст вопросы по этой теме.',
+    completedTitle: { kz: 'Сабақ тапсырылды', ru: 'Урок сдан' },
+    /** Real best attempt at this lesson's quiz, shown as "4/5". */
+    bestScore: { kz: 'Үздік нәтиже', ru: 'Лучший результат' },
+    /** Sits above the quiz button: says plainly what completing a lesson takes. */
+    gateNote: {
+      kz: 'Сабақ тест тапсырғанда ғана есептеледі — оқып шығу жеткіліксіз.',
+      ru: 'Урок засчитывается только после сдачи теста — одного прочтения мало.',
     },
-    /** Shown on a lesson finished earlier, so the XP isn't promised twice. */
-    alreadyCompleted: {
-      kz: 'Бұл сабақты бұрын аяқтағансыз — XP қайта берілмейді.',
-      ru: 'Этот урок уже пройден раньше — XP повторно не начисляется.',
+    startQuiz: { kz: 'Тест тапсыру', ru: 'Пройти тест' },
+    retryQuiz: { kz: 'Тестті қайталау', ru: 'Пройти тест снова' },
+    /** Honest state for a lesson whose questions haven't been written yet. */
+    quizNotReady: { kz: 'Тест дайындалуда', ru: 'Тест готовится' },
+    quizNotReadyText: {
+      kz: 'Бұл сабаққа сұрақтар әлі жазылмаған, сондықтан оны әзірге тапсырылды деп белгілеу мүмкін емес. Мәтінді оқи беріңіз — тест қосылған соң қайта кіріңіз.',
+      ru: 'Вопросы к этому уроку ещё не написаны, поэтому засчитать его пока нельзя. Читайте материал — тест появится позже.',
     },
     toQuiz: { kz: 'Викторинаға өту', ru: 'Перейти к викторине' },
     toPerson: { kz: 'Тұлғаны ашу', ru: 'Открыть личность' },
     toHome: { kz: 'Басты бетке', ru: 'На главную' },
+    nextLesson: { kz: 'Келесі сабақ', ru: 'Следующий урок' },
+  },
+
+  /** Unit-by-unit course outline (`/course`) and the lesson rows inside it. */
+  course: {
+    title: { kz: 'Курс бағдарламасы', ru: 'Программа курса' },
+    subtitle: {
+      kz: 'Бөлімдер мен сабақтар — ежелгі дәуірден бүгінге дейін',
+      ru: 'Разделы и уроки — от древности до наших дней',
+    },
+    /** Course-wide counter under the big "7 / 62". */
+    lessonsPassed: { kz: 'сабақ тапсырылды', ru: 'уроков сдано' },
+    /** Per-unit counter, kept short enough to sit beside the "3 / 7". */
+    unitPassed: { kz: 'тапсырылды', ru: 'сдано' },
+    /**
+     * Unit ordinal, wrapped around the unit number so both languages keep their
+     * own word order: kz "4-бөлім", ru "Раздел 4".
+     */
+    unitBefore: { kz: '', ru: 'Раздел ' },
+    unitAfter: { kz: '-бөлім', ru: '' },
+    /** A unit whose lessons are still being written. */
+    unitEmpty: {
+      kz: 'Бұл бөлімнің сабақтары әзірленіп жатыр.',
+      ru: 'Уроки этого раздела ещё готовятся.',
+    },
+    statusNew: { kz: 'Басталмаған', ru: 'Не начат' },
+    statusStarted: { kz: 'Оқылып жатыр', ru: 'В процессе' },
+    statusPassed: { kz: 'Тапсырылды', ru: 'Сдан' },
   },
 
   quiz: {
@@ -131,6 +170,30 @@ export const s = {
     poor: {
       kz: 'Бастамасы жаман емес. Өмірбаяндарды оқып, қайта көріңіз.',
       ru: 'Неплохое начало. Прочитайте биографии и попробуйте снова.',
+    },
+
+    /* ---- lesson mode: the quiz that decides whether a lesson is passed ---- */
+
+    /** Pass mark for the lesson quiz, e.g. "Өту шегі — 4/5". */
+    passMark: { kz: 'Өту шегі', ru: 'Проходной балл' },
+    lessonPassedTitle: { kz: 'Сабақ есептелді', ru: 'Урок засчитан' },
+    lessonPassedText: {
+      kz: 'Тестті тапсырдыңыз — сабақ курс бойынша өтілді деп белгіленді.',
+      ru: 'Тест сдан — урок отмечен в курсе как пройденный.',
+    },
+    /** Failure framing: not shame, just "the mark wasn't reached yet". */
+    lessonFailedTitle: { kz: 'Әзірге өту шегіне жетпеді', ru: 'Пока не хватило до проходного' },
+    lessonFailedText: {
+      kz: 'Талпыныс саны шектелмеген. Сабақ мәтініне оралып, әлсіз тұстарды қайта қараңыз да, тестті қайталаңыз.',
+      ru: 'Попыток сколько угодно. Вернитесь к уроку, перечитайте слабые места и пройдите тест снова.',
+    },
+    toLesson: { kz: 'Сабаққа қайту', ru: 'Вернуться к уроку' },
+    toCourse: { kz: 'Курсқа қайту', ru: 'Вернуться к курсу' },
+    /** Guard for a lesson quiz with no questions written yet. */
+    notReadyTitle: { kz: 'Тест әлі дайын емес', ru: 'Тест ещё не готов' },
+    notReadyText: {
+      kz: 'Бұл сабақтың сұрақтары әлі жазылмаған. Дайын болған соң осы жерден тапсыра аласыз.',
+      ru: 'Вопросы к этому уроку ещё не написаны. Как только они появятся, тест можно будет пройти здесь.',
     },
   },
 

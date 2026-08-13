@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Check, ChevronRight, Play, Sparkles } from 'lucide-react'
+import { ChevronRight, GraduationCap, Play, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PersonCard } from '../components/PersonCard'
@@ -10,7 +10,7 @@ import {
   SectionHeading,
 } from '../components/ui'
 import { eraColor } from '../data/eras'
-import { allLessons } from '../data/lessons'
+import { allLessons, lessonsInCourseOrder } from '../data/lessons'
 import { people } from '../data/people'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
@@ -34,14 +34,17 @@ export function Home() {
   const inProgress = lessons.filter(
     (item) => item.percent > 0 && item.percent < 100,
   )
-  const notStarted = lessons.filter((item) => item.percent === 0)
-  const finished = lessons.filter((item) => item.percent >= 100)
 
-  // Once every lesson has been opened there is nothing "new" left to show, so
-  // the same slot lists what was finished rather than an empty heading.
-  const secondList = notStarted.length > 0 ? notStarted : finished
-  const secondTitle =
-    notStarted.length > 0 ? s.home.newLessons : s.home.completedLessons
+  // Course-wide stat for the CTA card, counted against the lessons that really
+  // exist — the number grows on its own as content lands.
+  const passedLessons = allLessons.filter((lesson) =>
+    profile.completedLessons.includes(lesson.id),
+  ).length
+
+  // The genuinely next lessons: the first few not yet passed, in course order.
+  const recommended = lessonsInCourseOrder
+    .filter((lesson) => !profile.completedLessons.includes(lesson.id))
+    .slice(0, 3)
 
   // Greet the signed-in account's first name.
   const greetingName =
@@ -246,72 +249,118 @@ export function Home() {
           </motion.section>
         )}
 
-        {/* ---------- lessons not started yet (or, once none are left, finished ones) ---------- */}
-        {secondList.length > 0 && (
-          <motion.section variants={staggerItem} className="lg:col-span-2 lg:row-start-3">
-            <SectionHeading title={t(secondTitle)} />
-            <motion.ul
-              variants={staggerContainer}
-              initial="initial"
-              animate="animate"
-              className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4"
+        {/* ---------- the full course ---------- */}
+        <motion.section variants={staggerItem} className="lg:col-span-2 lg:row-start-3">
+          <SectionHeading title={t(s.home.courseTitle)} />
+
+          <motion.div whileHover={{ y: -3 }} transition={springSoft}>
+            <Link
+              to="/course"
+              className={cn(
+                'focus-ring group flex items-center gap-4 rounded-card bg-surface p-4 sm:p-5',
+                'shadow-soft ring-1 ring-line/60 transition-shadow duration-300 hover:shadow-lift',
+              )}
             >
-              {secondList.map(({ lesson, percent }) => (
-                <motion.li key={lesson.id} variants={staggerItem}>
-                  <motion.div whileHover={{ y: -2 }} transition={springSoft} className="h-full">
-                    <Link
-                      to={`/lesson/${lesson.id}`}
-                      className={cn(
-                        'focus-ring flex h-full w-full items-center gap-3.5 rounded-card bg-surface p-3.5 text-left',
-                        'shadow-soft ring-1 ring-line/60 transition-shadow duration-300 hover:shadow-lift',
-                      )}
-                    >
-                      <span
-                        className="grid h-11 w-11 shrink-0 place-items-center rounded-full"
-                        style={{
-                          background: `color-mix(in srgb, ${eraColor(lesson.eraKey)} 14%, var(--color-surface))`,
-                        }}
+              <span
+                className="grid h-12 w-12 shrink-0 place-items-center rounded-full"
+                style={{
+                  background: `color-mix(in srgb, ${eraColor('khanate')} 14%, var(--color-surface))`,
+                }}
+              >
+                <GraduationCap
+                  className="h-6 w-6"
+                  strokeWidth={2}
+                  style={{ color: eraColor('khanate') }}
+                />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-[16px] font-semibold text-ink">
+                  {t(s.home.courseTitle)}
+                </h3>
+                <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-soft">
+                  {t(s.home.courseText)}
+                </p>
+                <div className="mt-2 flex items-center gap-2.5">
+                  <span className="text-[13px] font-bold text-ink">
+                    {passedLessons}
+                    <span className="text-ink-faint"> / {allLessons.length}</span>
+                  </span>
+                  <ProgressBar
+                    percent={
+                      allLessons.length > 0
+                        ? (passedLessons / allLessons.length) * 100
+                        : 0
+                    }
+                    className="max-w-[180px] flex-1"
+                  />
+                </div>
+              </div>
+              <span className="inline-flex shrink-0 items-center gap-0.5 text-[13px] font-semibold text-brand">
+                <span className="hidden sm:inline">{t(s.home.courseAction)}</span>
+                <ChevronRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5" />
+              </span>
+            </Link>
+          </motion.div>
+
+          {/* the next few lessons in real course order, never random */}
+          {recommended.length > 0 && (
+            <>
+              <SectionHeading title={t(s.home.recommended)} className="mt-6" />
+              <motion.ul
+                variants={staggerContainer}
+                initial="initial"
+                animate="animate"
+                className="grid gap-2.5 md:grid-cols-3"
+              >
+                {recommended.map((lesson) => (
+                  <motion.li key={lesson.id} variants={staggerItem}>
+                    <motion.div whileHover={{ y: -2 }} transition={springSoft} className="h-full">
+                      <Link
+                        to={`/lesson/${lesson.id}`}
+                        className={cn(
+                          'focus-ring flex h-full w-full items-center gap-3.5 rounded-card bg-surface p-3.5 text-left',
+                          'shadow-soft ring-1 ring-line/60 transition-shadow duration-300 hover:shadow-lift',
+                        )}
                       >
-                        {percent >= 100 ? (
-                          <Check
-                            className="h-[18px] w-[18px]"
-                            strokeWidth={2.4}
-                            style={{ color: eraColor(lesson.eraKey) }}
-                          />
-                        ) : (
+                        <span
+                          className="grid h-11 w-11 shrink-0 place-items-center rounded-full"
+                          style={{
+                            background: `color-mix(in srgb, ${eraColor(lesson.eraKey)} 14%, var(--color-surface))`,
+                          }}
+                        >
                           <Sparkles
                             className="h-[18px] w-[18px]"
                             strokeWidth={2}
                             style={{ color: eraColor(lesson.eraKey) }}
                           />
-                        )}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          {percent === 0 && (
-                            <span className="rounded-full bg-gold-tint px-2 py-0.5 text-[10.5px] font-bold text-gold">
-                              {t(s.home.newBadge)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            {(profile.lessonProgress[lesson.id] ?? 0) === 0 && (
+                              <span className="rounded-full bg-gold-tint px-2 py-0.5 text-[10.5px] font-bold text-gold">
+                                {t(s.home.newBadge)}
+                              </span>
+                            )}
+                            <span className="truncate text-[12px] text-ink-faint">
+                              {t(lesson.meta)}
                             </span>
-                          )}
-                          <span className="truncate text-[12px] text-ink-faint">
-                            {t(lesson.meta)}
-                          </span>
+                          </div>
+                          <h3 className="mt-1 truncate text-[14.5px] font-semibold text-ink">
+                            {t(lesson.title)}
+                          </h3>
+                          <p className="mt-0.5 truncate text-[12.5px] text-ink-faint">
+                            {t(lesson.duration)}
+                          </p>
                         </div>
-                        <h3 className="mt-1 truncate text-[14.5px] font-semibold text-ink">
-                          {t(lesson.title)}
-                        </h3>
-                        <p className="mt-0.5 truncate text-[12.5px] text-ink-faint">
-                          {percent >= 100 ? t(s.home.complete) : t(lesson.duration)}
-                        </p>
-                      </div>
-                      <ChevronRight className="h-5 w-5 shrink-0 text-ink-faint" />
-                    </Link>
-                  </motion.div>
-                </motion.li>
-              ))}
-            </motion.ul>
-          </motion.section>
-        )}
+                        <ChevronRight className="h-5 w-5 shrink-0 text-ink-faint" />
+                      </Link>
+                    </motion.div>
+                  </motion.li>
+                ))}
+              </motion.ul>
+            </>
+          )}
+        </motion.section>
       </div>
     </motion.div>
   )

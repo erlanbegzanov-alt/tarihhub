@@ -1,19 +1,18 @@
 import { motion } from 'framer-motion'
-import { ArrowLeft, BookOpen, Check, Trophy, UserRound } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ArrowLeft, BookOpen, Check, ChevronRight, Lock, Trophy, UserRound } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { EraBadge, IconButton, ProgressBar, XpPill } from '../components/ui'
+import { EraBadge, IconButton, ProgressBar } from '../components/ui'
 import { eraColor, eras } from '../data/eras'
-import { getLesson } from '../data/lessons'
+import { getLesson, lessonsInCourseOrder } from '../data/lessons'
 import { getPerson } from '../data/people'
+import { buildLessonQuiz } from '../data/quiz'
+import { getUnit } from '../data/units'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
-import { XP_PER_LESSON, recordLessonProgress, useProfile } from '../lib/progress'
-
-/** Recorded on open, so a lesson the reader started shows up under "continue". */
-const STARTED_PERCENT = 10
+import { recordLessonStarted, useProfile } from '../lib/progress'
 
 export function LessonDetail() {
   const { id } = useParams()
@@ -22,14 +21,17 @@ export function LessonDetail() {
   const profile = useProfile()
   const lesson = getLesson(id)
 
-  /** True only for a completion that actually paid XP in this visit. */
-  const [awarded, setAwarded] = useState(false)
-
-  // Opening the lesson is real progress — but never enough to overwrite a
-  // higher percentage already recorded (`recordLessonProgress` clamps that).
+  // Opening a lesson is the only progress the reader awards themselves, and it
+  // can never complete anything — that takes passing the quiz below.
   useEffect(() => {
-    if (lesson) recordLessonProgress(lesson.id, STARTED_PERCENT)
+    if (lesson) recordLessonStarted(lesson.id)
   }, [lesson])
+
+  // Only the count matters here: whether this lesson can be gated at all.
+  const questionCount = useMemo(
+    () => (lesson ? buildLessonQuiz(lesson.id).length : 0),
+    [lesson],
+  )
 
   if (!lesson) {
     return (
@@ -48,14 +50,15 @@ export function LessonDetail() {
   const color = eraColor(lesson.eraKey)
   const percent = profile.lessonProgress[lesson.id] ?? 0
   const completed = profile.completedLessons.includes(lesson.id)
+  const best = profile.lessonQuizBest[lesson.id]
   const person = getPerson(lesson.relatedPersonId)
-  const quizPath = lesson.relatedPersonId ? `/quiz/${lesson.relatedPersonId}` : '/quiz'
+  const unit = getUnit(lesson.unitId)
+  const quizReady = questionCount > 0
 
-  const finish = () => {
-    // Read before recording: a repeat completion pays nothing, so promise nothing.
-    setAwarded(!completed)
-    recordLessonProgress(lesson.id, 100)
-  }
+  // Next lesson in real course order, when there is one after this.
+  const currentIndex = lessonsInCourseOrder.findIndex((item) => item.id === lesson.id)
+  const nextLesson =
+    currentIndex === -1 ? undefined : lessonsInCourseOrder[currentIndex + 1]
 
   return (
     <motion.div variants={staggerContainer} initial="initial" animate="animate">
@@ -69,6 +72,17 @@ export function LessonDetail() {
       <div className="mx-auto max-w-3xl">
         {/* ---------- title ---------- */}
         <motion.div variants={staggerItem}>
+          {unit && (
+            <Link
+              to="/course"
+              className="focus-ring mb-2.5 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold text-brand"
+            >
+              <ArrowLeft className="h-4 w-4" strokeWidth={2.2} />
+              {t(s.course.unitBefore)}
+              {unit.order}
+              {t(s.course.unitAfter)} · {t(unit.title)}
+            </Link>
+          )}
           <EraBadge eraKey={lesson.eraKey}>{t(eras[lesson.eraKey].label)}</EraBadge>
           <h1 className="mt-3 text-[26px] leading-[1.15] font-bold tracking-tight text-ink sm:text-[32px]">
             {t(lesson.title)}
@@ -123,7 +137,7 @@ export function LessonDetail() {
           {t(s.lesson.sourceNote)}
         </motion.p>
 
-        {/* ---------- completion ---------- */}
+        {/* ---------- the quiz gate ---------- */}
         <motion.section variants={staggerItem} className="mt-7">
           {completed ? (
             <div
@@ -139,64 +153,93 @@ export function LessonDetail() {
               <h2 className="mt-3 text-[19px] font-bold text-ink">
                 {t(s.lesson.completedTitle)}
               </h2>
-              {awarded ? (
-                <p className="mt-2 flex justify-center">
-                  <XpPill>
-                    +{XP_PER_LESSON} {t(s.common.xp)}
-                  </XpPill>
-                </p>
-              ) : (
-                <p className="mt-2 text-[12.5px] text-ink-faint">
-                  {t(s.lesson.alreadyCompleted)}
+              {/* The real score, never a bare checkmark. */}
+              {best && (
+                <p className="mt-2 text-[15px] font-semibold text-ink">
+                  {t(s.lesson.bestScore)}: {best.correct}/{best.total}
                 </p>
               )}
               <p className="mt-2.5 text-[14px] leading-relaxed text-ink-soft">
-                {t(s.lesson.completedText)}
+                {t(s.quiz.lessonPassedText)}
               </p>
 
               <div className="mt-4 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
-                <Link
-                  to={quizPath}
-                  className={cn(
-                    'focus-ring inline-flex items-center justify-center gap-2 rounded-full',
-                    'bg-brand px-5 py-3 text-[15px] font-semibold text-white shadow-soft',
-                    'transition-colors hover:bg-brand-dark',
-                  )}
-                >
-                  <Trophy className="h-[18px] w-[18px]" strokeWidth={2.2} />
-                  {t(s.lesson.toQuiz)}
-                </Link>
-                {person && (
+                {quizReady && (
                   <Link
-                    to={`/person/${person.id}`}
+                    to={`/quiz/lesson/${lesson.id}`}
                     className={cn(
                       'focus-ring inline-flex items-center justify-center gap-2 rounded-full',
                       'bg-surface px-5 py-3 text-[15px] font-semibold text-brand',
                       'ring-[1.5px] ring-brand/45 transition-colors hover:bg-brand-tint',
                     )}
                   >
-                    <UserRound className="h-[18px] w-[18px]" strokeWidth={2.2} />
-                    {t(person.name)}
+                    <Trophy className="h-[18px] w-[18px]" strokeWidth={2.2} />
+                    {t(s.lesson.retryQuiz)}
                   </Link>
                 )}
+                <Link
+                  to={nextLesson ? `/lesson/${nextLesson.id}` : '/course'}
+                  className={cn(
+                    'focus-ring inline-flex items-center justify-center gap-2 rounded-full',
+                    'bg-brand px-5 py-3 text-[15px] font-semibold text-white shadow-soft',
+                    'transition-colors hover:bg-brand-dark',
+                  )}
+                >
+                  {nextLesson ? t(s.lesson.nextLesson) : t(s.quiz.toCourse)}
+                  <ChevronRight className="h-[18px] w-[18px]" strokeWidth={2.2} />
+                </Link>
               </div>
+
+              {person && (
+                <Link
+                  to={`/person/${person.id}`}
+                  className="focus-ring mt-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg text-[13.5px] font-semibold text-brand"
+                >
+                  <UserRound className="h-4 w-4" strokeWidth={2.2} />
+                  {t(person.name)}
+                </Link>
+              )}
+            </div>
+          ) : quizReady ? (
+            <div className="text-center">
+              <p className="mb-3 text-[13px] leading-relaxed text-ink-faint">
+                {t(s.lesson.gateNote)}
+              </p>
+              <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} transition={springSoft}>
+                <Link
+                  to={`/quiz/lesson/${lesson.id}`}
+                  className={cn(
+                    'focus-ring flex w-full items-center justify-center gap-2 rounded-full',
+                    'bg-brand px-5 py-3.5 text-[15px] font-semibold text-white shadow-soft',
+                    'transition-colors hover:bg-brand-dark',
+                  )}
+                >
+                  <Trophy className="h-[18px] w-[18px]" strokeWidth={2.2} />
+                  {t(s.lesson.startQuiz)}
+                </Link>
+              </motion.div>
             </div>
           ) : (
-            <motion.button
-              type="button"
-              onClick={finish}
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
-              transition={springSoft}
-              className={cn(
-                'focus-ring flex w-full items-center justify-center gap-2 rounded-full',
-                'bg-brand px-5 py-3.5 text-[15px] font-semibold text-white shadow-soft',
-                'transition-colors hover:bg-brand-dark',
-              )}
-            >
-              <Check className="h-[18px] w-[18px]" strokeWidth={2.4} />
-              {t(s.lesson.complete)}
-            </motion.button>
+            /* No questions written for this lesson yet — say so plainly rather
+               than offering a button that opens an empty quiz. */
+            <div className="rounded-card bg-cream p-5 text-center ring-1 ring-line/60 sm:p-6">
+              <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-surface text-ink-faint ring-1 ring-line/60">
+                <Lock className="h-5 w-5" strokeWidth={2.2} />
+              </span>
+              <h2 className="mt-3 text-[17px] font-bold text-ink">
+                {t(s.lesson.quizNotReady)}
+              </h2>
+              <p className="mt-2 text-[14px] leading-relaxed text-ink-soft">
+                {t(s.lesson.quizNotReadyText)}
+              </p>
+              <Link
+                to="/course"
+                className="focus-ring mt-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg text-[13.5px] font-semibold text-brand"
+              >
+                {t(s.quiz.toCourse)}
+                <ChevronRight className="h-4 w-4" strokeWidth={2.2} />
+              </Link>
+            </div>
           )}
         </motion.section>
       </div>
