@@ -7,8 +7,24 @@ const STORAGE_KEY = 'tarihhub_profile_v2'
 
 export const XP_PER_LEVEL = 200
 
-/** Awarded once, the first time a lesson is finished (see `recordLessonProgress`). */
+/** Awarded once, the first time a lesson's quiz is passed (see `recordLessonQuizResult`). */
 export const XP_PER_LESSON = 20
+
+/**
+ * Share of a lesson quiz that has to be answered correctly for the lesson to
+ * count as passed. This is the only way a lesson is ever completed — reading it
+ * to the bottom proves nothing on its own.
+ */
+export const LESSON_PASS_RATIO = 0.8
+
+/** Recorded when a lesson is opened, so it shows up under "continue". */
+const LESSON_STARTED_PERCENT = 10
+
+/** Best attempt at one lesson's quiz — the real numbers, not a percentage. */
+export interface LessonQuizScore {
+  correct: number
+  total: number
+}
 
 export interface ProfileState {
   xp: number
@@ -25,8 +41,13 @@ export interface ProfileState {
   timelineViewed: boolean
   /** Real per-lesson progress: lesson id → 0-100. Absent id means "not started". */
   lessonProgress: Record<string, number>
-  /** Ids of lessons finished at least once — the XP award is keyed off this. */
+  /** Ids of lessons whose quiz was passed — the XP award is keyed off this. */
   completedLessons: string[]
+  /**
+   * Best quiz attempt per lesson, kept as real correct/total so the UI can show
+   * "4/5" rather than a bare percentage. A worse retry never overwrites it.
+   */
+  lessonQuizBest: Record<string, LessonQuizScore>
 }
 
 const DEFAULT_STATE: ProfileState = {
@@ -40,6 +61,7 @@ const DEFAULT_STATE: ProfileState = {
   timelineViewed: false,
   lessonProgress: {},
   completedLessons: [],
+  lessonQuizBest: {},
 }
 
 /**
@@ -52,6 +74,29 @@ function normalizeLessonProgress(value: unknown): Record<string, number> {
   for (const [id, percent] of Object.entries(value as Record<string, unknown>)) {
     if (typeof percent === 'number' && Number.isFinite(percent)) {
       result[id] = Math.max(0, Math.min(100, Math.round(percent)))
+    }
+  }
+  return result
+}
+
+/**
+ * Coerces an untrusted best-score map. An entry survives only as a pair of
+ * finite, sane numbers — a total below 1 is meaningless, and `correct` can
+ * never exceed it, so a corrupt value can't fake a passed lesson.
+ */
+function normalizeLessonQuizBest(value: unknown): Record<string, LessonQuizScore> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const result: Record<string, LessonQuizScore> = {}
+  for (const [id, score] of Object.entries(value as Record<string, unknown>)) {
+    if (!score || typeof score !== 'object' || Array.isArray(score)) continue
+    const { correct, total } = score as { correct?: unknown; total?: unknown }
+    if (typeof correct !== 'number' || !Number.isFinite(correct)) continue
+    if (typeof total !== 'number' || !Number.isFinite(total)) continue
+    const safeTotal = Math.round(total)
+    if (safeTotal < 1) continue
+    result[id] = {
+      correct: Math.max(0, Math.min(safeTotal, Math.round(correct))),
+      total: safeTotal,
     }
   }
   return result
@@ -100,6 +145,7 @@ export function normalizeProfile(value: unknown): ProfileState {
           (id): id is string => typeof id === 'string',
         )
       : DEFAULT_STATE.completedLessons,
+    lessonQuizBest: normalizeLessonQuizBest(parsed.lessonQuizBest),
   }
 }
 
@@ -245,31 +291,69 @@ export function recordPersonView(id: string): void {
 }
 
 /**
- * Records real progress through a lesson. Progress only ever moves forward —
- * re-opening a finished lesson can't drop it back to "just started". Reaching
- * 100 marks the lesson completed and pays `XP_PER_LESSON`, but only the first
- * time: finishing an already-finished lesson again awards nothing.
+ * Records that a lesson was opened. This is the only progress a reader can
+ * award themselves, and it deliberately tops out well below 100: opening a
+ * lesson can never complete it. A lesson already further along is left alone.
  */
-export function recordLessonProgress(id: string, percent: number): void {
-  const clamped = Math.max(0, Math.min(100, Math.round(percent)))
-  const current = state.lessonProgress[id] ?? 0
-  const next = Math.max(current, clamped)
-  const alreadyCompleted = state.completedLessons.includes(id)
+export function recordLessonStarted(id: string): void {
+  if ((state.lessonProgress[id] ?? 0) >= LESSON_STARTED_PERCENT) return
+  write({
+    ...state,
+    lessonProgress: { ...state.lessonProgress, [id]: LESSON_STARTED_PERCENT },
+  })
+}
 
-  // Nothing new to record: same percentage, and the completion (if any) is
-  // already banked.
-  if (next === current && (next < 100 || alreadyCompleted)) return
+/**
+ * Records one attempt at a lesson's gating quiz and returns whether *this*
+ * attempt reached `LESSON_PASS_RATIO`.
+ *
+ * The three things this has to get right:
+ * - a worse retry never overwrites a better `lessonQuizBest` entry;
+ * - `XP_PER_LESSON` is paid on the first pass only, never again;
+ * - a failed attempt leaves `completedLessons` and `lessonProgress` untouched,
+ *   so it can't undo a lesson that was already passed.
+ *
+ * The returned flag is about this attempt alone, so the result screen can say
+ * "not this time" honestly even when the lesson was banked on an earlier try.
+ */
+export function recordLessonQuizResult(
+  lessonId: string,
+  correct: number,
+  total: number,
+): boolean {
+  // An empty quiz can't be passed — it isn't a real assessment.
+  if (!Number.isFinite(total) || total < 1) return false
 
-  const completes = next >= 100 && !alreadyCompleted
+  const safeTotal = Math.round(total)
+  const safeCorrect = Math.max(
+    0,
+    Math.min(safeTotal, Number.isFinite(correct) ? Math.round(correct) : 0),
+  )
+  const ratio = safeCorrect / safeTotal
+  const passed = ratio >= LESSON_PASS_RATIO
+
+  const best = state.lessonQuizBest[lessonId]
+  const beatsBest = !best || ratio > best.correct / best.total
+  const completes = passed && !state.completedLessons.includes(lessonId)
 
   write({
     ...state,
     xp: completes ? state.xp + XP_PER_LESSON : state.xp,
-    lessonProgress: { ...state.lessonProgress, [id]: next },
+    lessonProgress: passed
+      ? { ...state.lessonProgress, [lessonId]: 100 }
+      : state.lessonProgress,
     completedLessons: completes
-      ? [...state.completedLessons, id]
+      ? [...state.completedLessons, lessonId]
       : state.completedLessons,
+    lessonQuizBest: beatsBest
+      ? {
+          ...state.lessonQuizBest,
+          [lessonId]: { correct: safeCorrect, total: safeTotal },
+        }
+      : state.lessonQuizBest,
   })
+
+  return passed
 }
 
 /** Records that the (unpaginated, full) timeline page was opened. */

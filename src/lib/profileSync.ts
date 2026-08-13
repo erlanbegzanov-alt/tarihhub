@@ -16,7 +16,7 @@ import {
   replaceProfile,
   setRemoteWriter,
 } from './progress'
-import type { ProfileState } from './progress'
+import type { LessonQuizScore, ProfileState } from './progress'
 
 function profileDoc(uid: string): DocumentReference | null {
   if (!db) return null
@@ -49,6 +49,18 @@ export function mergeProfiles(
     lessonProgress[id] = Math.max(lessonProgress[id] ?? 0, percent)
   }
 
+  // Per lesson, the better of the two best attempts. Compared by ratio, since
+  // the two sides can hold different question counts for the same lesson.
+  const lessonQuizBest: Record<string, LessonQuizScore> = {
+    ...remote.lessonQuizBest,
+  }
+  for (const [id, score] of Object.entries(local.lessonQuizBest)) {
+    const current = lessonQuizBest[id]
+    if (!current || score.correct / score.total > current.correct / current.total) {
+      lessonQuizBest[id] = score
+    }
+  }
+
   return {
     xp: Math.max(remote.xp, local.xp),
     quizzesCompleted: Math.max(remote.quizzesCompleted, local.quizzesCompleted),
@@ -64,6 +76,7 @@ export function mergeProfiles(
     completedLessons: [
       ...new Set([...remote.completedLessons, ...local.completedLessons]),
     ],
+    lessonQuizBest,
   }
 }
 
