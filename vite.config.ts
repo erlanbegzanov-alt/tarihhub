@@ -48,13 +48,33 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         runtimeCaching: [
           {
-            urlPattern: ({ request }) =>
-              request.destination === 'image' || request.destination === 'font',
-            handler: 'CacheFirst',
+            // Portrait PNGs (`public/portraits/*.png`) keep a stable filename even
+            // when the underlying image is regenerated — there's no content hash
+            // in the URL to bust a stale cache. CacheFirst would then serve last
+            // month's portrait forever (up to the 30-day/200-entry cap) even
+            // after the real file on the server changes. StaleWhileRevalidate
+            // still answers instantly from cache, but also revalidates against
+            // the network in the background, so a changed portrait shows up on
+            // the visitor's next reload instead of staying stuck.
+            urlPattern: ({ request }) => request.destination === 'image',
+            handler: 'StaleWhileRevalidate',
             options: {
-              cacheName: 'assets-cache',
+              cacheName: 'images-cache',
               expiration: {
                 maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+            },
+          },
+          {
+            // Fonts are genuinely immutable once shipped, so CacheFirst (no
+            // revalidation round-trip) is the right, cheaper choice here.
+            urlPattern: ({ request }) => request.destination === 'font',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'fonts-cache',
+              expiration: {
+                maxEntries: 30,
                 maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
               },
             },
