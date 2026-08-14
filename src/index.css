@@ -31,6 +31,7 @@
   --color-wrong-tint: #f9e7e5;
 
   /* ---- Era accent system ---- */
+  --color-era-ancient: #7d6a4f;
   --color-era-saka: #c2703d;
   --color-era-turkic: #7a5ab8;
   --color-era-golden: #c9a227;
@@ -97,6 +98,7 @@
   --color-wrong-tint: #351916;
 
   /* ---- Era accent system ---- */
+  --color-era-ancient: #b39a72;
   --color-era-saka: #d9915f;
   --color-era-turkic: #a68ee2;
   --color-era-golden: #d9b23c;

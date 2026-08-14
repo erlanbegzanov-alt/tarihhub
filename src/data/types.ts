@@ -11,6 +11,7 @@ export interface LocalizedText {
  * that is reused for that era's dots, tags and portrait gradients everywhere.
  */
 export type EraKey =
+  | 'ancient'
   | 'saka'
   | 'turkic'
   | 'golden'

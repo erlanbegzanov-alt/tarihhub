@@ -8,6 +8,11 @@ export interface EraMeta {
 }
 
 export const eras: Record<EraKey, EraMeta> = {
+  ancient: {
+    key: 'ancient',
+    label: { kz: 'Тас және қола дәуірі', ru: 'Каменный и бронзовый век' },
+    color: 'var(--color-era-ancient)',
+  },
   saka: {
     key: 'saka',
     label: { kz: 'Сақ дәуірі', ru: 'Сакская эпоха' },
@@ -61,6 +66,7 @@ export function eraColor(key: EraKey): string {
 
 /** Eras offered as filter chips on the timeline screen. */
 export const timelineEraKeys: EraKey[] = [
+  'ancient',
   'saka',
   'turkic',
   'golden',

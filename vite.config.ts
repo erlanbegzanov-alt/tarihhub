@@ -41,6 +41,11 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Default cap is 2 MiB; the course content (60+ bilingual lessons and
+        // their quiz pools) pushes the main bundle past that. Raised well
+        // above the current size so it doesn't need revisiting as more
+        // lessons land.
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: ({ request }) =>
