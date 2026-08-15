@@ -125,6 +125,13 @@ export function SignIn() {
               {displayedError}
             </p>
           )}
+          {/* Raw Firebase error code — small print, so a report back names
+              the exact cause instead of just "не удалось войти". */}
+          {session.redirectError && (
+            <p className="mt-1.5 text-center text-[10.5px] text-ink-faint">
+              {session.redirectError}
+            </p>
+          )}
         </motion.div>
       </motion.div>
     </div>
