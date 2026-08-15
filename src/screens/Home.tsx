@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { ChevronRight, GraduationCap, Play, Sparkles } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PersonCard } from '../components/PersonCard'
 import {
@@ -10,6 +10,7 @@ import {
   SectionHeading,
 } from '../components/ui'
 import { eraColor } from '../data/eras'
+import { todaysFeaturedEvent } from '../data/featuredEvents'
 import { allLessons, lessonsInCourseOrder } from '../data/lessons'
 import { people } from '../data/people'
 import { s } from '../i18n/strings'
@@ -25,6 +26,12 @@ export function Home() {
   const [query, setQuery] = useState('')
   const session = useSession()
   const profile = useProfile()
+
+  // Deterministic by calendar day — same card for everyone on a given day,
+  // rotating through every era over `featuredEvents.length` days so a
+  // visitor who returns a few days later sees something different, without
+  // recomputing (and so a mid-day re-render never flips it) on every render.
+  const featuredEvent = useMemo(() => todaysFeaturedEvent(), [])
 
   // Real progress, read live from the profile — never baked into the data.
   const lessons = allLessons.map((lesson) => ({
@@ -108,41 +115,41 @@ export function Home() {
               <div
                 className="relative h-32 w-full sm:h-40"
                 style={{
-                  background: `linear-gradient(140deg,
-                    color-mix(in srgb, ${eraColor('khanate')} 26%, var(--color-surface)),
-                    color-mix(in srgb, ${eraColor('khanate')} 8%, var(--color-surface)))`,
+                  background: `color-mix(in srgb, ${eraColor(featuredEvent.eraKey)} 10%, var(--color-surface))`,
                 }}
               >
-                <svg
-                  viewBox="0 0 400 160"
-                  preserveAspectRatio="none"
-                  className="absolute inset-0 h-full w-full"
-                  fill="none"
-                  aria-hidden
-                >
-                  <g
-                    stroke={eraColor('khanate')}
-                    strokeOpacity="0.22"
-                    strokeWidth="1"
-                  >
-                    <path d="M0 120C60 90 90 130 150 104S250 60 310 92 400 78 400 78" />
-                    <path d="M0 138C70 112 110 148 170 124S270 84 330 112 400 100 400 100" />
-                    <circle cx="330" cy="46" r="22" />
-                    <circle cx="330" cy="46" r="34" />
-                  </g>
-                </svg>
+                <img
+                  src={featuredEvent.image}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
                 <span className="absolute top-4 left-4">
-                  <EraBadge eraKey="khanate" className="bg-surface/80 backdrop-blur">
-                    {t(s.home.todayEventBadge)}
+                  <EraBadge
+                    eraKey={featuredEvent.eraKey}
+                    className="bg-surface/80 backdrop-blur"
+                  >
+                    {t(featuredEvent.badge)}
                   </EraBadge>
+                </span>
+                {/* Honest caption — every one of these is an AI scene illustration,
+                    not a photo of the actual moment (none survive). */}
+                <span
+                  className={cn(
+                    'absolute bottom-2 left-2 rounded-full px-2 py-0.5',
+                    'bg-black/45 text-[10.5px] font-medium text-white backdrop-blur-sm',
+                  )}
+                >
+                  {t(s.person.portraitDepiction)}
                 </span>
               </div>
               <div className="p-4 sm:p-5">
                 <h3 className="text-lg leading-snug font-semibold text-ink sm:text-xl">
-                  {t(s.home.todayEventTitle)}
+                  {t(featuredEvent.title)}
                 </h3>
                 <p className="mt-1.5 text-[14px] leading-relaxed text-ink-soft">
-                  {t(s.home.todayEventText)}
+                  {t(featuredEvent.text)}
                 </p>
                 <span className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-brand">
                   {t(s.timeline.title)}
