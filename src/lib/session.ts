@@ -8,8 +8,9 @@
  */
 import {
   GoogleAuthProvider,
+  getRedirectResult,
   onAuthStateChanged,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
   updateProfile,
 } from 'firebase/auth'
@@ -34,6 +35,12 @@ export interface SessionState {
   /** False until the first `onAuthStateChanged` callback has run. */
   authResolved: boolean
   onboarded: boolean
+  /**
+   * Firebase error code from a failed `signInWithRedirect` round trip, read
+   * once by the sign-in screen after the visitor lands back on the site.
+   * `null` on every load that isn't the tail end of a failed sign-in.
+   */
+  redirectError: string | null
 }
 
 function readFlag(key: string): boolean {
@@ -60,6 +67,7 @@ let state: SessionState = {
   // gate never sits on a spinner.
   authResolved: !isFirebaseReady,
   onboarded: readFlag(ONBOARDED_KEY),
+  redirectError: null,
 }
 
 const listeners = new Set<() => void>()
@@ -93,6 +101,17 @@ export function sessionGate(session: SessionState): SessionGate {
 }
 
 if (auth) {
+  // Catches a failed round trip through Google (denied consent, disallowed
+  // domain, …) — `onAuthStateChanged` alone only ever reports "signed out",
+  // never why, so the sign-in screen would otherwise fail silently.
+  getRedirectResult(auth).catch((cause) => {
+    const code =
+      typeof cause === 'object' && cause !== null && 'code' in cause
+        ? String((cause as { code: unknown }).code)
+        : 'auth/unknown'
+    set({ redirectError: code })
+  })
+
   onAuthStateChanged(auth, (firebaseUser) => {
     if (firebaseUser) {
       // Reaching a real account means the intro has served its purpose, even on
@@ -125,8 +144,12 @@ export function completeOnboarding(): void {
 
 export async function signInWithGoogle(): Promise<void> {
   if (!auth) throw new Error('firebase-not-configured')
-  await signInWithPopup(auth, new GoogleAuthProvider())
-  // The auth listener above flips the gate to the app.
+  // A full-page redirect rather than a popup: popups are unreliable across
+  // mobile browsers and any desktop setup with strict third-party storage
+  // limits, which was silently failing sign-in for real visitors. The result
+  // is picked up by `getRedirectResult` above once Google sends the visitor
+  // back, and the auth listener then flips the gate to the app.
+  await signInWithRedirect(auth, new GoogleAuthProvider())
 }
 
 /** Overrides the display name shown in the app, on top of whatever Google supplied. */

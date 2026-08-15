@@ -6,7 +6,7 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import { pressable, staggerContainer, staggerItem } from '../lib/motion'
-import { signInWithGoogle } from '../lib/session'
+import { signInWithGoogle, useSession } from '../lib/session'
 import { isFirebaseReady } from '../lib/firebase'
 
 /** Google's brand mark, inlined so the screen needs no external assets. */
@@ -35,6 +35,7 @@ function GoogleMark({ className }: { className?: string }) {
 
 export function SignIn() {
   const { t } = useLang()
+  const session = useSession()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -43,18 +44,26 @@ export function SignIn() {
     setPending(true)
     try {
       await signInWithGoogle()
-      // On success the auth listener in session.ts flips the gate to the app.
+      // The page navigates away to Google from here; on return,
+      // `redirectError` below (or the auth listener, on success) takes over.
     } catch (cause) {
       const code =
         typeof cause === 'object' && cause !== null && 'code' in cause
           ? String((cause as { code: unknown }).code)
           : ''
-      const cancelled =
-        code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request'
+      const cancelled = code === 'auth/cancelled-popup-request'
       setError(t(cancelled ? s.auth.cancelled : s.auth.failed))
       setPending(false)
     }
   }
+
+  // Set once, on the load right after a failed round trip through Google —
+  // `signInWithGoogle` above only ever gets to see a network-level throw,
+  // never a rejection Google/Firebase itself issued after the redirect.
+  const redirectFailed = session.redirectError !== null
+  const redirectCancelled = session.redirectError === 'auth/cancelled-popup-request'
+  const displayedError =
+    error ?? (redirectFailed ? t(redirectCancelled ? s.auth.cancelled : s.auth.failed) : null)
 
   return (
     <div className="flex min-h-dvh flex-col justify-center bg-cream px-5 py-10 sm:px-6">
@@ -111,9 +120,9 @@ export function SignIn() {
             {pending ? t(s.auth.signingIn) : t(s.auth.google)}
           </motion.button>
 
-          {error && (
+          {displayedError && (
             <p className="mt-3 rounded-tile bg-wrong-tint px-3.5 py-2.5 text-center text-[12.5px] font-medium text-wrong">
-              {error}
+              {displayedError}
             </p>
           )}
         </motion.div>
