@@ -46,9 +46,6 @@ export const s = {
       ru: 'Все разделы и уроки — от древности до наших дней, по порядку.',
     },
     courseAction: { kz: 'Курсты ашу', ru: 'Открыть курс' },
-    /** Short list of the next unfinished lessons in course order. */
-    recommended: { kz: 'Келесі сабақтар', ru: 'Следующие уроки' },
-    newBadge: { kz: 'Жаңа', ru: 'Новое' },
     greeting: { kz: 'Қайырлы күн', ru: 'Добрый день' },
     complete: { kz: 'аяқталды', ru: 'завершено' },
   },

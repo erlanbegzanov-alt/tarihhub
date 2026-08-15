@@ -187,15 +187,22 @@ export function AIChat() {
           <ArrowLeft className="h-5 w-5" strokeWidth={2} />
         </IconButton>
 
-        <PortraitPanel
-          initial={person.initial}
-          eraKey={person.eraKey}
-          motif={person.motif}
-          portrait={person.portrait}
-          name={t(person.name)}
-          size="sm"
-          className="h-11 w-11 shrink-0 rounded-full"
-        />
+        <button
+          type="button"
+          onClick={() => navigate(`/person/${person.id}`)}
+          aria-label={t(person.name)}
+          className="focus-ring shrink-0 rounded-full"
+        >
+          <PortraitPanel
+            initial={person.initial}
+            eraKey={person.eraKey}
+            motif={person.motif}
+            portrait={person.portrait}
+            name={t(person.name)}
+            size="sm"
+            className="h-11 w-11 rounded-full"
+          />
+        </button>
 
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-[16px] font-semibold text-ink">
@@ -228,14 +235,21 @@ export function AIChat() {
             transition={{ duration: 0.35, ease: easeOut }}
             className="mx-auto max-w-md py-8 text-center"
           >
-            <PortraitPanel
-              initial={person.initial}
-              eraKey={person.eraKey}
-              motif={person.motif}
-              portrait={person.portrait}
-              name={t(person.name)}
-              className="mx-auto h-24 w-20 rounded-tile"
-            />
+            <button
+              type="button"
+              onClick={() => navigate(`/person/${person.id}`)}
+              aria-label={t(person.name)}
+              className="focus-ring mx-auto block rounded-tile"
+            >
+              <PortraitPanel
+                initial={person.initial}
+                eraKey={person.eraKey}
+                motif={person.motif}
+                portrait={person.portrait}
+                name={t(person.name)}
+                className="h-24 w-20 rounded-tile"
+              />
+            </button>
             <h2 className="mt-4 text-[17px] font-semibold text-ink">
               {t(person.name)}
             </h2>

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ChevronRight, GraduationCap, Play, Sparkles } from 'lucide-react'
+import { ChevronDown, ChevronRight, GraduationCap, Play } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PersonCard } from '../components/PersonCard'
@@ -11,7 +11,7 @@ import {
 } from '../components/ui'
 import { eraColor } from '../data/eras'
 import { todaysFeaturedEvent } from '../data/featuredEvents'
-import { allLessons, lessonsInCourseOrder } from '../data/lessons'
+import { allLessons } from '../data/lessons'
 import { people } from '../data/people'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
@@ -20,10 +20,16 @@ import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { useProfile } from '../lib/progress'
 import { useSession } from '../lib/session'
 
+// Collapsed height of the "continue learning" list before it needs its own
+// expand toggle — past this, an unbounded number of in-progress lessons would
+// make Home scroll forever.
+const CONTINUE_LEARNING_COLLAPSED = 4
+
 export function Home() {
   const { t } = useLang()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
+  const [showAllInProgress, setShowAllInProgress] = useState(false)
   const session = useSession()
   const profile = useProfile()
 
@@ -47,11 +53,6 @@ export function Home() {
   const passedLessons = allLessons.filter((lesson) =>
     profile.completedLessons.includes(lesson.id),
   ).length
-
-  // The genuinely next lessons: the first few not yet passed, in course order.
-  const recommended = lessonsInCourseOrder
-    .filter((lesson) => !profile.completedLessons.includes(lesson.id))
-    .slice(0, 3)
 
   // Greet the signed-in account's first name.
   const greetingName =
@@ -209,7 +210,10 @@ export function Home() {
               animate="animate"
               className="flex flex-col gap-2.5"
             >
-              {inProgress.map(({ lesson, percent }) => (
+              {(showAllInProgress
+                ? inProgress
+                : inProgress.slice(0, CONTINUE_LEARNING_COLLAPSED)
+              ).map(({ lesson, percent }) => (
                 <motion.li key={lesson.id} variants={staggerItem}>
                   <motion.div whileHover={{ y: -2 }} transition={springSoft}>
                     <Link
@@ -253,6 +257,17 @@ export function Home() {
                 </motion.li>
               ))}
             </motion.ul>
+
+            {!showAllInProgress && inProgress.length > CONTINUE_LEARNING_COLLAPSED && (
+              <button
+                type="button"
+                onClick={() => setShowAllInProgress(true)}
+                className="focus-ring mt-2.5 flex w-full items-center justify-center gap-0.5 rounded-lg py-1.5 text-[13px] font-semibold text-brand"
+              >
+                {t(s.common.seeAll)}
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            )}
           </motion.section>
         )}
 
@@ -308,65 +323,6 @@ export function Home() {
               </span>
             </Link>
           </motion.div>
-
-          {/* the next few lessons in real course order, never random */}
-          {recommended.length > 0 && (
-            <>
-              <SectionHeading title={t(s.home.recommended)} className="mt-6" />
-              <motion.ul
-                variants={staggerContainer}
-                initial="initial"
-                animate="animate"
-                className="grid gap-2.5 md:grid-cols-3"
-              >
-                {recommended.map((lesson) => (
-                  <motion.li key={lesson.id} variants={staggerItem}>
-                    <motion.div whileHover={{ y: -2 }} transition={springSoft} className="h-full">
-                      <Link
-                        to={`/lesson/${lesson.id}`}
-                        className={cn(
-                          'focus-ring flex h-full w-full items-center gap-3.5 rounded-card bg-surface p-3.5 text-left',
-                          'shadow-soft ring-1 ring-line/60 transition-shadow duration-300 hover:shadow-lift',
-                        )}
-                      >
-                        <span
-                          className="grid h-11 w-11 shrink-0 place-items-center rounded-full"
-                          style={{
-                            background: `color-mix(in srgb, ${eraColor(lesson.eraKey)} 14%, var(--color-surface))`,
-                          }}
-                        >
-                          <Sparkles
-                            className="h-[18px] w-[18px]"
-                            strokeWidth={2}
-                            style={{ color: eraColor(lesson.eraKey) }}
-                          />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            {(profile.lessonProgress[lesson.id] ?? 0) === 0 && (
-                              <span className="rounded-full bg-gold-tint px-2 py-0.5 text-[10.5px] font-bold text-gold">
-                                {t(s.home.newBadge)}
-                              </span>
-                            )}
-                            <span className="truncate text-[12px] text-ink-faint">
-                              {t(lesson.meta)}
-                            </span>
-                          </div>
-                          <h3 className="mt-1 truncate text-[14.5px] font-semibold text-ink">
-                            {t(lesson.title)}
-                          </h3>
-                          <p className="mt-0.5 truncate text-[12.5px] text-ink-faint">
-                            {t(lesson.duration)}
-                          </p>
-                        </div>
-                        <ChevronRight className="h-5 w-5 shrink-0 text-ink-faint" />
-                      </Link>
-                    </motion.div>
-                  </motion.li>
-                ))}
-              </motion.ul>
-            </>
-          )}
         </motion.section>
       </div>
     </motion.div>
