@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ChevronRight, MapPin } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ArrowLeft, ChevronDown, ChevronRight, MapPin } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { KazakhstanMap } from '../components/KazakhstanMap'
 import { SITE_ICONS, siteColor } from '../components/siteMeta'
@@ -16,6 +16,11 @@ import { cn } from '../lib/cn'
 import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 
 type Filter = SiteCategory | 'all'
+
+// Collapsed length of the site list before it needs its own expand toggle —
+// past this, scrolling through all 26+ real-world sites on every visit was
+// the friction the "ограничения как в меню курса" request was about.
+const SITES_COLLAPSED = 6
 
 function SiteDetail({ site, onClose }: { site: MapSite; onClose: () => void }) {
   const { t } = useLang()
@@ -41,10 +46,7 @@ function SiteDetail({ site, onClose }: { site: MapSite; onClose: () => void }) {
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="text-[17px] font-semibold text-ink">{t(site.name)}</h3>
-          <p className="mt-0.5 font-mono text-[11.5px] text-ink-faint">
-            {site.coords}
-          </p>
-          <p className="mt-2 text-[14px] leading-relaxed text-ink-soft">
+          <p className="mt-1.5 text-[14px] leading-relaxed text-ink-soft">
             {t(site.description)}
           </p>
           {person && (
@@ -76,6 +78,7 @@ export function MapScreen() {
   const [filter, setFilter] = useState<Filter>('all')
   const [eraKey, setEraKey] = useState<EraKey | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [showAllSites, setShowAllSites] = useState(false)
 
   const territory = eraKey ? eraTerritory(eraKey) : null
 
@@ -86,6 +89,12 @@ export function MapScreen() {
         : mapSites.filter((site) => site.category === filter),
     [filter],
   )
+
+  // A fresh filter starts collapsed again — otherwise switching from "all"
+  // (expanded) to a small category leaves an orphaned expand state.
+  useEffect(() => setShowAllSites(false), [filter, eraKey])
+
+  const visibleSites = showAllSites ? sites : sites.slice(0, SITES_COLLAPSED)
 
   const active = sites.find((site) => site.id === activeId) ?? null
 
@@ -197,7 +206,7 @@ export function MapScreen() {
             animate="animate"
             className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1"
           >
-            {sites.map((site) => {
+            {visibleSites.map((site) => {
               const Icon = SITE_ICONS[site.category]
               const color = siteColor(site.category)
               const isActive = activeId === site.id
@@ -230,7 +239,7 @@ export function MapScreen() {
                         {t(site.name)}
                       </span>
                       <span className="block truncate text-[12px] text-ink-faint">
-                        {site.coords}
+                        {t(site.description)}
                       </span>
                     </span>
                     <MapPin
@@ -243,6 +252,17 @@ export function MapScreen() {
               )
             })}
           </motion.ul>
+
+          {!showAllSites && sites.length > SITES_COLLAPSED && (
+            <button
+              type="button"
+              onClick={() => setShowAllSites(true)}
+              className="focus-ring flex w-full items-center justify-center gap-0.5 rounded-lg py-1.5 text-[13px] font-semibold text-brand"
+            >
+              {t(s.common.seeAll)}
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          )}
         </motion.div>
       </div>
     </motion.div>

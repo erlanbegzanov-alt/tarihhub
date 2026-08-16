@@ -4,6 +4,7 @@ import {
   Bookmark,
   Check,
   Landmark,
+  MapPin,
   Medal,
   MessageCircle,
   Share2,
@@ -252,12 +253,10 @@ export function PersonDetail() {
                   <Link
                     key={site.id}
                     to="/map"
-                    className="focus-ring rounded-full bg-surface px-4 py-2 text-[13.5px] font-medium text-ink-soft shadow-soft ring-1 ring-line/60 hover:text-ink"
+                    className="focus-ring inline-flex items-center gap-1.5 rounded-full bg-surface px-4 py-2 text-[13.5px] font-medium text-ink-soft shadow-soft ring-1 ring-line/60 hover:text-ink"
                   >
+                    <MapPin className="h-3.5 w-3.5 shrink-0 text-ink-faint" strokeWidth={2} />
                     {t(site.name)}
-                    <span className="ml-2 text-[11px] text-ink-faint">
-                      {site.coords}
-                    </span>
                   </Link>
                 ))}
               </div>
