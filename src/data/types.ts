@@ -129,10 +129,32 @@ export interface QuizQuestion {
   explanation: LocalizedText
 }
 
+/**
+ * One inline "check yourself" question shown right under a lesson section.
+ * Unlike `QuizQuestion` it carries no `lessonIds`/`personIds` tags — it is
+ * already scoped by living inside that section's own `check` array, and must
+ * be answerable from that section's `body` alone (see `LessonSection.check`).
+ */
+export interface SectionCheckQuestion {
+  id: string
+  question: LocalizedText
+  options: QuizOption[]
+  correctId: string
+  explanation: LocalizedText
+}
+
 /** One readable chunk of a lesson: a heading plus 1–3 short paragraphs. */
 export interface LessonSection {
   heading: LocalizedText
   body: LocalizedText
+  /**
+   * Optional inline mini-quiz (3–5 questions) testing only this section's own
+   * content — the Khan-Academy-style "check yourself" step between reading and
+   * the lesson's final gating quiz. Never blocks scrolling past; answering it
+   * moves `lessonProgress` up (see `recordSectionCheckDone` in progress.ts) but
+   * never gates lesson completion — only the gating quiz in `quiz.ts` does that.
+   */
+  check?: SectionCheckQuestion[]
 }
 
 export interface Lesson {

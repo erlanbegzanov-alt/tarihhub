@@ -48,6 +48,13 @@ export interface ProfileState {
    * "4/5" rather than a bare percentage. A worse retry never overwrites it.
    */
   lessonQuizBest: Record<string, LessonQuizScore>
+  /**
+   * `${lessonId}:${sectionIndex}` keys for inline section checks the reader has
+   * gone through at least once (see `recordSectionCheckDone`). Never removed —
+   * a check answered wrong today can be retried, but "opened it" is permanent,
+   * the same non-punishing spirit as `lessonProgress` itself.
+   */
+  sectionChecksDone: string[]
 }
 
 const DEFAULT_STATE: ProfileState = {
@@ -62,7 +69,12 @@ const DEFAULT_STATE: ProfileState = {
   lessonProgress: {},
   completedLessons: [],
   lessonQuizBest: {},
+  sectionChecksDone: [],
 }
+
+/** Share of `lessonProgress` that inline section checks alone can fill — the
+ * last stretch to 100 stays reserved for actually passing the gating quiz. */
+const SECTION_CHECKS_MAX_PERCENT = 90
 
 /**
  * Coerces an untrusted lesson-progress map: only finite numbers survive, and
@@ -146,6 +158,11 @@ export function normalizeProfile(value: unknown): ProfileState {
         )
       : DEFAULT_STATE.completedLessons,
     lessonQuizBest: normalizeLessonQuizBest(parsed.lessonQuizBest),
+    sectionChecksDone: Array.isArray(parsed.sectionChecksDone)
+      ? parsed.sectionChecksDone.filter(
+          (id): id is string => typeof id === 'string',
+        )
+      : DEFAULT_STATE.sectionChecksDone,
   }
 }
 
@@ -300,6 +317,42 @@ export function recordLessonStarted(id: string): void {
   write({
     ...state,
     lessonProgress: { ...state.lessonProgress, [id]: LESSON_STARTED_PERCENT },
+  })
+}
+
+/**
+ * Records that a lesson section's inline "check yourself" mini-quiz was gone
+ * through at least once (see `LessonSection.check`). Non-blocking and never
+ * punishing — a wrong answer doesn't undo it, and this can only raise
+ * `lessonProgress`, never lower it. Progress climbs towards
+ * `SECTION_CHECKS_MAX_PERCENT` as more of the lesson's sections get checked;
+ * the last stretch to 100 is reserved for `recordLessonQuizResult` passing the
+ * real gating quiz, so a section check alone can never mark a lesson complete.
+ */
+export function recordSectionCheckDone(
+  lessonId: string,
+  sectionIndex: number,
+  totalSections: number,
+): void {
+  const key = `${lessonId}:${sectionIndex}`
+  if (state.sectionChecksDone.includes(key)) return
+
+  const sectionChecksDone = [...state.sectionChecksDone, key]
+  const prefix = `${lessonId}:`
+  const doneForLesson = sectionChecksDone.filter((k) => k.startsWith(prefix)).length
+  const sectionPercent =
+    totalSections > 0
+      ? Math.round((doneForLesson / totalSections) * SECTION_CHECKS_MAX_PERCENT)
+      : 0
+  const current = state.lessonProgress[lessonId] ?? 0
+
+  write({
+    ...state,
+    sectionChecksDone,
+    lessonProgress: {
+      ...state.lessonProgress,
+      [lessonId]: Math.max(current, LESSON_STARTED_PERCENT, sectionPercent),
+    },
   })
 }
 

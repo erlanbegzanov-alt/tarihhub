@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { ArrowLeft, BookOpen, Check, ChevronRight, Lock, Trophy, UserRound } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { SectionCheck } from '../components/SectionCheck'
 import { EraBadge, IconButton, ProgressBar } from '../components/ui'
 import { eraColor, eras } from '../data/eras'
 import { getLesson, lessonsInCourseOrder } from '../data/lessons'
@@ -125,6 +126,15 @@ export function LessonDetail() {
                   {t(section.body)}
                 </p>
               </div>
+              {section.check && section.check.length > 0 && (
+                <SectionCheck
+                  questions={section.check}
+                  lessonId={lesson.id}
+                  sectionIndex={index}
+                  totalSections={lesson.sections.length}
+                  color={color}
+                />
+              )}
             </motion.section>
           ))}
         </div>

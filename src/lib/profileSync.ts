@@ -71,6 +71,9 @@ export function mergeProfiles(
       ...new Set([...remote.unlockedBadges, ...local.unlockedBadges]),
     ],
     peopleViewed: [...new Set([...remote.peopleViewed, ...local.peopleViewed])],
+    sectionChecksDone: [
+      ...new Set([...remote.sectionChecksDone, ...local.sectionChecksDone]),
+    ],
     timelineViewed: remote.timelineViewed || local.timelineViewed,
     lessonProgress,
     completedLessons: [

@@ -107,6 +107,19 @@ export const s = {
     toPerson: { kz: 'Тұлғаны ашу', ru: 'Открыть личность' },
     toHome: { kz: 'Басты бетке', ru: 'На главную' },
     nextLesson: { kz: 'Келесі сабақ', ru: 'Следующий урок' },
+
+    /** Inline "check yourself" mini-quiz shown under a lesson section. */
+    check: {
+      title: { kz: 'Өзіңді тексер', ru: 'Проверь себя' },
+      /** e.g. "Сұрақ 2 / 3" — progress inside this section's own mini-quiz. */
+      counter: { kz: 'Сұрақ', ru: 'Вопрос' },
+      next: { kz: 'Келесі', ru: 'Далее' },
+      /** Shown once every question in this section's check has been answered. */
+      done: { kz: 'Осы бөлім тексерілді', ru: 'Часть проверена' },
+      /** e.g. "2 / 3 дұрыс" after finishing this section's check. */
+      score: { kz: 'дұрыс', ru: 'верно' },
+      retry: { kz: 'Қайталау', ru: 'Пройти ещё раз' },
+    },
   },
 
   /** Unit-by-unit course outline (`/course`) and the lesson rows inside it. */
