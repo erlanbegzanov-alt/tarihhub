@@ -136,6 +136,13 @@ export function SignIn() {
                 : ''}
             </p>
           )}
+          {/* Diagnostic-only, shown regardless of error: tells apart a
+              silent "no pending redirect" from an actual thrown failure. */}
+          {session.redirectDebug && (
+            <p className="mt-1.5 px-2 text-center text-[10.5px] leading-snug break-words text-ink-faint opacity-70">
+              {session.redirectDebug}
+            </p>
+          )}
         </motion.div>
       </motion.div>
     </div>

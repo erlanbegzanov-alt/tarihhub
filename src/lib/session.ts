@@ -41,6 +41,13 @@ export interface SessionState {
    * on every load that isn't the tail end of a failed sign-in.
    */
   redirectError: { code: string; message: string } | null
+  /**
+   * Diagnostic-only: what `getRedirectResult` actually resolved with,
+   * including the ordinarily-silent "no pending redirect" case — added
+   * because a sign-in that goes quiet with no error at all still needs to
+   * be told apart from one that never gets a chance to run.
+   */
+  redirectDebug: string | null
 }
 
 function readFlag(key: string): boolean {
@@ -68,6 +75,7 @@ let state: SessionState = {
   authResolved: !isFirebaseReady,
   onboarded: readFlag(ONBOARDED_KEY),
   redirectError: null,
+  redirectDebug: null,
 }
 
 const listeners = new Set<() => void>()
@@ -104,15 +112,22 @@ if (auth) {
   // Catches a failed round trip through Google (denied consent, disallowed
   // domain, …) — `onAuthStateChanged` alone only ever reports "signed out",
   // never why, so the sign-in screen would otherwise fail silently.
-  getRedirectResult(auth).catch((cause) => {
-    const code =
-      typeof cause === 'object' && cause !== null && 'code' in cause
-        ? String((cause as { code: unknown }).code)
-        : 'auth/unknown'
-    const message =
-      cause instanceof Error ? cause.message : String(cause)
-    set({ redirectError: { code, message } })
-  })
+  getRedirectResult(auth)
+    .then((result) => {
+      set({
+        redirectDebug: result
+          ? `resolved with user ${result.user.uid}`
+          : 'resolved with null (no pending redirect found)',
+      })
+    })
+    .catch((cause) => {
+      const code =
+        typeof cause === 'object' && cause !== null && 'code' in cause
+          ? String((cause as { code: unknown }).code)
+          : 'auth/unknown'
+      const message = cause instanceof Error ? cause.message : String(cause)
+      set({ redirectError: { code, message }, redirectDebug: `threw ${code}` })
+    })
 
   onAuthStateChanged(auth, (firebaseUser) => {
     if (firebaseUser) {
