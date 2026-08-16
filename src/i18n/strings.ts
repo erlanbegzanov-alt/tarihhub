@@ -110,6 +110,8 @@ export const s = {
     /** Step between parts inside one lesson — not the previous/next lesson. */
     prevPart: { kz: 'Алдыңғы', ru: 'Назад' },
     nextPart: { kz: 'Келесі', ru: 'Далее' },
+    /** The stepper's extra last chip — a flag icon, not a number, on purpose. */
+    finalStep: { kz: 'Қорытынды тест', ru: 'Итоговый тест' },
 
     /** Inline "check yourself" mini-quiz shown under a lesson section. */
     check: {

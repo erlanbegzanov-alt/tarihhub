@@ -5,6 +5,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Flag,
   Lock,
   Trophy,
   UserRound,
@@ -72,6 +73,9 @@ export function LessonDetail() {
   const person = getPerson(lesson.relatedPersonId)
   const unit = getUnit(lesson.unitId)
   const quizReady = questionCount > 0
+  // The stepper's extra chip past the last real section — the lesson's own
+  // gating quiz, marked with a flag rather than a number.
+  const isFinalStep = activeIndex === lesson.sections.length
 
   // Next lesson in real course order, when there is one after this.
   const currentIndex = lessonsInCourseOrder.findIndex((item) => item.id === lesson.id)
@@ -153,6 +157,30 @@ export function LessonDetail() {
               </button>
             )
           })}
+
+          {/* The final chip is a flag, not a number — the lesson's own test,
+              not "part 6". */}
+          <button
+            type="button"
+            onClick={() => setActiveIndex(lesson.sections.length)}
+            aria-label={t(s.lesson.finalStep)}
+            aria-current={isFinalStep ? 'step' : undefined}
+            className={cn(
+              'focus-ring grid h-9 w-9 shrink-0 place-items-center rounded-full transition-colors duration-200',
+              isFinalStep
+                ? 'text-white shadow-soft'
+                : completed
+                  ? 'text-white'
+                  : 'bg-surface text-ink-soft ring-1 ring-line/60 hover:ring-brand/40',
+            )}
+            style={isFinalStep || completed ? { backgroundColor: color } : undefined}
+          >
+            <Flag
+              className="h-4 w-4"
+              strokeWidth={2.4}
+              fill={isFinalStep || completed ? 'currentColor' : 'none'}
+            />
+          </button>
         </motion.div>
 
         <div className="mt-4">
@@ -164,84 +192,93 @@ export function LessonDetail() {
               exit={{ opacity: 0, x: -16 }}
               transition={{ duration: 0.22, ease: easeOut }}
             >
-              <div className="mb-2.5 flex items-center gap-2">
-                <span
-                  className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold text-white"
-                  style={{ backgroundColor: color }}
-                >
-                  {activeIndex + 1}
-                </span>
-                <h2 className="text-[17px] leading-snug font-semibold text-ink">
-                  {t(lesson.sections[activeIndex].heading)}
-                </h2>
-              </div>
-              <div
-                className="rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60 sm:p-6"
-                style={{ borderLeft: `4px solid ${color}` }}
-              >
-                <p className="text-[15.5px] leading-[1.75] whitespace-pre-line text-ink">
-                  {t(lesson.sections[activeIndex].body)}
-                </p>
-              </div>
-              {lesson.sections[activeIndex].check &&
-                lesson.sections[activeIndex].check!.length > 0 && (
-                  <SectionCheck
-                    questions={lesson.sections[activeIndex].check!}
-                    lessonId={lesson.id}
-                    sectionIndex={activeIndex}
-                    totalSections={lesson.sections.length}
-                    color={color}
-                  />
-                )}
+              {!isFinalStep && (
+                <>
+                  <div className="mb-2.5 flex items-center gap-2">
+                    <span
+                      className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold text-white"
+                      style={{ backgroundColor: color }}
+                    >
+                      {activeIndex + 1}
+                    </span>
+                    <h2 className="text-[17px] leading-snug font-semibold text-ink">
+                      {t(lesson.sections[activeIndex].heading)}
+                    </h2>
+                  </div>
+                  <div
+                    className="rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60 sm:p-6"
+                    style={{ borderLeft: `4px solid ${color}` }}
+                  >
+                    <p className="text-[15.5px] leading-[1.75] whitespace-pre-line text-ink">
+                      {t(lesson.sections[activeIndex].body)}
+                    </p>
+                  </div>
+                  {lesson.sections[activeIndex].check &&
+                    lesson.sections[activeIndex].check!.length > 0 && (
+                      <SectionCheck
+                        questions={lesson.sections[activeIndex].check!}
+                        lessonId={lesson.id}
+                        sectionIndex={activeIndex}
+                        totalSections={lesson.sections.length}
+                        color={color}
+                      />
+                    )}
 
-              {/* ---------- prev/next between parts ---------- */}
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  disabled={activeIndex === 0}
-                  onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
-                  className={cn(
-                    'focus-ring inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[13.5px] font-semibold transition-colors',
-                    activeIndex === 0
-                      ? 'cursor-not-allowed bg-surface/60 text-ink-faint ring-1 ring-line/40'
-                      : 'bg-surface text-ink ring-1 ring-line/60 hover:ring-brand/40',
-                  )}
-                >
-                  <ChevronLeft className="h-4 w-4" strokeWidth={2.2} />
-                  {t(s.lesson.prevPart)}
-                </button>
-                <button
-                  type="button"
-                  disabled={activeIndex === lesson.sections.length - 1}
-                  onClick={() =>
-                    setActiveIndex((i) => Math.min(lesson.sections.length - 1, i + 1))
-                  }
-                  className={cn(
-                    'focus-ring inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-soft transition-colors',
-                    activeIndex === lesson.sections.length - 1 &&
-                      'cursor-not-allowed opacity-40',
-                  )}
-                  style={{ backgroundColor: color }}
-                >
-                  {t(s.lesson.nextPart)}
-                  <ChevronRight className="h-4 w-4" strokeWidth={2.2} />
-                </button>
-              </div>
-            </motion.section>
-          </AnimatePresence>
-        </div>
+                  {/* ---------- prev/next between parts ---------- */}
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      disabled={activeIndex === 0}
+                      onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
+                      className={cn(
+                        'focus-ring inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[13.5px] font-semibold transition-colors',
+                        activeIndex === 0
+                          ? 'cursor-not-allowed bg-surface/60 text-ink-faint ring-1 ring-line/40'
+                          : 'bg-surface text-ink ring-1 ring-line/60 hover:ring-brand/40',
+                      )}
+                    >
+                      <ChevronLeft className="h-4 w-4" strokeWidth={2.2} />
+                      {t(s.lesson.prevPart)}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setActiveIndex((i) => Math.min(lesson.sections.length, i + 1))
+                      }
+                      className="focus-ring inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-soft transition-colors"
+                      style={{ backgroundColor: color }}
+                    >
+                      {activeIndex === lesson.sections.length - 1
+                        ? t(s.lesson.finalStep)
+                        : t(s.lesson.nextPart)}
+                      {activeIndex === lesson.sections.length - 1 ? (
+                        <Flag className="h-4 w-4" strokeWidth={2.2} />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" strokeWidth={2.2} />
+                      )}
+                    </button>
+                  </div>
 
-        <motion.p
-          variants={staggerItem}
-          className="mt-5 flex items-start gap-2 text-[12.5px] leading-relaxed text-ink-faint"
-        >
-          <BookOpen className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
-          {t(s.lesson.sourceNote)}
-        </motion.p>
+                  <p className="mt-5 flex items-start gap-2 text-[12.5px] leading-relaxed text-ink-faint">
+                    <BookOpen className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
+                    {t(s.lesson.sourceNote)}
+                  </p>
+                </>
+              )}
 
-        {/* ---------- the quiz gate ---------- */}
-        <motion.section variants={staggerItem} className="mt-7">
-          {completed ? (
+              {/* ---------- the quiz gate — only on the final "flag" step ---------- */}
+              {isFinalStep && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setActiveIndex(lesson.sections.length - 1)}
+                    className="focus-ring mb-4 inline-flex items-center gap-1 rounded-full bg-surface px-4 py-2.5 text-[13.5px] font-semibold text-ink ring-1 ring-line/60 hover:ring-brand/40"
+                  >
+                    <ChevronLeft className="h-4 w-4" strokeWidth={2.2} />
+                    {t(s.lesson.prevPart)}
+                  </button>
+
+                  {completed ? (
             <div
               className="rounded-card bg-surface p-5 text-center shadow-soft ring-1 ring-line/60 sm:p-6"
               style={{ borderTop: `4px solid ${color}` }}
@@ -342,8 +379,12 @@ export function LessonDetail() {
                 <ChevronRight className="h-4 w-4" strokeWidth={2.2} />
               </Link>
             </div>
-          )}
-        </motion.section>
+                  )}
+                </>
+              )}
+            </motion.section>
+          </AnimatePresence>
+        </div>
       </div>
     </motion.div>
   )
