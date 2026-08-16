@@ -2,6 +2,12 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// The `runtimeCaching[].urlPattern` functions below run inside the generated
+// service worker, not here — workbox-build serializes them via `toString()`
+// as-is into that file, so `self` resolves to the real ServiceWorkerGlobalScope
+// at runtime even though this config itself builds under Node.
+declare const self: { location: { origin: string } }
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -56,7 +62,15 @@ export default defineConfig({
             // still answers instantly from cache, but also revalidates against
             // the network in the background, so a changed portrait shows up on
             // the visitor's next reload instead of staying stuck.
-            urlPattern: ({ request }) => request.destination === 'image',
+            //
+            // Scoped to our own origin: an unscoped `destination === 'image'`
+            // match also caught the signed-in user's Google profile photo
+            // (lh3.googleusercontent.com) — the service worker's own fetch
+            // for that isn't covered by the CSP's img-src, only connect-src,
+            // which doesn't list Google's domains, so the fetch got blocked
+            // outright instead of just falling through to the network.
+            urlPattern: ({ request, url }) =>
+              url.origin === self.location.origin && request.destination === 'image',
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'images-cache',
@@ -69,7 +83,8 @@ export default defineConfig({
           {
             // Fonts are genuinely immutable once shipped, so CacheFirst (no
             // revalidation round-trip) is the right, cheaper choice here.
-            urlPattern: ({ request }) => request.destination === 'font',
+            urlPattern: ({ request, url }) =>
+              url.origin === self.location.origin && request.destination === 'font',
             handler: 'CacheFirst',
             options: {
               cacheName: 'fonts-cache',
@@ -80,8 +95,16 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: ({ request }) =>
-              request.destination === 'script' || request.destination === 'style',
+            // Same origin-scoping bug, but for scripts: an unscoped match here
+            // caught Google's own `apis.google.com/js/api.js` (loaded by the
+            // Firebase Auth SDK as part of finishing Google sign-in). The
+            // service worker's fetch for it violated the CSP's connect-src
+            // (which only allows script-src for that domain, not fetches),
+            // so the request came back as a network error and broke sign-in
+            // right after the visitor picked their Google account.
+            urlPattern: ({ request, url }) =>
+              url.origin === self.location.origin &&
+              (request.destination === 'script' || request.destination === 'style'),
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'app-shell-cache',
