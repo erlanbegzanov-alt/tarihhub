@@ -1,6 +1,15 @@
-import { motion } from 'framer-motion'
-import { ArrowLeft, BookOpen, Check, ChevronRight, Lock, Trophy, UserRound } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  ArrowLeft,
+  BookOpen,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Lock,
+  Trophy,
+  UserRound,
+} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { SectionCheck } from '../components/SectionCheck'
 import { EraBadge, IconButton, ProgressBar } from '../components/ui'
@@ -12,7 +21,7 @@ import { getUnit } from '../data/units'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
-import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { recordLessonStarted, useProfile } from '../lib/progress'
 
 export function LessonDetail() {
@@ -22,11 +31,19 @@ export function LessonDetail() {
   const profile = useProfile()
   const lesson = getLesson(id)
 
+  // Which part is on screen right now — parts live on separate "pages" inside
+  // the lesson (like Khan Academy's per-lesson sidebar), not stacked in one
+  // long scroll.
+  const [activeIndex, setActiveIndex] = useState(0)
+
   // Opening a lesson is the only progress the reader awards themselves, and it
   // can never complete anything — that takes passing the quiz below.
   useEffect(() => {
     if (lesson) recordLessonStarted(lesson.id)
   }, [lesson])
+
+  // A fresh lesson always opens on its first part.
+  useEffect(() => setActiveIndex(0), [id])
 
   // Only the count matters here: whether this lesson can be gated at all.
   const questionCount = useMemo(
@@ -103,19 +120,59 @@ export function LessonDetail() {
           </div>
         </motion.div>
 
-        {/* ---------- sections ---------- */}
-        <div className="mt-7 flex flex-col gap-5">
-          {lesson.sections.map((section, index) => (
-            <motion.section key={section.heading.ru} variants={staggerItem}>
+        {/* ---------- part stepper — one part on screen at a time ---------- */}
+        <motion.div
+          variants={staggerItem}
+          className="rail-scroll -mx-4 mt-7 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 md:mx-0 md:px-0"
+        >
+          {lesson.sections.map((section, index) => {
+            const done = profile.sectionChecksDone.includes(`${lesson.id}:${index}`)
+            const isActive = index === activeIndex
+            return (
+              <button
+                key={section.heading.ru}
+                type="button"
+                onClick={() => setActiveIndex(index)}
+                aria-label={t(section.heading)}
+                aria-current={isActive ? 'step' : undefined}
+                className={cn(
+                  'focus-ring grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold transition-colors duration-200',
+                  isActive
+                    ? 'text-white shadow-soft'
+                    : done
+                      ? 'text-white'
+                      : 'bg-surface text-ink-soft ring-1 ring-line/60 hover:ring-brand/40',
+                )}
+                style={isActive || done ? { backgroundColor: color } : undefined}
+              >
+                {done && !isActive ? (
+                  <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                ) : (
+                  index + 1
+                )}
+              </button>
+            )
+          })}
+        </motion.div>
+
+        <div className="mt-4">
+          <AnimatePresence mode="wait">
+            <motion.section
+              key={activeIndex}
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -16 }}
+              transition={{ duration: 0.22, ease: easeOut }}
+            >
               <div className="mb-2.5 flex items-center gap-2">
                 <span
                   className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold text-white"
                   style={{ backgroundColor: color }}
                 >
-                  {index + 1}
+                  {activeIndex + 1}
                 </span>
                 <h2 className="text-[17px] leading-snug font-semibold text-ink">
-                  {t(section.heading)}
+                  {t(lesson.sections[activeIndex].heading)}
                 </h2>
               </div>
               <div
@@ -123,20 +180,55 @@ export function LessonDetail() {
                 style={{ borderLeft: `4px solid ${color}` }}
               >
                 <p className="text-[15.5px] leading-[1.75] whitespace-pre-line text-ink">
-                  {t(section.body)}
+                  {t(lesson.sections[activeIndex].body)}
                 </p>
               </div>
-              {section.check && section.check.length > 0 && (
-                <SectionCheck
-                  questions={section.check}
-                  lessonId={lesson.id}
-                  sectionIndex={index}
-                  totalSections={lesson.sections.length}
-                  color={color}
-                />
-              )}
+              {lesson.sections[activeIndex].check &&
+                lesson.sections[activeIndex].check!.length > 0 && (
+                  <SectionCheck
+                    questions={lesson.sections[activeIndex].check!}
+                    lessonId={lesson.id}
+                    sectionIndex={activeIndex}
+                    totalSections={lesson.sections.length}
+                    color={color}
+                  />
+                )}
+
+              {/* ---------- prev/next between parts ---------- */}
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  disabled={activeIndex === 0}
+                  onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
+                  className={cn(
+                    'focus-ring inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[13.5px] font-semibold transition-colors',
+                    activeIndex === 0
+                      ? 'cursor-not-allowed bg-surface/60 text-ink-faint ring-1 ring-line/40'
+                      : 'bg-surface text-ink ring-1 ring-line/60 hover:ring-brand/40',
+                  )}
+                >
+                  <ChevronLeft className="h-4 w-4" strokeWidth={2.2} />
+                  {t(s.lesson.prevPart)}
+                </button>
+                <button
+                  type="button"
+                  disabled={activeIndex === lesson.sections.length - 1}
+                  onClick={() =>
+                    setActiveIndex((i) => Math.min(lesson.sections.length - 1, i + 1))
+                  }
+                  className={cn(
+                    'focus-ring inline-flex items-center gap-1 rounded-full px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-soft transition-colors',
+                    activeIndex === lesson.sections.length - 1 &&
+                      'cursor-not-allowed opacity-40',
+                  )}
+                  style={{ backgroundColor: color }}
+                >
+                  {t(s.lesson.nextPart)}
+                  <ChevronRight className="h-4 w-4" strokeWidth={2.2} />
+                </button>
+              </div>
             </motion.section>
-          ))}
+          </AnimatePresence>
         </div>
 
         <motion.p

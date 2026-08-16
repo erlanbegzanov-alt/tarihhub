@@ -107,6 +107,9 @@ export const s = {
     toPerson: { kz: 'Тұлғаны ашу', ru: 'Открыть личность' },
     toHome: { kz: 'Басты бетке', ru: 'На главную' },
     nextLesson: { kz: 'Келесі сабақ', ru: 'Следующий урок' },
+    /** Step between parts inside one lesson — not the previous/next lesson. */
+    prevPart: { kz: 'Алдыңғы', ru: 'Назад' },
+    nextPart: { kz: 'Келесі', ru: 'Далее' },
 
     /** Inline "check yourself" mini-quiz shown under a lesson section. */
     check: {
