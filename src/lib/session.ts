@@ -8,9 +8,8 @@
  */
 import {
   GoogleAuthProvider,
-  getRedirectResult,
   onAuthStateChanged,
-  signInWithRedirect,
+  signInWithCredential,
   signOut,
   updateProfile,
 } from 'firebase/auth'
@@ -35,19 +34,6 @@ export interface SessionState {
   /** False until the first `onAuthStateChanged` callback has run. */
   authResolved: boolean
   onboarded: boolean
-  /**
-   * Firebase error from a failed `signInWithRedirect` round trip, read once
-   * by the sign-in screen after the visitor lands back on the site. `null`
-   * on every load that isn't the tail end of a failed sign-in.
-   */
-  redirectError: { code: string; message: string } | null
-  /**
-   * Diagnostic-only: what `getRedirectResult` actually resolved with,
-   * including the ordinarily-silent "no pending redirect" case — added
-   * because a sign-in that goes quiet with no error at all still needs to
-   * be told apart from one that never gets a chance to run.
-   */
-  redirectDebug: string | null
 }
 
 function readFlag(key: string): boolean {
@@ -74,8 +60,6 @@ let state: SessionState = {
   // gate never sits on a spinner.
   authResolved: !isFirebaseReady,
   onboarded: readFlag(ONBOARDED_KEY),
-  redirectError: null,
-  redirectDebug: null,
 }
 
 const listeners = new Set<() => void>()
@@ -109,26 +93,6 @@ export function sessionGate(session: SessionState): SessionGate {
 }
 
 if (auth) {
-  // Catches a failed round trip through Google (denied consent, disallowed
-  // domain, …) — `onAuthStateChanged` alone only ever reports "signed out",
-  // never why, so the sign-in screen would otherwise fail silently.
-  getRedirectResult(auth)
-    .then((result) => {
-      set({
-        redirectDebug: result
-          ? `resolved with user ${result.user.uid}`
-          : 'resolved with null (no pending redirect found)',
-      })
-    })
-    .catch((cause) => {
-      const code =
-        typeof cause === 'object' && cause !== null && 'code' in cause
-          ? String((cause as { code: unknown }).code)
-          : 'auth/unknown'
-      const message = cause instanceof Error ? cause.message : String(cause)
-      set({ redirectError: { code, message }, redirectDebug: `threw ${code}` })
-    })
-
   onAuthStateChanged(auth, (firebaseUser) => {
     if (firebaseUser) {
       // Reaching a real account means the intro has served its purpose, even on
@@ -159,14 +123,20 @@ export function completeOnboarding(): void {
   set({ onboarded: true })
 }
 
-export async function signInWithGoogle(): Promise<void> {
+/**
+ * Takes the ID token Google Identity Services hands back (see `SignIn.tsx`'s
+ * native Google button) and exchanges it for a Firebase session directly —
+ * one client-side REST call, no popup and no cross-domain redirect. Both of
+ * those were tried first and both turned out to be unreliable in practice:
+ * popups silently failed across mobile browsers, and the redirect flow's
+ * cross-origin handoff through Firebase's own auth-domain handler kept
+ * resolving with nothing to complete, in Incognito and on real devices
+ * alike, with no error to act on either way.
+ */
+export async function signInWithGoogleIdToken(idToken: string): Promise<void> {
   if (!auth) throw new Error('firebase-not-configured')
-  // A full-page redirect rather than a popup: popups are unreliable across
-  // mobile browsers and any desktop setup with strict third-party storage
-  // limits, which was silently failing sign-in for real visitors. The result
-  // is picked up by `getRedirectResult` above once Google sends the visitor
-  // back, and the auth listener then flips the gate to the app.
-  await signInWithRedirect(auth, new GoogleAuthProvider())
+  await signInWithCredential(auth, GoogleAuthProvider.credential(idToken))
+  // The auth listener above flips the gate to the app.
 }
 
 /** Overrides the display name shown in the app, on top of whatever Google supplied. */

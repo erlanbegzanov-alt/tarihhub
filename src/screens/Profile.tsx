@@ -21,15 +21,9 @@ import { badges } from '../data/lessons'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
-import { isFirebaseReady } from '../lib/firebase'
 import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { levelInfo, useProfile } from '../lib/progress'
-import {
-  signInWithGoogle,
-  signOutUser,
-  updateDisplayName,
-  useSession,
-} from '../lib/session'
+import { signOutUser, updateDisplayName, useSession } from '../lib/session'
 import { useTheme } from '../lib/theme'
 import type { ThemePreference } from '../lib/theme'
 
@@ -46,7 +40,6 @@ export function Profile() {
   const level = levelInfo(profile.xp)
   const session = useSession()
   const { preference: themePreference, resolved: resolvedTheme, setTheme } = useTheme()
-  const [authError, setAuthError] = useState<string | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
 
@@ -54,15 +47,6 @@ export function Profile() {
   const displayName =
     session.user?.displayName || session.user?.email || t(s.profile.userName)
   const photoURL = session.user?.photoURL ?? ''
-
-  const handleSignIn = async () => {
-    setAuthError(null)
-    try {
-      await signInWithGoogle()
-    } catch {
-      setAuthError(t(s.auth.failed))
-    }
-  }
 
   const startEditingName = () => {
     setNameDraft(displayName)
@@ -341,41 +325,21 @@ export function Profile() {
                 </span>
               </span>
 
-              {session.user ? (
-                <button
-                  type="button"
-                  onClick={() => void signOutUser()}
-                  className={cn(
-                    'focus-ring flex shrink-0 items-center gap-1.5 rounded-full bg-cream px-4 py-1.5',
-                    'text-[12.5px] font-bold text-ink-soft transition-colors hover:text-ink',
-                  )}
-                >
-                  <LogOut className="h-[14px] w-[14px]" strokeWidth={2.2} />
-                  {t(s.auth.signOut)}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => void handleSignIn()}
-                  disabled={!isFirebaseReady}
-                  title={isFirebaseReady ? undefined : t(s.auth.notConfigured)}
-                  className={cn(
-                    'focus-ring shrink-0 rounded-full px-4 py-1.5 text-[12.5px] font-bold transition-colors',
-                    isFirebaseReady
-                      ? 'bg-brand text-white hover:bg-brand-dark'
-                      : 'cursor-not-allowed bg-cream text-ink-faint',
-                  )}
-                >
-                  {t(s.auth.google)}
-                </button>
-              )}
+              {/* Reaching Profile at all already requires a signed-in user
+                  (see App.tsx's mandatory sign-in gate), so sign-out is the
+                  only action this control ever needs to offer. */}
+              <button
+                type="button"
+                onClick={() => void signOutUser()}
+                className={cn(
+                  'focus-ring flex shrink-0 items-center gap-1.5 rounded-full bg-cream px-4 py-1.5',
+                  'text-[12.5px] font-bold text-ink-soft transition-colors hover:text-ink',
+                )}
+              >
+                <LogOut className="h-[14px] w-[14px]" strokeWidth={2.2} />
+                {t(s.auth.signOut)}
+              </button>
             </div>
-
-            {authError && (
-              <p className="mt-2.5 text-right text-[12px] font-medium text-wrong">
-                {authError}
-              </p>
-            )}
           </motion.section>
         </div>
 
