@@ -36,11 +36,11 @@ export interface SessionState {
   authResolved: boolean
   onboarded: boolean
   /**
-   * Firebase error code from a failed `signInWithRedirect` round trip, read
-   * once by the sign-in screen after the visitor lands back on the site.
-   * `null` on every load that isn't the tail end of a failed sign-in.
+   * Firebase error from a failed `signInWithRedirect` round trip, read once
+   * by the sign-in screen after the visitor lands back on the site. `null`
+   * on every load that isn't the tail end of a failed sign-in.
    */
-  redirectError: string | null
+  redirectError: { code: string; message: string } | null
 }
 
 function readFlag(key: string): boolean {
@@ -109,7 +109,9 @@ if (auth) {
       typeof cause === 'object' && cause !== null && 'code' in cause
         ? String((cause as { code: unknown }).code)
         : 'auth/unknown'
-    set({ redirectError: code })
+    const message =
+      cause instanceof Error ? cause.message : String(cause)
+    set({ redirectError: { code, message } })
   })
 
   onAuthStateChanged(auth, (firebaseUser) => {

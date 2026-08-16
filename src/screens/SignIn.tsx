@@ -61,7 +61,7 @@ export function SignIn() {
   // `signInWithGoogle` above only ever gets to see a network-level throw,
   // never a rejection Google/Firebase itself issued after the redirect.
   const redirectFailed = session.redirectError !== null
-  const redirectCancelled = session.redirectError === 'auth/cancelled-popup-request'
+  const redirectCancelled = session.redirectError?.code === 'auth/cancelled-popup-request'
   const displayedError =
     error ?? (redirectFailed ? t(redirectCancelled ? s.auth.cancelled : s.auth.failed) : null)
 
@@ -125,11 +125,15 @@ export function SignIn() {
               {displayedError}
             </p>
           )}
-          {/* Raw Firebase error code — small print, so a report back names
-              the exact cause instead of just "не удалось войти". */}
+          {/* Raw Firebase error code + message — small print, so a report
+              back names the exact cause instead of just "не удалось войти". */}
           {session.redirectError && (
-            <p className="mt-1.5 text-center text-[10.5px] text-ink-faint">
-              {session.redirectError}
+            <p className="mt-1.5 px-2 text-center text-[10.5px] leading-snug break-words text-ink-faint">
+              {session.redirectError.code}
+              {session.redirectError.message &&
+              session.redirectError.message !== session.redirectError.code
+                ? ` — ${session.redirectError.message}`
+                : ''}
             </p>
           )}
         </motion.div>
