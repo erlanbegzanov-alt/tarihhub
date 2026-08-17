@@ -1,12 +1,13 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ClipboardCheck, RotateCcw, X } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { SectionCheckQuestion } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import { easeOut, springSoft } from '../lib/motion'
 import { recordSectionCheckDone } from '../lib/progress'
+import { shuffled } from '../lib/shuffle'
 
 const LETTERS = ['A', 'B', 'C', 'D']
 
@@ -37,10 +38,20 @@ export function SectionCheck({
   const [correctCount, setCorrectCount] = useState(0)
   const [finished, setFinished] = useState(false)
 
-  if (questions.length === 0) return null
+  // Freshly randomised every mount and every retry (`round`): both which
+  // order the questions come in and which slot each option lands in, so a
+  // reader can't pattern-match "the answer is always first".
+  const ordered = useMemo(
+    () =>
+      shuffled(questions).map((q) => ({ ...q, options: shuffled(q.options) })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `round` is the retry counter: bumping it is exactly what should re-shuffle.
+    [questions, round],
+  )
 
-  const question = questions[index]
-  const isLast = index === questions.length - 1
+  if (ordered.length === 0) return null
+
+  const question = ordered[index]
+  const isLast = index === ordered.length - 1
   const revealed = picked !== null
 
   const choose = (optionId: string) => {

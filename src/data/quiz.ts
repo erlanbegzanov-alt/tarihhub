@@ -1,3 +1,4 @@
+import { shuffled } from '../lib/shuffle'
 import { lessonQuestions } from './lessonQuestions'
 import type { QuizQuestion } from './types'
 
@@ -11105,16 +11106,21 @@ const persona: QuizQuestion[] = [
 export const quizQuestions: QuizQuestion[] = [...general, ...persona]
 
 export const QUIZ_LENGTH = 5
+/**
+ * The lesson-gating quiz aims much higher than the quick practice quiz — real
+ * exam-length ENT practice, not a five-question check. Still capped by
+ * `.slice()` at whatever's actually written for that lesson (see
+ * `buildLessonQuiz`'s own doc comment), so a thin lesson never fakes a
+ * 30-question test it doesn't have.
+ */
+export const LESSON_QUIZ_LENGTH = 30
 export const XP_PER_QUIZ = 20
 
-/** Fisher–Yates shuffle — doesn't mutate the input. */
-function shuffled<T>(items: T[]): T[] {
-  const copy = [...items]
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[copy[i], copy[j]] = [copy[j], copy[i]]
-  }
-  return copy
+/** Freshly shuffles a question's own options too, not just which questions
+ * are picked — `correctId` travels with its option regardless of array
+ * position, so this is safe and makes the correct slot unpredictable. */
+function withShuffledOptions(question: QuizQuestion): QuizQuestion {
+  return { ...question, options: shuffled(question.options) }
 }
 
 /**
@@ -11128,8 +11134,11 @@ export function buildQuiz(personId?: string): QuizQuestion[] {
   const specific = personId
     ? persona.filter((q) => q.personIds?.includes(personId))
     : []
-  if (specific.length >= QUIZ_LENGTH) return shuffled(specific).slice(0, QUIZ_LENGTH)
-  return shuffled([...specific, ...general]).slice(0, QUIZ_LENGTH)
+  const picked =
+    specific.length >= QUIZ_LENGTH
+      ? shuffled(specific).slice(0, QUIZ_LENGTH)
+      : shuffled([...specific, ...general]).slice(0, QUIZ_LENGTH)
+  return picked.map(withShuffledOptions)
 }
 
 /**
@@ -11141,5 +11150,5 @@ export function buildQuiz(personId?: string): QuizQuestion[] {
  */
 export function buildLessonQuiz(lessonId: string): QuizQuestion[] {
   const tagged = lessonQuestions.filter((q) => q.lessonIds?.includes(lessonId))
-  return shuffled(tagged).slice(0, QUIZ_LENGTH)
+  return shuffled(tagged).slice(0, LESSON_QUIZ_LENGTH).map(withShuffledOptions)
 }
