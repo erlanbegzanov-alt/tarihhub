@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ChevronDown, ChevronRight, GraduationCap, Play } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronUp, GraduationCap, Play } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PersonCard } from '../components/PersonCard'
@@ -258,14 +258,23 @@ export function Home() {
               ))}
             </motion.ul>
 
-            {!showAllInProgress && inProgress.length > CONTINUE_LEARNING_COLLAPSED && (
+            {inProgress.length > CONTINUE_LEARNING_COLLAPSED && (
               <button
                 type="button"
-                onClick={() => setShowAllInProgress(true)}
+                onClick={() => setShowAllInProgress((prev) => !prev)}
                 className="focus-ring mt-2.5 flex w-full items-center justify-center gap-0.5 rounded-lg py-1.5 text-[13px] font-semibold text-brand"
               >
-                {t(s.common.seeAll)}
-                <ChevronDown className="h-4 w-4" />
+                {showAllInProgress ? (
+                  <>
+                    {t(s.common.seeLess)}
+                    <ChevronUp className="h-4 w-4" />
+                  </>
+                ) : (
+                  <>
+                    {t(s.common.seeAll)}
+                    <ChevronDown className="h-4 w-4" />
+                  </>
+                )}
               </button>
             )}
           </motion.section>

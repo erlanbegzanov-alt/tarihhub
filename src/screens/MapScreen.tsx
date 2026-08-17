@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ChevronDown, ChevronRight, MapPin } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, ChevronUp, MapPin } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { KazakhstanMap } from '../components/KazakhstanMap'
@@ -253,14 +253,23 @@ export function MapScreen() {
             })}
           </motion.ul>
 
-          {!showAllSites && sites.length > SITES_COLLAPSED && (
+          {sites.length > SITES_COLLAPSED && (
             <button
               type="button"
-              onClick={() => setShowAllSites(true)}
+              onClick={() => setShowAllSites((prev) => !prev)}
               className="focus-ring flex w-full items-center justify-center gap-0.5 rounded-lg py-1.5 text-[13px] font-semibold text-brand"
             >
-              {t(s.common.seeAll)}
-              <ChevronDown className="h-4 w-4" />
+              {showAllSites ? (
+                <>
+                  {t(s.common.seeLess)}
+                  <ChevronUp className="h-4 w-4" />
+                </>
+              ) : (
+                <>
+                  {t(s.common.seeAll)}
+                  <ChevronDown className="h-4 w-4" />
+                </>
+              )}
             </button>
           )}
         </motion.div>
