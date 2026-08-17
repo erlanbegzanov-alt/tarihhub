@@ -38,13 +38,17 @@ export function SectionCheck({
   const [correctCount, setCorrectCount] = useState(0)
   const [finished, setFinished] = useState(false)
 
-  // Freshly randomised every mount and every retry (`round`): both which
-  // order the questions come in and which slot each option lands in, so a
-  // reader can't pattern-match "the answer is always first".
+  // Each round draws a random slice from the section's full question pool
+  // (not just a reshuffle of the same set) so a reader who retries — or
+  // revisits the lesson later — meets different questions, not the same
+  // three reordered. Option order is shuffled too.
+  const PICK_COUNT = 3
   const ordered = useMemo(
     () =>
-      shuffled(questions).map((q) => ({ ...q, options: shuffled(q.options) })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `round` is the retry counter: bumping it is exactly what should re-shuffle.
+      shuffled(questions)
+        .slice(0, Math.min(PICK_COUNT, questions.length))
+        .map((q) => ({ ...q, options: shuffled(q.options) })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `round` is the retry counter: bumping it is exactly what should re-draw.
     [questions, round],
   )
 
@@ -90,7 +94,7 @@ export function SectionCheck({
         <h3 className="text-[13.5px] font-bold text-ink">{t(s.lesson.check.title)}</h3>
         {!finished && (
           <span className="ml-auto text-[12px] font-medium text-ink-faint">
-            {t(s.lesson.check.counter)} {index + 1}/{questions.length}
+            {t(s.lesson.check.counter)} {index + 1}/{ordered.length}
           </span>
         )}
       </div>
@@ -105,7 +109,7 @@ export function SectionCheck({
             className="mt-3 flex items-center justify-between gap-3"
           >
             <p className="text-[13.5px] font-semibold text-ink">
-              {t(s.lesson.check.done)} — {correctCount}/{questions.length}{' '}
+              {t(s.lesson.check.done)} — {correctCount}/{ordered.length}{' '}
               {t(s.lesson.check.score)}
             </p>
             <button
