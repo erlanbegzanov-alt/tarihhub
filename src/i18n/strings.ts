@@ -304,6 +304,19 @@ export const s = {
     editName: { kz: 'Атын өзгерту', ru: 'Изменить имя' },
     namePlaceholder: { kz: 'Атыңызды жазыңыз', ru: 'Введите имя' },
     save: { kz: 'Сақтау', ru: 'Сохранить' },
+
+    /**
+     * Rank titles (see src/data/ranks.ts) — a coarser, gendered progression
+     * that runs alongside `level`, on the same XP, rather than replacing it.
+     */
+    rankTitle: { kz: 'Атақ', ru: 'Звание' },
+    rankPickTitle: { kz: 'Атақ жолын таңдаңыз', ru: 'Выберите линию званий' },
+    rankMale: { kz: 'Ер', ru: 'Мужская' },
+    rankFemale: { kz: 'Әйел', ru: 'Женская' },
+    rankStep: { kz: 'Дәреже', ru: 'Ступень' },
+    rankNext: { kz: 'Келесі атақ', ru: 'Следующее звание' },
+    rankMax: { kz: 'Ең жоғары атақ', ru: 'Высшее звание' },
+    rankOpensAt: { kz: 'Ашылады:', ru: 'Откроется:' },
   },
 
   /** First-launch intro tour, shown once per browser before the sign-in screen. */

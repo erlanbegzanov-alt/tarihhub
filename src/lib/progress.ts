@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import type { AvatarGender } from '../data/ranks'
 
 // Bumped from 'tarihhub_profile' — the old key held pre-launch seed data
 // (fake XP/streak/badges baked in during earlier development) that isn't
@@ -55,6 +56,11 @@ export interface ProfileState {
    * the same non-punishing spirit as `lessonProgress` itself.
    */
   sectionChecksDone: string[]
+  /**
+   * Which gendered title track the rank is read from (see `src/data/ranks.ts`).
+   * `null` until the reader picks one on the profile screen.
+   */
+  avatarGender: AvatarGender | null
 }
 
 const DEFAULT_STATE: ProfileState = {
@@ -70,6 +76,7 @@ const DEFAULT_STATE: ProfileState = {
   completedLessons: [],
   lessonQuizBest: {},
   sectionChecksDone: [],
+  avatarGender: null,
 }
 
 /** Share of `lessonProgress` that inline section checks alone can fill — the
@@ -163,6 +170,10 @@ export function normalizeProfile(value: unknown): ProfileState {
           (id): id is string => typeof id === 'string',
         )
       : DEFAULT_STATE.sectionChecksDone,
+    avatarGender:
+      parsed.avatarGender === 'm' || parsed.avatarGender === 'f'
+        ? parsed.avatarGender
+        : DEFAULT_STATE.avatarGender,
   }
 }
 
@@ -420,6 +431,12 @@ export function recordTimelineViewed(): void {
 export function unlockBadge(id: string): void {
   if (state.unlockedBadges.includes(id)) return
   write({ ...state, unlockedBadges: [...state.unlockedBadges, id] })
+}
+
+/** Records which gendered title track the rank is read from. */
+export function setAvatarGender(gender: AvatarGender): void {
+  if (state.avatarGender === gender) return
+  write({ ...state, avatarGender: gender })
 }
 
 export interface LevelInfo {

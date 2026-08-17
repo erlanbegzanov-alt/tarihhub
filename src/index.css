@@ -54,6 +54,49 @@
   /* ---- Type ---- */
   --font-sans: "Inter", "Segoe UI", ui-sans-serif, system-ui, -apple-system,
     "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+
+  /* ---- Rank badge (src/components/RankBadge.tsx) ---- */
+  /* Only the top three ranks are animated, and only ever here. Literal gold
+     rather than var(--color-gold): a keyframed shadow can't read a custom
+     property that the dark theme redefines. The shimmer curve is the `easeOut`
+     token from src/lib/motion.ts. Every one of these rests on an invisible
+     final frame, so the reduced-motion rule at the end of this file — which
+     cuts any animation to one 0.001ms pass — leaves a plain, still badge. */
+  --animate-rank-glow: rank-glow 2.8s ease-in-out infinite;
+  --animate-rank-shimmer: rank-shimmer 3.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  --animate-rank-twinkle: rank-twinkle 1.9s ease-in-out infinite;
+
+  @keyframes rank-glow {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgb(201 162 39 / 0);
+    }
+    50% {
+      box-shadow: 0 0 22px 4px rgb(201 162 39 / 0.55);
+    }
+  }
+
+  @keyframes rank-shimmer {
+    0% {
+      transform: translateX(-140%) skewX(-12deg);
+    }
+    60%,
+    100% {
+      transform: translateX(280%) skewX(-12deg);
+    }
+  }
+
+  @keyframes rank-twinkle {
+    0%,
+    100% {
+      opacity: 0;
+      transform: scale(0);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.15);
+    }
+  }
 }
 
 /*

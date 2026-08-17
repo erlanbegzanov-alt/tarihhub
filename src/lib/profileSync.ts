@@ -75,6 +75,8 @@ export function mergeProfiles(
       ...new Set([...remote.sectionChecksDone, ...local.sectionChecksDone]),
     ],
     timelineViewed: remote.timelineViewed || local.timelineViewed,
+    // A track picked on any device beats an unset one; the cloud copy breaks a tie.
+    avatarGender: remote.avatarGender ?? local.avatarGender,
     lessonProgress,
     completedLessons: [
       ...new Set([...remote.completedLessons, ...local.completedLessons]),
