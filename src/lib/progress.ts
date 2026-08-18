@@ -63,7 +63,7 @@ export interface ProfileState {
   avatarGender: AvatarGender | null
 }
 
-const DEFAULT_STATE: ProfileState = {
+export const DEFAULT_STATE: ProfileState = {
   xp: 0,
   streak: 0,
   quizzesCompleted: 0,

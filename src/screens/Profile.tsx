@@ -14,7 +14,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MotifIcon } from '../components/Motif'
 import { RankBadge } from '../components/RankBadge'
 import { FilterChip, IconButton, ProgressBar } from '../components/ui'
@@ -25,7 +25,14 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
-import { levelInfo, setAvatarGender, useProfile } from '../lib/progress'
+import {
+  DEFAULT_STATE,
+  levelInfo,
+  normalizeProfile,
+  replaceProfile,
+  setAvatarGender,
+  useProfile,
+} from '../lib/progress'
 import { signOutUser, updateDisplayName, useSession } from '../lib/session'
 import { useTheme } from '../lib/theme'
 import type { ThemePreference } from '../lib/theme'
@@ -37,6 +44,22 @@ const THEME_OPTIONS: { value: ThemePreference; label: typeof s.profile.themeLigh
   { value: 'system', label: s.profile.themeSystem },
 ]
 
+/**
+ * Hidden developer panel (see "🛠 Dev режим" below). Off by default for every
+ * normal visitor — only active once this localStorage flag is set, which
+ * only happens via the `?dev=1` query param or a previous dev session.
+ */
+const DEV_MODE_KEY = 'tarihhub_dev'
+
+function readDevModeFlag(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(DEV_MODE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 export function Profile() {
   const { t, lang, setLang } = useLang()
   const profile = useProfile()
@@ -47,6 +70,62 @@ export function Profile() {
   const { preference: themePreference, resolved: resolvedTheme, setTheme } = useTheme()
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
+
+  // ---------- dev mode ----------
+  const [devMode, setDevMode] = useState(() => readDevModeFlag())
+  const [xpDraft, setXpDraft] = useState('')
+  const [jsonDraft, setJsonDraft] = useState(() => JSON.stringify(profile, null, 2))
+  const [jsonError, setJsonError] = useState<string | null>(null)
+
+  // `?dev=1` flips the flag on (persisted in localStorage) and is then
+  // stripped from the address bar so it doesn't linger in history/URL bar.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('dev') !== '1') return
+    try {
+      window.localStorage.setItem(DEV_MODE_KEY, '1')
+    } catch {
+      /* storage unavailable — dev mode just won't persist across reloads */
+    }
+    params.delete('dev')
+    const query = params.toString()
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`,
+    )
+    setDevMode(true)
+  }, [])
+
+  // Keeps the JSON editor showing the live profile (e.g. after a tier-jump
+  // click) rather than going stale the moment something else changes it.
+  useEffect(() => {
+    setJsonDraft(JSON.stringify(profile, null, 2))
+  }, [profile])
+
+  const disableDevMode = () => {
+    try {
+      window.localStorage.removeItem(DEV_MODE_KEY)
+    } catch {
+      /* storage unavailable */
+    }
+    setDevMode(false)
+  }
+
+  const applyXpDraft = () => {
+    const parsed = Number(xpDraft)
+    if (!Number.isFinite(parsed)) return
+    replaceProfile({ ...profile, xp: Math.round(parsed) })
+  }
+
+  const applyJsonDraft = () => {
+    try {
+      replaceProfile(normalizeProfile(JSON.parse(jsonDraft)))
+      setJsonError(null)
+    } catch (error) {
+      setJsonError(error instanceof Error ? error.message : 'Некорректный JSON')
+    }
+  }
 
   // The real Google identity, or whatever the user renamed it to.
   const displayName =
@@ -374,6 +453,129 @@ export function Profile() {
               </>
             )}
           </motion.section>
+
+          {/* ---------- dev mode ---------- */}
+          {devMode && (
+            <motion.section
+              variants={staggerItem}
+              className="rounded-card border-2 border-dashed border-line bg-surface p-5 shadow-soft sm:p-6"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-[17px] font-semibold text-ink">🛠 Dev режим</h2>
+                <button
+                  type="button"
+                  onClick={disableDevMode}
+                  className="focus-ring shrink-0 rounded-full bg-cream px-4 py-1.5 text-[12.5px] font-bold text-ink-soft transition-colors hover:text-ink"
+                >
+                  Выключить dev-режим
+                </button>
+              </div>
+
+              {/* rank-tier jump */}
+              <div className="mt-4">
+                <p className="mb-2 text-[12.5px] font-semibold text-ink-soft">
+                  Быстрый переход по рангам
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {ranks.map((tier, index) => (
+                    <button
+                      key={tier.minXp}
+                      type="button"
+                      onClick={() => replaceProfile({ ...profile, xp: tier.minXp })}
+                      className="focus-ring rounded-full bg-cream px-3.5 py-1.5 text-[12.5px] font-semibold text-ink-soft transition-colors hover:text-ink"
+                    >
+                      {index + 1} — {tier.title.m.ru} / {tier.title.f.ru}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* gender toggle */}
+              <div className="mt-4 border-t border-line-soft pt-4">
+                <p className="mb-2 text-[12.5px] font-semibold text-ink-soft">
+                  Пол аватара
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAvatarGender('m')}
+                    className="focus-ring rounded-full bg-cream px-4 py-1.5 text-[12.5px] font-semibold text-ink-soft transition-colors hover:text-ink"
+                  >
+                    м
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAvatarGender('f')}
+                    className="focus-ring rounded-full bg-cream px-4 py-1.5 text-[12.5px] font-semibold text-ink-soft transition-colors hover:text-ink"
+                  >
+                    ж
+                  </button>
+                </div>
+              </div>
+
+              {/* raw xp */}
+              <div className="mt-4 border-t border-line-soft pt-4">
+                <p className="mb-2 text-[12.5px] font-semibold text-ink-soft">
+                  Произвольный XP
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={xpDraft}
+                    onChange={(event) => setXpDraft(event.target.value)}
+                    placeholder={String(profile.xp)}
+                    className="focus-ring w-32 rounded-tile bg-cream px-3.5 py-1.5 text-[13.5px] text-ink outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={applyXpDraft}
+                    className="focus-ring rounded-full bg-cream px-4 py-1.5 text-[12.5px] font-semibold text-ink-soft transition-colors hover:text-ink"
+                  >
+                    Применить
+                  </button>
+                </div>
+              </div>
+
+              {/* full JSON editor */}
+              <div className="mt-4 border-t border-line-soft pt-4">
+                <p className="mb-2 text-[12.5px] font-semibold text-ink-soft">
+                  Полный JSON-редактор профиля
+                </p>
+                <textarea
+                  value={jsonDraft}
+                  onChange={(event) => setJsonDraft(event.target.value)}
+                  rows={12}
+                  spellCheck={false}
+                  className="focus-ring w-full rounded-tile bg-cream px-3.5 py-2.5 font-mono text-[12px] leading-relaxed text-ink outline-none"
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={applyJsonDraft}
+                    className="focus-ring rounded-full bg-cream px-4 py-1.5 text-[12.5px] font-semibold text-ink-soft transition-colors hover:text-ink"
+                  >
+                    Применить JSON
+                  </button>
+                  {jsonError && (
+                    <p className="rounded-tile bg-wrong-tint px-3 py-1.5 text-[12px] font-medium text-wrong">
+                      {jsonError}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* reset */}
+              <div className="mt-4 border-t border-line-soft pt-4">
+                <button
+                  type="button"
+                  onClick={() => replaceProfile(DEFAULT_STATE)}
+                  className="focus-ring rounded-full bg-wrong-tint px-4 py-1.5 text-[12.5px] font-bold text-wrong transition-colors hover:opacity-80"
+                >
+                  Сбросить профиль
+                </button>
+              </div>
+            </motion.section>
+          )}
 
           {/* ---------- settings ---------- */}
           <motion.section
