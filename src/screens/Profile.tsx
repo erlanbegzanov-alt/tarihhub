@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import {
   Check,
   Compass,
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { MotifIcon } from '../components/Motif'
-import { RankStatusPill } from '../components/RankBadge'
+import { RankBadge, RankStatusPill } from '../components/RankBadge'
 import { RankSheet } from '../components/RankSheet'
 import { IconButton, ProgressBar } from '../components/ui'
 import { eraColor } from '../data/eras'
@@ -74,6 +74,7 @@ function readDevModeFlag(): boolean {
 
 export function Profile() {
   const { t, lang, setLang } = useLang()
+  const reduceMotion = useReducedMotion()
   const profile = useProfile()
   const level = levelInfo(profile.xp)
   const gender = profile.avatarGender
@@ -232,7 +233,26 @@ export function Profile() {
           >
             <div className="flex items-center gap-4">
               <div className="relative shrink-0">
-                {photoURL ? (
+                {gender ? (
+                  <motion.button
+                    type="button"
+                    onClick={() => setRankSheetOpen(true)}
+                    aria-expanded={rankSheetOpen}
+                    aria-label={t(s.profile.rankSheetTitle)}
+                    whileHover={reduceMotion ? undefined : { scale: 1.04 }}
+                    whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+                    transition={springSoft}
+                    className="focus-ring block cursor-pointer rounded-full"
+                  >
+                    <RankBadge
+                      tierIndex={displayedTierIndex}
+                      gender={gender}
+                      title={displayedTitle}
+                      size={64}
+                      className="h-16 w-16 sm:!h-[72px] sm:!w-[72px]"
+                    />
+                  </motion.button>
+                ) : photoURL ? (
                   <img
                     src={photoURL}
                     alt=""

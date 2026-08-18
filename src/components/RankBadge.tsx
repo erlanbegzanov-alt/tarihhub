@@ -41,8 +41,8 @@ const TIER_ICONS: LucideIcon[] = [
 /**
  * The circular rank avatar.
  *
- * Art is served from `public/avatars/{gender}/{tier}.png` with a 1-based tier
- * (`/avatars/m/1.png` … `/avatars/f/7.png`). Nothing needs changing here when a
+ * Art is served from `public/avatars/{gender}/{tier}.webp` with a 1-based tier
+ * (`/avatars/m/1.webp` … `/avatars/f/7.webp`). Nothing needs changing here when a
  * real file is dropped in — until one exists the request 404s and the icon
  * placeholder below takes over.
  *
@@ -70,7 +70,7 @@ export function RankBadge({
   const fx = tierEffect(tierIndex)
   const owner = tierIndex === OWNER_TIER_INDEX
   // The owner tier has no art to serve — it isn't part of the avatar set.
-  const src = owner ? null : `/avatars/${gender}/${tierIndex + 1}.png`
+  const src = owner ? null : `/avatars/${gender}/${tierIndex + 1}.webp`
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
   const Icon = owner ? Sparkles : TIER_ICONS[tierIndex]
 
