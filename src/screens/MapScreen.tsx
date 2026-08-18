@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ChevronDown, ChevronRight, ChevronUp, MapPin } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { KazakhstanMap } from '../components/KazakhstanMap'
+import { ERA_MAP_IMAGES, KazakhstanMap } from '../components/KazakhstanMap'
 import { SITE_ICONS, siteColor } from '../components/siteMeta'
 import { FilterChip, IconButton } from '../components/ui'
 import { eraColor, eras, siteCategories, timelineEraKeys } from '../data/eras'
@@ -175,7 +175,7 @@ export function MapScreen() {
             }
             activeEraKey={eraKey}
           />
-          {eraKey && (
+          {eraKey && !ERA_MAP_IMAGES[eraKey] && (
             <p
               className="mt-2.5 px-1 text-[12.5px] leading-relaxed font-medium"
               style={{ color: `color-mix(in srgb, ${eraColor(eraKey)} 78%, #17211e)` }}

@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useMemo } from 'react'
-import { eraColor } from '../data/eras'
+import { eraColor, eras } from '../data/eras'
 import { eraTerritory } from '../data/eraTerritories'
 import type { EraTerritory, TerritoryPlace } from '../data/eraTerritories'
 import { KAZAKHSTAN_ID, centralAsiaCountries, projectLonLat } from '../data/geo'
@@ -51,6 +51,17 @@ const CENTRAL_ASIA_IDS = new Set(centralAsiaCountries.map((c) => c.id))
 const contextCountries = wideEurasiaCountries.filter(
   (c) => !CENTRAL_ASIA_IDS.has(c.id),
 )
+
+/**
+ * Pre-made illustrated maps, one per era, dropped in whole rather than drawn
+ * from `eraTerritories.ts` — the procedural SVG overlay kept missing the mark
+ * against real reference maps across several rounds of redrawing (see git
+ * history), so eras with a real reference image here just show it directly.
+ * Not geo-referenced to `projectLonLat`, so no site pins are overlaid on top.
+ */
+export const ERA_MAP_IMAGES: Partial<Record<EraKey, string>> = {
+  goldenHorde: '/era-maps/goldenHorde.webp',
+}
 
 function unionView(territory: EraTerritory | null): View {
   if (!territory) return BASE_VIEW
@@ -157,10 +168,32 @@ export function KazakhstanMap({
   const territory = activeEraKey ? eraTerritory(activeEraKey) : null
   const overlayColor = activeEraKey ? eraColor(activeEraKey) : null
   const view = useMemo(() => unionView(territory), [territory])
+  const eraImage = activeEraKey ? ERA_MAP_IMAGES[activeEraKey] : null
 
   /** Zoomed far enough out that a full pin chip per site would be unreadable. */
   const isWide = view.width > BASE_VIEW.width * 1.35
   const strokeScale = view.width / BASE_VIEW.width
+
+  if (eraImage) {
+    return (
+      <div
+        className={cn(
+          'relative w-full overflow-hidden rounded-card bg-surface p-3 shadow-soft ring-1 ring-line/60 sm:p-5',
+          className,
+        )}
+      >
+        <div className="relative w-full overflow-hidden rounded-tile" style={{ aspectRatio: '1400 / 912' }}>
+          <img
+            src={eraImage}
+            alt={t(eras[activeEraKey as EraKey].label)}
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
