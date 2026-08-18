@@ -454,6 +454,20 @@ export function recordLessonQuizResult(
   return passed
 }
 
+/**
+ * Records the XP one finished battle earned (see `src/lib/battle.ts`).
+ *
+ * Battle XP is real XP: it feeds the same `xp` field every level and rank in
+ * the app is read from, exactly like `XP_PER_LESSON` does. Nothing else about
+ * the profile moves — a duel is not a quiz, so `quizzesCompleted` and the badge
+ * set are deliberately left alone. A zero or malformed amount is ignored rather
+ * than written, so a lost duel can't rewrite the profile for nothing.
+ */
+export function recordBattleResult(xpEarned: number): void {
+  if (!Number.isFinite(xpEarned) || xpEarned <= 0) return
+  write({ ...state, xp: state.xp + Math.round(xpEarned) })
+}
+
 /** Records that the (unpaginated, full) timeline page was opened. */
 export function recordTimelineViewed(): void {
   if (state.timelineViewed) return

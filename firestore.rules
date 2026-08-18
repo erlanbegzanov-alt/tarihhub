@@ -2,11 +2,72 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // The only document path the app reads/writes: each signed-in user's own
-    // progress state. Scoped to `request.auth.uid == uid` — one user can
-    // never read or write another user's document.
+    // Each signed-in user's own progress state. Scoped to
+    // `request.auth.uid == uid` — one user can never read or write another
+    // user's document.
     match /users/{uid}/profile/state {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    /* ------------------------------ battles ------------------------------ */
+    /*
+     * The 1v1 battle mode (see src/lib/battle.ts) is the only part of the app
+     * where one signed-in user sees anything belonging to another. Every
+     * collection below is shaped so that no client ever needs write permission
+     * on a document another user owns: a player only ever writes their own
+     * mirror, their own queue slot, and their own half of a shared match.
+     */
+
+    // Public mirror of just what an opponent row or a leaderboard row needs —
+    // never the full private profile above. Readable by any signed-in user,
+    // writable only by the account it describes.
+    match /battlePlayers/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // One waiting slot per user, doc id = uid. Anyone signed in may scan the
+    // queue to find a candidate — it carries no sensitive data. Deletes are
+    // deliberately open: the worst case is a queue entry cleared early, and it
+    // is what lets the player who created a match clean up after it without
+    // needing the other side's cooperation.
+    match /battleQueue/{uid} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.auth.uid == uid;
+      allow delete: if request.auth != null;
+    }
+
+    // The atomic matchmaking lock, doc id = the uid of the player being
+    // claimed. Created inside a transaction that first checks it is absent, so
+    // two players can never claim the same candidate. `claimedBy` must be the
+    // caller, so a claim can't be forged in someone else's name.
+    match /battleClaims/{candidateUid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.claimedBy;
+      allow delete: if request.auth != null;
+    }
+
+    // A live duel. Readable only by its two players. On update the immutable
+    // fields have to survive untouched, and each player may only ever write
+    // their own slot: players[0] writes `p1`, players[1] writes `p2` (either
+    // may flip `status`). Neither can reach into the other's score.
+    match /battleMatches/{matchId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.players;
+      allow create: if request.auth != null
+        && request.resource.data.players.size() == 2
+        && request.auth.uid in request.resource.data.players
+        && request.resource.data.status == 'active';
+      allow update: if request.auth != null
+        && request.auth.uid in resource.data.players
+        && request.resource.data.players == resource.data.players
+        && request.resource.data.mode == resource.data.mode
+        && request.resource.data.questionIds == resource.data.questionIds
+        && request.resource.data.createdAt == resource.data.createdAt
+        && (
+          (request.auth.uid == resource.data.players[0] && request.resource.data.p2 == resource.data.p2)
+          || (request.auth.uid == resource.data.players[1] && request.resource.data.p1 == resource.data.p1)
+        );
     }
 
     // Explicit deny-all default: blocks any other path, including ones added

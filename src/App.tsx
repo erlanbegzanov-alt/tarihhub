@@ -11,6 +11,7 @@ import { pageVariants } from './lib/motion'
 import { recordVisit } from './lib/progress'
 import { completeOnboarding, sessionGate, useSession } from './lib/session'
 import { AIChat } from './screens/AIChat'
+import { Battle } from './screens/Battle'
 import { Explore } from './screens/Explore'
 import { Home } from './screens/Home'
 import { LessonDetail } from './screens/LessonDetail'
@@ -49,6 +50,7 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: '/quiz/lesson/:lessonId', element: <Quiz /> },
   { path: '/timeline', element: <Timeline /> },
   { path: '/map', element: <MapScreen /> },
+  { path: '/battle', element: <Battle /> },
   { path: '/profile', element: <Profile /> },
   { path: '*', element: <Home /> },
 ]
