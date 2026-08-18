@@ -80,6 +80,8 @@ export function mergeProfiles(
     // Purely a display choice, so the same rule applies: the cloud copy is the
     // one the user last deliberately set, and `null` means "no choice made".
     displayedRankTier: remote.displayedRankTier ?? local.displayedRankTier,
+    // Same rule, independently: the cloud copy is the last deliberate pick.
+    displayedAvatarTier: remote.displayedAvatarTier ?? local.displayedAvatarTier,
     lessonProgress,
     completedLessons: [
       ...new Set([...remote.completedLessons, ...local.completedLessons]),

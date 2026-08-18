@@ -31,6 +31,7 @@ import {
   normalizeProfile,
   replaceProfile,
   setAvatarGender,
+  setDisplayedAvatarTier,
   setDisplayedRankTier,
   useProfile,
 } from '../lib/progress'
@@ -84,27 +85,31 @@ export function Profile() {
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [rankSheetOpen, setRankSheetOpen] = useState(false)
+  const [rankSheetMode, setRankSheetMode] = useState<'avatar' | 'title'>('title')
 
   // ---------- rank display ----------
   const ownerTierAvailable = session.user?.email === OWNER_EMAIL
   const realTierIndex = rank?.tierIndex ?? 0
   /**
-   * What the profile shows. The stored choice only counts if it is a tier this
+   * What the profile shows. A stored choice only counts if it is a tier this
    * account can actually claim — an earned one, or the owner tier for the owner
    * — so it degrades to the real tier rather than being trusted on its face.
-   * Real XP is read from `profile.xp` throughout and never from this.
+   * Real XP is read from `profile.xp` throughout and never from this. The
+   * title and avatar are two independent choices, so this resolution runs
+   * once per choice below.
    */
-  const displayedTierIndex = (() => {
-    const chosen = profile.displayedRankTier
+  const resolveDisplayedTier = (chosen: number | null) => {
     if (chosen === null) return realTierIndex
     if (chosen === OWNER_TIER_INDEX) return ownerTierAvailable ? chosen : realTierIndex
     return chosen <= realTierIndex ? chosen : realTierIndex
-  })()
+  }
+  const displayedTitleTierIndex = resolveDisplayedTier(profile.displayedRankTier)
+  const displayedAvatarTierIndex = resolveDisplayedTier(profile.displayedAvatarTier)
   const displayedTitle =
-    displayedTierIndex === OWNER_TIER_INDEX
+    displayedTitleTierIndex === OWNER_TIER_INDEX
       ? t(OWNER_TITLE)
       : gender
-        ? t(ranks[displayedTierIndex].title[gender])
+        ? t(ranks[displayedTitleTierIndex].title[gender])
         : t(s.profile.rankPickTitle)
 
   // ---------- dev mode ----------
@@ -236,7 +241,10 @@ export function Profile() {
                 {gender ? (
                   <motion.button
                     type="button"
-                    onClick={() => setRankSheetOpen(true)}
+                    onClick={() => {
+                      setRankSheetMode('avatar')
+                      setRankSheetOpen(true)
+                    }}
                     aria-expanded={rankSheetOpen}
                     aria-label={t(s.profile.rankSheetTitle)}
                     whileHover={reduceMotion ? undefined : { scale: 1.04 }}
@@ -245,7 +253,7 @@ export function Profile() {
                     className="focus-ring block cursor-pointer rounded-full"
                   >
                     <RankBadge
-                      tierIndex={displayedTierIndex}
+                      tierIndex={displayedAvatarTierIndex}
                       gender={gender}
                       title={displayedTitle}
                       size={64}
@@ -326,10 +334,13 @@ export function Profile() {
                   </div>
                 )}
                 <RankStatusPill
-                  tierIndex={displayedTierIndex}
+                  tierIndex={displayedTitleTierIndex}
                   title={displayedTitle}
                   expanded={rankSheetOpen}
-                  onClick={() => setRankSheetOpen(true)}
+                  onClick={() => {
+                    setRankSheetMode('title')
+                    setRankSheetOpen(true)
+                  }}
                 />
               </div>
             </div>
@@ -675,10 +686,15 @@ export function Profile() {
         gender={gender}
         onPickGender={setAvatarGender}
         realTierIndex={realTierIndex}
-        displayedTierIndex={displayedTierIndex}
-        onSelect={(tierIndex) =>
+        displayedAvatarTierIndex={displayedAvatarTierIndex}
+        displayedTitleTierIndex={displayedTitleTierIndex}
+        initialMode={rankSheetMode}
+        onSelectAvatar={(tierIndex) =>
           // `null` restores the default "show whatever XP reaches", so picking
           // the real tier back doesn't pin it in place as new XP arrives.
+          setDisplayedAvatarTier(tierIndex === realTierIndex ? null : tierIndex)
+        }
+        onSelectTitle={(tierIndex) =>
           setDisplayedRankTier(tierIndex === realTierIndex ? null : tierIndex)
         }
         ownerTierAvailable={ownerTierAvailable}

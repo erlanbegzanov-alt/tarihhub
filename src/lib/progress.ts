@@ -68,6 +68,14 @@ export interface ProfileState {
    * back into `xp`, so the real progression is untouched by the choice.
    */
   displayedRankTier: number | null
+  /**
+   * Independent from `displayedRankTier`: which earned tier's *avatar art* the
+   * profile shows, when the reader has picked one different from the tier
+   * their title reads. Same nullable, defensive-resolution spirit — `null`
+   * means "show whatever my XP currently reaches", same default as
+   * `displayedRankTier`, resolved separately.
+   */
+  displayedAvatarTier: number | null
 }
 
 export const DEFAULT_STATE: ProfileState = {
@@ -85,6 +93,7 @@ export const DEFAULT_STATE: ProfileState = {
   sectionChecksDone: [],
   avatarGender: null,
   displayedRankTier: null,
+  displayedAvatarTier: null,
 }
 
 /** Share of `lessonProgress` that inline section checks alone can fill — the
@@ -192,6 +201,13 @@ export function normalizeProfile(value: unknown): ProfileState {
       parsed.displayedRankTier >= 0
         ? Math.round(parsed.displayedRankTier)
         : DEFAULT_STATE.displayedRankTier,
+    // Same shape-only check, resolved the same defensive way at render time.
+    displayedAvatarTier:
+      typeof parsed.displayedAvatarTier === 'number' &&
+      Number.isFinite(parsed.displayedAvatarTier) &&
+      parsed.displayedAvatarTier >= 0
+        ? Math.round(parsed.displayedAvatarTier)
+        : DEFAULT_STATE.displayedAvatarTier,
   }
 }
 
@@ -461,6 +477,12 @@ export function setAvatarGender(gender: AvatarGender): void {
 export function setDisplayedRankTier(tier: number | null): void {
   if (state.displayedRankTier === tier) return
   write({ ...state, displayedRankTier: tier })
+}
+
+/** Records which earned tier's avatar art to show off; `null` matches the title tier. */
+export function setDisplayedAvatarTier(tier: number | null): void {
+  if (state.displayedAvatarTier === tier) return
+  write({ ...state, displayedAvatarTier: tier })
 }
 
 export interface LevelInfo {

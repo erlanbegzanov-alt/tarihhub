@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Lock, Star, X } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { AvatarGender } from '../data/ranks'
 import { ranks } from '../data/ranks'
 import { s } from '../i18n/strings'
@@ -26,8 +26,11 @@ export function RankSheet({
   gender,
   onPickGender,
   realTierIndex,
-  displayedTierIndex,
-  onSelect,
+  displayedAvatarTierIndex,
+  displayedTitleTierIndex,
+  onSelectAvatar,
+  onSelectTitle,
+  initialMode,
   ownerTierAvailable,
   xp,
 }: {
@@ -38,13 +41,19 @@ export function RankSheet({
   onPickGender: (gender: AvatarGender) => void
   /** Tier the reader's real XP reaches. */
   realTierIndex: number
-  /** Tier currently on display, which may be any earned tier at or below it. */
-  displayedTierIndex: number
-  onSelect: (tierIndex: number) => void
+  /** Tier currently on display as avatar art, which may be any earned tier at or below it. */
+  displayedAvatarTierIndex: number
+  /** Tier currently on display as the title text, which may be any earned tier at or below it. */
+  displayedTitleTierIndex: number
+  onSelectAvatar: (tierIndex: number) => void
+  onSelectTitle: (tierIndex: number) => void
+  /** Which tab is active when the sheet opens. */
+  initialMode: 'avatar' | 'title'
   ownerTierAvailable: boolean
   xp: number
 }) {
   const { t } = useLang()
+  const [mode, setMode] = useState<'avatar' | 'title'>(initialMode)
 
   useEffect(() => {
     if (!open) return
@@ -54,6 +63,11 @@ export function RankSheet({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
+
+  // Which of the two independent choices the tier grid below reflects right now.
+  const activeDisplayedIndex =
+    mode === 'avatar' ? displayedAvatarTierIndex : displayedTitleTierIndex
+  const activeOnSelect = mode === 'avatar' ? onSelectAvatar : onSelectTitle
 
   const nextRank = gender ? ranks[realTierIndex + 1] : undefined
   const currentMinXp = ranks[realTierIndex].minXp
@@ -132,9 +146,36 @@ export function RankSheet({
               </>
             ) : (
               <>
-                <p className="mt-1 text-[12.5px] leading-snug text-ink-soft">
-                  {t(s.profile.rankSheetHint)}
-                </p>
+                <div className="mt-3 flex rounded-full bg-cream p-1">
+                  {(
+                    [
+                      { value: 'avatar', label: s.profile.rankSheetModeAvatar },
+                      { value: 'title', label: s.profile.rankSheetModeTitle },
+                    ] as const
+                  ).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setMode(option.value)}
+                      aria-pressed={mode === option.value}
+                      className={cn(
+                        'focus-ring relative flex-1 rounded-full px-4 py-1.5 text-[12.5px] font-bold transition-colors duration-200',
+                        mode === option.value
+                          ? 'text-white'
+                          : 'text-ink-faint hover:text-ink',
+                      )}
+                    >
+                      {mode === option.value && (
+                        <motion.span
+                          layoutId="rank-sheet-mode"
+                          className="absolute inset-0 rounded-full bg-brand"
+                          transition={springSoft}
+                        />
+                      )}
+                      <span className="relative z-10">{t(option.label)}</span>
+                    </button>
+                  ))}
+                </div>
 
                 {/* Always the real XP, never the tier on display. */}
                 <div className="mt-4">
@@ -174,11 +215,11 @@ export function RankSheet({
                           : undefined
                       }
                       unlocked={index <= realTierIndex}
-                      selected={index === displayedTierIndex}
-                      starred={index === realTierIndex && index !== displayedTierIndex}
+                      selected={index === activeDisplayedIndex}
+                      starred={index === realTierIndex && index !== activeDisplayedIndex}
                       lockedLabel={t(s.profile.locked)}
                       reachedLabel={t(s.profile.rankReached)}
-                      onSelect={onSelect}
+                      onSelect={activeOnSelect}
                     />
                   ))}
 
@@ -190,11 +231,11 @@ export function RankSheet({
                       gender={gender}
                       title={t(OWNER_TITLE)}
                       unlocked
-                      selected={displayedTierIndex === OWNER_TIER_INDEX}
+                      selected={activeDisplayedIndex === OWNER_TIER_INDEX}
                       starred={false}
                       lockedLabel={t(s.profile.locked)}
                       reachedLabel={t(s.profile.rankReached)}
-                      onSelect={onSelect}
+                      onSelect={activeOnSelect}
                     />
                   )}
                 </ul>
