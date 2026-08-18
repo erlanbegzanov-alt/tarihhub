@@ -17,15 +17,19 @@ import type { EraKey, LocalizedText } from './types'
  *
  * `goldenHorde` (Алтын Орда, 13th–15th c.: the Mongol conquest, Ulus Jochi/Batu,
  * and the Ak Orda successor state) is a real polity and a separate `EraKey` from
- * `golden` — see `people.ts` (zhoshy-khan, batu-khan) and `timeline.ts`. The
- * shape drawn here is the Ak Orda (White Horde), the eastern wing of Ulus Jochi
- * whose 14th-c. territory is described in sources as most of present Kazakhstan
- * except Zhetysu, east of the Ural, north of the Aral Sea and the Syr Darya —
- * anchored on Saraishyq, Sygnak (capital) and the Syr Darya cities, all of which
- * are already-sourced pins in `mapSites.ts`. The wider Golden Horde (Sarai, on
- * the Volga, outside this map's projection bounds) is called out as a `region`
- * point for context rather than drawn, since its own core lies west of the
- * geo.ts bounding box.
+ * `golden` — see `people.ts` (zhoshy-khan, batu-khan) and `timeline.ts`. It draws
+ * two shapes: a `soft` outer one for Ulus Jochi at its 14th-c. height (Urals to
+ * the Danube, Black Sea to the Caucasus, capital Sarai on the Volga — sourced via
+ * Britannica's "Golden Horde" overview), and the solid inner one for the Ak Orda
+ * (White Horde), the eastern wing whose territory is described in sources as most
+ * of present Kazakhstan except Zhetysu, east of the Ural, north of the Aral Sea
+ * and the Syr Darya — anchored on Saraishyq, Sygnak (capital) and the Syr Darya
+ * cities, all of which are already-sourced pins in `mapSites.ts`. `projectLonLat`
+ * itself has no bounding box — it's a fixed linear formula — so the outer shape
+ * can reach west past `geo.ts`'s own pre-baked country outlines (clipped to
+ * 42–100°E) into territory only `geoWide.ts` draws (clipped to 25–115°E,
+ * `KazakhstanMap.tsx`'s `contextCountries`), the same way the `turkic` shape
+ * below already reaches the Black Sea.
  */
 
 /**
@@ -233,16 +237,41 @@ export const eraTerritories: Partial<Record<EraKey, EraTerritory>> = {
   },
 
   /**
-   * Ak Orda (White Horde), 13th–early 15th c.: the eastern wing of Ulus Jochi
-   * (Batu's Golden Horde). By the 14th century its territory covered most of
-   * present Kazakhstan except Zhetysu — east of the Ural (Saraishyq), north of
-   * the Aral Sea and Syr Darya (Sygnak, its capital, and the other Syr Darya
-   * cities), stopping short of Lake Balkhash and the Zhetysu/Mogulistan lands
-   * to the south-east. It is the direct predecessor of the Kazakh Khanate
-   * (1465) drawn next.
+   * Two shapes, drawn outer-first so the solid one reads on top:
+   *
+   * 1. `soft` — Ulus Jochi (Golden Horde) at its 14th-c. height under Uzbeg
+   *    Khan: the Urals to the Danube, the Black Sea to the Caucasus, capital
+   *    Sarai on the Volga. Anchored on real named cities — Sarai, Bulgar
+   *    (Volga Bulgaria), Crimea, Azaq/Azov, Derbent, Urgench (Khwarezm) — the
+   *    same "landmark points, not a precise line" spirit as every other shape
+   *    in this file (see the module doc comment above).
+   * 2. Solid — Ak Orda (White Horde), 13th–early 15th c.: the eastern wing of
+   *    Ulus Jochi. By the 14th century its territory covered most of present
+   *    Kazakhstan except Zhetysu — east of the Ural (Saraishyq), north of the
+   *    Aral Sea and Syr Darya (Sygnak, its capital, and the other Syr Darya
+   *    cities), stopping short of Lake Balkhash and the Zhetysu/Mogulistan
+   *    lands to the south-east. It is the direct predecessor of the Kazakh
+   *    Khanate (1465) drawn next.
    */
   goldenHorde: {
     shapes: [
+      {
+        variant: 'soft',
+        path: ringPath([
+          [49.03, 54.98],
+          [58, 56],
+          [68, 54.5],
+          [78, 48.5],
+          [77, 44.8],
+          [66.96, 44.16],
+          [60.63, 41.55],
+          [51, 43.5],
+          [48.3, 42.06],
+          [34.4, 45.2],
+          [29, 46.5],
+          [39.4, 47.1],
+        ]),
+      },
       {
         path: ringPath([
           [51.7, 47.0],
@@ -264,8 +293,8 @@ export const eraTerritories: Partial<Record<EraKey, EraTerritory>> = {
       },
     ],
     label: {
-      kz: 'Ақ Орда (Алтын Орданың шығыс қанаты), XIV ғасыр: қазіргі Қазақстанның Жетісудан басқа дерлік барлық аумағы — Жайықтың шығысы, Арал теңізі мен Сырдарияның солтүстігі. Астанасы — Сығанақ. Ақ Орда — 1465 жылғы Қазақ хандығының тікелей алдындағы мемлекет.',
-      ru: 'Ак-Орда (восточное крыло Золотой Орды), XIV век: почти вся территория современного Казахстана, кроме Жетысу — к востоку от Урала, к северу от Аральского моря и Сырдарьи. Столица — Сыгнак. Ак-Орда — непосредственный предшественник Казахского ханства 1465 года.',
+      kz: 'Ашық түс — Алтын Орданың (Жошы ұлысы) Өзбек хан тұсындағы (XIV ғ.) ең кең шегі: Оралдан Дунайға, Қара теңізден Кавказға дейін, астанасы — Еділдегі Сарай. Қанық түс — оның шығыс қанаты, Ақ Орда: қазіргі Қазақстанның Жетісудан басқа дерлік барлық аумағы, астанасы Сығанақ. Ақ Орда — 1465 жылғы Қазақ хандығының тікелей алдындағы мемлекет.',
+      ru: 'Бледная заливка — наибольшие пределы Золотой Орды (Улуса Джучи) при хане Узбеке (XIV в.): от Урала до Дуная, от Чёрного моря до Кавказа, столица — Сарай на Волге. Насыщенная заливка — её восточное крыло, Ак-Орда: почти вся территория современного Казахстана, кроме Жетысу, столица Сыгнак. Ак-Орда — непосредственный предшественник Казахского ханства 1465 года.',
     },
     places: [
       {
@@ -273,6 +302,20 @@ export const eraTerritories: Partial<Record<EraKey, EraTerritory>> = {
         name: { kz: 'Ақ Орда', ru: 'Ак-Орда' },
         lon: 60,
         lat: 48,
+        kind: 'region',
+      },
+      {
+        id: 'goldenhorde-bulgar',
+        name: { kz: 'Болғар', ru: 'Булгар' },
+        lon: 49.03,
+        lat: 54.98,
+        kind: 'city',
+      },
+      {
+        id: 'goldenhorde-crimea',
+        name: { kz: 'Қырым', ru: 'Крым' },
+        lon: 34.4,
+        lat: 45.2,
         kind: 'region',
       },
       {
