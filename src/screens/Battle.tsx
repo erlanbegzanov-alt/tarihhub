@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Check, Crown, Loader2, Swords, Trophy, Users, Zap } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ProgressBar, SectionHeading } from '../components/ui'
 import { battleQuestion } from '../data/battleQuestions'
 import type { QuizQuestion } from '../data/types'
@@ -154,33 +155,27 @@ function TimerRing({ seconds }: { seconds: number }) {
  *  stacked instead of packed into a scrolling pill rail. */
 function ModeOption({
   active,
-  disabled,
   icon,
   title,
   subtitle,
-  badge,
   onClick,
 }: {
   active: boolean
-  disabled?: boolean
   icon: ReactNode
   title: string
   subtitle: string
-  badge?: string
   onClick: () => void
 }) {
   return (
     <motion.button
       type="button"
-      disabled={disabled}
       onClick={onClick}
-      whileHover={disabled ? undefined : { y: -2 }}
-      whileTap={disabled ? undefined : { scale: 0.99 }}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.99 }}
       transition={springSoft}
       className={cn(
         'focus-ring flex w-full items-center gap-3.5 rounded-card px-4 py-3.5 text-left',
         'bg-surface shadow-soft ring-1 transition-colors duration-200',
-        disabled && 'cursor-default opacity-60',
         active ? 'ring-brand/50' : 'ring-line/60',
       )}
     >
@@ -196,19 +191,12 @@ function ModeOption({
         {icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-2">
-          <span className="text-[15.5px] font-bold text-ink">{title}</span>
-          {badge && (
-            <span className="rounded-full bg-cream-deep px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-ink-faint">
-              {badge}
-            </span>
-          )}
-        </span>
+        <span className="text-[15.5px] font-bold text-ink">{title}</span>
         <span className="mt-0.5 block truncate text-[12.5px] text-ink-soft">
           {subtitle}
         </span>
       </span>
-      {active && !disabled && (
+      {active && (
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand text-white">
           <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
         </span>
@@ -221,6 +209,7 @@ function ModeOption({
 
 export function Battle() {
   const { t } = useLang()
+  const navigate = useNavigate()
   const session = useSession()
   const profile = useProfile()
   const user = session.user
@@ -495,7 +484,8 @@ export function Battle() {
         </div>
       </motion.div>
 
-      {/* mode picker — the third row is the teacher-hosted mode, not built yet */}
+      {/* mode picker — the third row leaves for the teacher-hosted mode, which
+          is a room rather than a duel and so lives on its own screens */}
       <motion.div variants={staggerItem} className="mt-5 flex flex-col gap-2.5">
         <ModeOption
           active={mode === 'casual'}
@@ -519,12 +509,13 @@ export function Battle() {
         />
         <ModeOption
           active={false}
-          disabled
           icon={<Users className="h-5 w-5" strokeWidth={2} />}
           title={t(s.battle.modeKahoot)}
           subtitle={t(s.battle.modeKahootSub)}
-          badge={t(s.battle.soon)}
-          onClick={() => {}}
+          onClick={() => {
+            if (inDuel) return
+            navigate('/battle/kahoot')
+          }}
         />
       </motion.div>
 

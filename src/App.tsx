@@ -14,6 +14,10 @@ import { AIChat } from './screens/AIChat'
 import { Battle } from './screens/Battle'
 import { Explore } from './screens/Explore'
 import { Home } from './screens/Home'
+import { Kahoot } from './screens/Kahoot'
+import { KahootCreate } from './screens/KahootCreate'
+import { KahootHost } from './screens/KahootHost'
+import { KahootJoin } from './screens/KahootJoin'
 import { LessonDetail } from './screens/LessonDetail'
 import { MapScreen } from './screens/MapScreen'
 import { Onboarding } from './screens/Onboarding'
@@ -51,6 +55,11 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: '/timeline', element: <Timeline /> },
   { path: '/map', element: <MapScreen /> },
   { path: '/battle', element: <Battle /> },
+  { path: '/battle/kahoot', element: <Kahoot /> },
+  { path: '/battle/kahoot/create', element: <KahootCreate /> },
+  { path: '/battle/kahoot/edit/:gameId', element: <KahootCreate /> },
+  { path: '/battle/kahoot/host/:gameId', element: <KahootHost /> },
+  { path: '/battle/kahoot/play/:code', element: <KahootJoin /> },
   { path: '/profile', element: <Profile /> },
   { path: '*', element: <Home /> },
 ]

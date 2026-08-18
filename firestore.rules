@@ -70,6 +70,61 @@ service cloud.firestore {
         );
     }
 
+    /* ------------------------------- kahoot ------------------------------- */
+    /*
+     * The teacher-hosted live quiz (see src/lib/kahoot.ts). Same no-server
+     * shape as the duels above: the teacher's own browser drives the room, and
+     * the rules are what stop anyone else from driving it instead.
+     */
+
+    // An authored quiz. Deliberately *not* readable by students, not even the
+    // ones in the teacher's own room: the correct answers are stored here, so
+    // anyone who could read this collection could read the answer key straight
+    // out of Firestore while the question is still open. Students never touch
+    // it — the host copies each question's public half into the room document
+    // below as it is revealed.
+    // The query behind "my games" filters on `hostUid == uid`, which is what
+    // lets the same condition serve `list` as well as `get`.
+    match /kahootGames/{gameId} {
+      allow read, delete: if request.auth != null
+        && request.auth.uid == resource.data.hostUid;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.hostUid;
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.hostUid
+        && request.resource.data.hostUid == resource.data.hostUid;
+    }
+
+    // A live room, doc id = the join code students type. Any signed-in user
+    // may read it — that is how a student plays — but only the host ever
+    // writes it, which is what makes `currentQuestion` trustworthy: a student
+    // cannot plant a question, skip ahead, or reveal an answer early. The
+    // answer to the open question is not in this document at all until the
+    // host moves the room to `reveal`.
+    match /kahootSessions/{code} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.hostUid;
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.hostUid;
+      allow delete: if request.auth != null
+        && request.auth.uid == resource.data.hostUid;
+
+      // One row per student, keyed by uid so a student can only ever write
+      // their own — never another player's score. Scores are self-reported,
+      // exactly as each duelist reports their own `xp` in `battleMatches`;
+      // this is the same trust model, not a weaker one. The host may delete a
+      // row so the room can be cleaned up when the game is over.
+      match /players/{uid} {
+        allow read: if request.auth != null;
+        allow create, update: if request.auth != null && request.auth.uid == uid;
+        allow delete: if request.auth != null && (
+          request.auth.uid == uid
+          || request.auth.uid == get(/databases/$(database)/documents/kahootSessions/$(code)).data.hostUid
+        );
+      }
+    }
+
     // Explicit deny-all default: blocks any other path, including ones added
     // by mistake later, from being reachable without an matching rule above.
     match /{document=**} {

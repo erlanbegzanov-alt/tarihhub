@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    /*
+     * Question photos for the teacher-hosted quiz (see src/lib/kahoot.ts).
+     *
+     * Same posture as firestore.rules: nobody writes anything that isn't
+     * theirs. The path carries the owner's uid, so a teacher can only ever
+     * upload under their own prefix — `kahootPhotos/{their uid}/…` — and can
+     * never overwrite or delete another teacher's photo.
+     *
+     * Reads are open to every signed-in user on purpose. A photo is part of a
+     * question the whole class has to look at, and the students in a room are
+     * not knowable from the storage path, so the readable set is "anyone with
+     * an account" rather than a list that cannot be expressed here. Nothing
+     * private is ever uploaded to this prefix: it holds classroom quiz images
+     * only.
+     */
+    match /kahootPhotos/{uid}/{gameId}/{photo} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Explicit deny-all default, matching firestore.rules: a path added later
+    // by mistake is unreachable until it is given a rule of its own.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
