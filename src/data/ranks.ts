@@ -50,7 +50,7 @@ export const ranks: Rank[] = [
     minXp: 900,
     title: {
       m: { kz: 'Би', ru: 'Би' },
-      f: { kz: 'Апа', ru: 'Апа' },
+      f: { kz: 'Шешен', ru: 'Шешен' },
     },
   },
   {
