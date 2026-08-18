@@ -41,8 +41,8 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore'
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
-import { db, storage } from './firebase'
+import { uploadImage } from './cloudinary'
+import { db } from './firebase'
 
 /* ------------------------------ the rules ------------------------------ */
 
@@ -397,22 +397,10 @@ export async function deleteGame(gameId: string): Promise<void> {
  *
  * Failing is a normal outcome, not an error state: a question is perfectly
  * publishable without a photo, so the caller shows a note and carries on.
+ * Goes to Cloudinary, not Firebase — see `src/lib/cloudinary.ts` for why.
  */
-export async function uploadQuestionPhoto(
-  uid: string,
-  gameId: string,
-  questionId: string,
-  file: File,
-): Promise<string | null> {
-  if (!storage) return null
-  try {
-    const target = ref(storage, `kahootPhotos/${uid}/${gameId}/${questionId}`)
-    await uploadBytes(target, file, { contentType: file.type || 'image/jpeg' })
-    return await getDownloadURL(target)
-  } catch (error) {
-    console.warn('[tarihhub] Could not upload the question photo.', error)
-    return null
-  }
+export async function uploadQuestionPhoto(file: File): Promise<string | null> {
+  return uploadImage(file)
 }
 
 /* ------------------------------- the room ------------------------------- */

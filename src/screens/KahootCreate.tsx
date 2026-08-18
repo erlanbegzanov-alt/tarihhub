@@ -117,7 +117,7 @@ export function KahootCreate() {
       return
     }
     setUploading(question.id)
-    const url = await uploadQuestionPhoto(uid, gameId, question.id, file)
+    const url = await uploadQuestionPhoto(file)
     setUploading(null)
     if (!url) {
       setPhotoError(t(s.kahoot.photoFailed))
