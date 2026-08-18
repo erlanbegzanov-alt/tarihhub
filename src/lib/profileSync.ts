@@ -77,6 +77,9 @@ export function mergeProfiles(
     timelineViewed: remote.timelineViewed || local.timelineViewed,
     // A track picked on any device beats an unset one; the cloud copy breaks a tie.
     avatarGender: remote.avatarGender ?? local.avatarGender,
+    // Purely a display choice, so the same rule applies: the cloud copy is the
+    // one the user last deliberately set, and `null` means "no choice made".
+    displayedRankTier: remote.displayedRankTier ?? local.displayedRankTier,
     lessonProgress,
     completedLessons: [
       ...new Set([...remote.completedLessons, ...local.completedLessons]),

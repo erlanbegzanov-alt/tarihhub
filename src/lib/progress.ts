@@ -61,6 +61,13 @@ export interface ProfileState {
    * `null` until the reader picks one on the profile screen.
    */
   avatarGender: AvatarGender | null
+  /**
+   * Which rank tier the profile *shows*, when the reader has picked one they
+   * already earned instead of their newest. `null` — the default — means "show
+   * whatever my XP currently reaches". Purely cosmetic: nothing here ever feeds
+   * back into `xp`, so the real progression is untouched by the choice.
+   */
+  displayedRankTier: number | null
 }
 
 export const DEFAULT_STATE: ProfileState = {
@@ -77,6 +84,7 @@ export const DEFAULT_STATE: ProfileState = {
   lessonQuizBest: {},
   sectionChecksDone: [],
   avatarGender: null,
+  displayedRankTier: null,
 }
 
 /** Share of `lessonProgress` that inline section checks alone can fill — the
@@ -174,6 +182,16 @@ export function normalizeProfile(value: unknown): ProfileState {
       parsed.avatarGender === 'm' || parsed.avatarGender === 'f'
         ? parsed.avatarGender
         : DEFAULT_STATE.avatarGender,
+    // Only the shape is checked here. Whether the tier is one this reader has
+    // actually earned is decided where it is rendered, against live XP and (for
+    // the owner tier) the signed-in identity — so a hand-edited value can't
+    // display a rank the account has no claim to.
+    displayedRankTier:
+      typeof parsed.displayedRankTier === 'number' &&
+      Number.isFinite(parsed.displayedRankTier) &&
+      parsed.displayedRankTier >= 0
+        ? Math.round(parsed.displayedRankTier)
+        : DEFAULT_STATE.displayedRankTier,
   }
 }
 
@@ -437,6 +455,12 @@ export function unlockBadge(id: string): void {
 export function setAvatarGender(gender: AvatarGender): void {
   if (state.avatarGender === gender) return
   write({ ...state, avatarGender: gender })
+}
+
+/** Records which earned tier to show off; `null` restores "whatever XP reaches". */
+export function setDisplayedRankTier(tier: number | null): void {
+  if (state.displayedRankTier === tier) return
+  write({ ...state, displayedRankTier: tier })
 }
 
 export interface LevelInfo {

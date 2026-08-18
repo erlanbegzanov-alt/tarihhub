@@ -4,7 +4,6 @@ import {
   Compass,
   Flame,
   Languages,
-  Lock,
   LogOut,
   Medal,
   Moon,
@@ -16,8 +15,9 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { MotifIcon } from '../components/Motif'
-import { RankBadge } from '../components/RankBadge'
-import { FilterChip, IconButton, ProgressBar } from '../components/ui'
+import { RankStatusPill } from '../components/RankBadge'
+import { RankSheet } from '../components/RankSheet'
+import { IconButton, ProgressBar } from '../components/ui'
 import { eraColor } from '../data/eras'
 import { badges } from '../data/lessons'
 import { rankInfo, ranks } from '../data/ranks'
@@ -31,8 +31,10 @@ import {
   normalizeProfile,
   replaceProfile,
   setAvatarGender,
+  setDisplayedRankTier,
   useProfile,
 } from '../lib/progress'
+import { OWNER_TIER_INDEX, OWNER_TITLE } from '../lib/rankStyle'
 import { signOutUser, updateDisplayName, useSession } from '../lib/session'
 import { useTheme } from '../lib/theme'
 import type { ThemePreference } from '../lib/theme'
@@ -50,6 +52,16 @@ const THEME_OPTIONS: { value: ThemePreference; label: typeof s.profile.themeLigh
  * only happens via the `?dev=1` query param or a previous dev session.
  */
 const DEV_MODE_KEY = 'tarihhub_dev'
+
+/**
+ * The one account the owner tier is granted to. Checked against the *signed-in
+ * Firebase session*, not against anything the browser can set — unlike
+ * `DEV_MODE_KEY` above, which is a plain localStorage flag anyone with the
+ * `?dev=1` link can flip. Email rather than UID because the UID isn't knowable
+ * without reading it out of a live session first, and this address is already
+ * Google-verified by the time Firebase reports it.
+ */
+const OWNER_EMAIL = 'erlanbegzanov@gmail.com'
 
 function readDevModeFlag(): boolean {
   if (typeof window === 'undefined') return false
@@ -70,6 +82,29 @@ export function Profile() {
   const { preference: themePreference, resolved: resolvedTheme, setTheme } = useTheme()
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
+  const [rankSheetOpen, setRankSheetOpen] = useState(false)
+
+  // ---------- rank display ----------
+  const ownerTierAvailable = session.user?.email === OWNER_EMAIL
+  const realTierIndex = rank?.tierIndex ?? 0
+  /**
+   * What the profile shows. The stored choice only counts if it is a tier this
+   * account can actually claim — an earned one, or the owner tier for the owner
+   * — so it degrades to the real tier rather than being trusted on its face.
+   * Real XP is read from `profile.xp` throughout and never from this.
+   */
+  const displayedTierIndex = (() => {
+    const chosen = profile.displayedRankTier
+    if (chosen === null) return realTierIndex
+    if (chosen === OWNER_TIER_INDEX) return ownerTierAvailable ? chosen : realTierIndex
+    return chosen <= realTierIndex ? chosen : realTierIndex
+  })()
+  const displayedTitle =
+    displayedTierIndex === OWNER_TIER_INDEX
+      ? t(OWNER_TITLE)
+      : gender
+        ? t(ranks[displayedTierIndex].title[gender])
+        : t(s.profile.rankPickTitle)
 
   // ---------- dev mode ----------
   const [devMode, setDevMode] = useState(() => readDevModeFlag())
@@ -148,14 +183,6 @@ export function Profile() {
   const unlockedCount = badges.filter(
     (badge) => badge.unlocked || profile.unlockedBadges.includes(badge.id),
   ).length
-
-  // Fill of the current rank tier. The top tier has nothing left to fill.
-  const rankPercent =
-    rank && rank.nextMinXp !== null
-      ? Math.round(
-          ((profile.xp - rank.minXp) / (rank.nextMinXp - rank.minXp)) * 100,
-        )
-      : 100
 
   const stats = [
     {
@@ -278,10 +305,12 @@ export function Profile() {
                     )}
                   </div>
                 )}
-                <p className="mt-0.5 truncate text-[13.5px] text-ink-soft">
-                  {t(s.profile.role)} · {level.level}
-                  {t(s.profile.levelShort)}
-                </p>
+                <RankStatusPill
+                  tierIndex={displayedTierIndex}
+                  title={displayedTitle}
+                  expanded={rankSheetOpen}
+                  onClick={() => setRankSheetOpen(true)}
+                />
               </div>
             </div>
 
@@ -321,137 +350,6 @@ export function Profile() {
                 )
               })}
             </div>
-          </motion.section>
-
-          {/* ---------- rank ---------- */}
-          <motion.section
-            variants={staggerItem}
-            className="rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60 sm:p-6"
-          >
-            <h2 className="text-[17px] font-semibold text-ink">
-              {t(s.profile.rankTitle)}
-            </h2>
-
-            {!rank || !gender ? (
-              <>
-                <p className="mt-1 text-[13.5px] text-ink-soft">
-                  {t(s.profile.rankPickTitle)}
-                </p>
-                <div className="mt-3 flex gap-2">
-                  <FilterChip
-                    active={false}
-                    layoutGroup="rank-gender"
-                    onClick={() => setAvatarGender('m')}
-                  >
-                    {t(s.profile.rankMale)}
-                  </FilterChip>
-                  <FilterChip
-                    active={false}
-                    layoutGroup="rank-gender"
-                    onClick={() => setAvatarGender('f')}
-                  >
-                    {t(s.profile.rankFemale)}
-                  </FilterChip>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="mt-4 flex items-center gap-4">
-                  <RankBadge
-                    tierIndex={rank.tierIndex}
-                    gender={gender}
-                    title={t(rank.title)}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xl font-bold tracking-tight text-ink">
-                      {t(rank.title)}
-                    </p>
-                    <p className="mt-0.5 text-[13.5px] text-ink-soft">
-                      {t(s.profile.rankStep)} {rank.tierIndex + 1} / {ranks.length}
-                    </p>
-                  </div>
-                </div>
-
-                {rank.nextMinXp !== null ? (
-                  <div className="mt-5">
-                    <div className="mb-2 flex items-baseline justify-between gap-3">
-                      <span className="truncate text-[12.5px] font-medium text-ink-soft">
-                        {t(s.profile.rankNext)}:{' '}
-                        {t(ranks[rank.tierIndex + 1].title[gender])}
-                      </span>
-                      <span className="shrink-0 text-[12.5px] font-bold text-ink">
-                        {profile.xp - rank.minXp} / {rank.nextMinXp - rank.minXp} XP
-                      </span>
-                    </div>
-                    <ProgressBar
-                      percent={rankPercent}
-                      height={8}
-                      color="var(--color-gold)"
-                    />
-                  </div>
-                ) : (
-                  <p className="mt-5 text-[12.5px] font-medium text-ink-soft">
-                    {t(s.profile.rankMax)}
-                  </p>
-                )}
-
-                <ul
-                  className={cn(
-                    '-mx-5 mt-5 flex flex-wrap gap-2 px-5 pt-4 sm:-mx-6 sm:px-6',
-                    'border-t border-line-soft',
-                  )}
-                >
-                  {ranks.map((tier, index) => {
-                    const unlocked = index <= rank.tierIndex
-                    return (
-                      <li
-                        key={tier.minXp}
-                        className="w-[88px] shrink-0 text-center"
-                      >
-                        <span
-                          className={cn(
-                            'mx-auto grid h-9 w-9 place-items-center rounded-full',
-                            'text-[12.5px] font-bold',
-                            index === rank.tierIndex
-                              ? 'bg-gold text-white'
-                              : unlocked
-                                ? 'bg-cream-deep text-ink-soft'
-                                : 'bg-cream text-ink-faint',
-                          )}
-                        >
-                          {unlocked ? (
-                            index + 1
-                          ) : (
-                            <Lock
-                              className="h-[14px] w-[14px]"
-                              strokeWidth={2.2}
-                              role="img"
-                              aria-label={t(s.profile.locked)}
-                            />
-                          )}
-                        </span>
-                        <p
-                          className={cn(
-                            'mt-1.5 text-[11.5px] leading-tight font-semibold',
-                            unlocked ? 'text-ink' : 'text-ink-faint',
-                          )}
-                        >
-                          {t(tier.title[gender])}
-                        </p>
-                        {!unlocked && (
-                          <p className="mt-0.5 text-[10.5px] leading-tight text-ink-faint">
-                            {t(s.profile.rankOpensAt)}{' '}
-                            <span className="whitespace-nowrap">
-                              {tier.minXp} XP
-                            </span>
-                          </p>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              </>
-            )}
           </motion.section>
 
           {/* ---------- dev mode ---------- */}
@@ -750,6 +648,22 @@ export function Profile() {
           </motion.ul>
         </motion.section>
       </div>
+
+      <RankSheet
+        open={rankSheetOpen}
+        onClose={() => setRankSheetOpen(false)}
+        gender={gender}
+        onPickGender={setAvatarGender}
+        realTierIndex={realTierIndex}
+        displayedTierIndex={displayedTierIndex}
+        onSelect={(tierIndex) =>
+          // `null` restores the default "show whatever XP reaches", so picking
+          // the real tier back doesn't pin it in place as new XP arrives.
+          setDisplayedRankTier(tierIndex === realTierIndex ? null : tierIndex)
+        }
+        ownerTierAvailable={ownerTierAvailable}
+        xp={profile.xp}
+      />
     </motion.div>
   )
 }

@@ -24,6 +24,17 @@
   --color-gold: #c9a227;
   --color-gold-tint: #fbf2d9;
 
+  /* ---- Rank tier ladder (src/components/RankBadge.tsx) ---- */
+  /* One distinct hue per tier — bronze → steel → jade → rose → violet silk —
+     the way game rarity ladders read (grey < green < blue < purple < gold),
+     not a single hue at rising opacity. Tier 1 stays uncoloured on purpose and
+     gold is reserved for tier 7, so the top of the ladder still reads as rare. */
+  --tier-2: #a9753f;
+  --tier-3: #3f6f9c;
+  --tier-4: #3f8f6a;
+  --tier-5: #a24a63;
+  --tier-6: #7a5ab8;
+
   /* ---- Feedback ---- */
   --color-correct: #2c8a57;
   --color-correct-tint: #e3f4ea;
@@ -56,47 +67,14 @@
     "Helvetica Neue", "Noto Sans", Arial, sans-serif;
 
   /* ---- Rank badge (src/components/RankBadge.tsx) ---- */
-  /* Only the top three ranks are animated, and only ever here. Literal gold
-     rather than var(--color-gold): a keyframed shadow can't read a custom
-     property that the dark theme redefines. The shimmer curve is the `easeOut`
-     token from src/lib/motion.ts. Every one of these rests on an invisible
-     final frame, so the reduced-motion rule at the end of this file — which
-     cuts any animation to one 0.001ms pass — leaves a plain, still badge. */
-  --animate-rank-glow: rank-glow 2.8s ease-in-out infinite;
+  /* The shimmer curve is the `easeOut` token from src/lib/motion.ts. The glow
+     is not a token: every animated tier sets its own `animation` inline so it
+     can carry that tier's duration (see TIER_EFFECTS in RankBadge.tsx). The
+     keyframes themselves live outside `@theme`, below the dark block — Tailwind
+     drops `@theme` keyframes whose `--animate-*` token no utility references,
+     and these are reached through inline styles it cannot see. */
   --animate-rank-shimmer: rank-shimmer 3.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
   --animate-rank-twinkle: rank-twinkle 1.9s ease-in-out infinite;
-
-  @keyframes rank-glow {
-    0%,
-    100% {
-      box-shadow: 0 0 0 0 rgb(201 162 39 / 0);
-    }
-    50% {
-      box-shadow: 0 0 22px 4px rgb(201 162 39 / 0.55);
-    }
-  }
-
-  @keyframes rank-shimmer {
-    0% {
-      transform: translateX(-140%) skewX(-12deg);
-    }
-    60%,
-    100% {
-      transform: translateX(280%) skewX(-12deg);
-    }
-  }
-
-  @keyframes rank-twinkle {
-    0%,
-    100% {
-      opacity: 0;
-      transform: scale(0);
-    }
-    50% {
-      opacity: 1;
-      transform: scale(1.15);
-    }
-  }
 }
 
 /*
@@ -152,12 +130,114 @@
   --color-era-soviet: #91a5bd;
   --color-era-independence: #45bcd4;
 
+  /* ---- Rank tier ladder ---- */
+  --tier-2: #c99257;
+  --tier-3: #5f93cf;
+  --tier-4: #4fb488;
+  --tier-5: #c96f8c;
+  --tier-6: #9b82d6;
+
   /* ---- Shadows ---- */
   /* Tinted shadows vanish on a dark page, so lean on black plus a faint
      top-light hairline for the rail. */
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px -8px rgb(0 0 0 / 0.55);
   --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.35), 0 18px 38px -14px rgb(0 0 0 / 0.7);
   --shadow-rail: 0 0 0 1px rgb(255 255 255 / 0.05), 0 10px 40px -20px rgb(0 0 0 / 0.8);
+}
+
+/*
+ * Rank badge animations (src/components/RankBadge.tsx).
+ *
+ * The three glow strengths are one gesture at rising intensity, and all three
+ * read their colour from `--tier-glow` rather than a literal: each animated
+ * badge sets that property inline on itself, so the same keyframes serve every
+ * tier hue and both themes. (Setting it on the element is what makes this work
+ * — a keyframed shadow resolves custom properties against the element it runs
+ * on.) Every one rests on an invisible 0%/100% frame, so the reduced-motion
+ * rule at the end of this file — which cuts any animation to one 0.001ms pass —
+ * leaves a plain, still badge.
+ */
+@keyframes rank-glow-soft {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--tier-glow, var(--color-gold)) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 11px 1.5px color-mix(in srgb, var(--tier-glow, var(--color-gold)) 32%, transparent);
+  }
+}
+
+@keyframes rank-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--tier-glow, var(--color-gold)) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 22px 4px color-mix(in srgb, var(--tier-glow, var(--color-gold)) 55%, transparent);
+  }
+}
+
+@keyframes rank-glow-rich {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--tier-glow, var(--color-gold)) 0%, transparent),
+      0 0 0 0 color-mix(in srgb, var(--tier-glow, var(--color-gold)) 0%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 32px 7px color-mix(in srgb, var(--tier-glow, var(--color-gold)) 68%, transparent),
+      0 0 58px 16px color-mix(in srgb, var(--tier-glow, var(--color-gold)) 32%, transparent);
+  }
+}
+
+@keyframes rank-shimmer {
+  0% {
+    transform: translateX(-140%) skewX(-12deg);
+  }
+  60%,
+  100% {
+    transform: translateX(280%) skewX(-12deg);
+  }
+}
+
+@keyframes rank-twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+/*
+ * Owner tier only (see OWNER_TIER_INDEX in src/lib/rankStyle.ts). Both rest on
+ * the identity transform, so the reduced-motion cut leaves the badge as it
+ * looks at rest rather than frozen mid-cycle.
+ */
+/* Gold → amber → rose → violet and back. Deliberately swings −135° rather than
+   a full turn: a full turn would drag the badge through green and cyan, which
+   collide with the brand. Rest is 0deg — an untouched gold. */
+@keyframes rank-owner-hue {
+  0%,
+  100% {
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    filter: hue-rotate(-135deg);
+  }
+}
+
+@keyframes rank-owner-ring {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @layer base {

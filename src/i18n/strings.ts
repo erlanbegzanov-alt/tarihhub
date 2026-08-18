@@ -317,6 +317,13 @@ export const s = {
     rankNext: { kz: 'Келесі атақ', ru: 'Следующее звание' },
     rankMax: { kz: 'Ең жоғары атақ', ru: 'Высшее звание' },
     rankOpensAt: { kz: 'Ашылады:', ru: 'Откроется:' },
+    rankSheetTitle: { kz: 'Атақтар', ru: 'Звания' },
+    rankSheetHint: {
+      kz: 'Ашық атақтардың кез келгенін таңдап, профильде соны көрсете аласың.',
+      ru: 'Выбери любое открытое звание — оно и будет показано в профиле.',
+    },
+    /** Marks the tier XP has actually reached, when a lower one is on display. */
+    rankReached: { kz: 'Қазір жеткен дәрежең', ru: 'Твоя текущая ступень' },
   },
 
   /** First-launch intro tour, shown once per browser before the sign-in screen. */
