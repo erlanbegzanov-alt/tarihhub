@@ -215,8 +215,20 @@ export const s = {
     },
 
     modeCasual: { kz: 'Қарапайым', ru: 'Обычный' },
+    modeCasualSub: {
+      kz: 'Жаттығу, рейтингке әсер етпейді',
+      ru: 'Тренировка, без риска для рейтинга',
+    },
     modeRanked: { kz: 'Рейтинг', ru: 'Рейтинг' },
+    modeRankedSub: {
+      kz: 'Нәтиже рейтингіңді өзгертеді',
+      ru: 'Результат меняет твой рейтинг',
+    },
     modeKahoot: { kz: 'Кахут', ru: 'Кахут' },
+    modeKahootSub: {
+      kz: 'Мұғалім өз сұрақтарын жасайды',
+      ru: 'Учитель создаёт свою игру',
+    },
     /** Badge on the teacher-hosted mode, which is not built yet. */
     soon: { kz: 'жақында', ru: 'скоро' },
 

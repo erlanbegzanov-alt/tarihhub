@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Crown, Loader2, Swords, Trophy } from 'lucide-react'
+import { Check, Crown, Loader2, Swords, Trophy, Users, Zap } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FilterChip, ProgressBar, SectionHeading } from '../components/ui'
+import type { ReactNode } from 'react'
+import { ProgressBar, SectionHeading } from '../components/ui'
 import { battleQuestion } from '../data/battleQuestions'
 import type { QuizQuestion } from '../data/types'
 import { s } from '../i18n/strings'
@@ -146,6 +147,73 @@ function TimerRing({ seconds }: { seconds: number }) {
         {left}
       </span>
     </div>
+  )
+}
+
+/** One full-width row in the mode picker — big enough to read at a glance,
+ *  stacked instead of packed into a scrolling pill rail. */
+function ModeOption({
+  active,
+  disabled,
+  icon,
+  title,
+  subtitle,
+  badge,
+  onClick,
+}: {
+  active: boolean
+  disabled?: boolean
+  icon: ReactNode
+  title: string
+  subtitle: string
+  badge?: string
+  onClick: () => void
+}) {
+  return (
+    <motion.button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      whileHover={disabled ? undefined : { y: -2 }}
+      whileTap={disabled ? undefined : { scale: 0.99 }}
+      transition={springSoft}
+      className={cn(
+        'focus-ring flex w-full items-center gap-3.5 rounded-card px-4 py-3.5 text-left',
+        'bg-surface shadow-soft ring-1 transition-colors duration-200',
+        disabled && 'cursor-default opacity-60',
+        active ? 'ring-brand/50' : 'ring-line/60',
+      )}
+    >
+      <span
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-full"
+        style={{
+          background: active
+            ? 'var(--color-brand-tint)'
+            : 'var(--color-cream-deep)',
+          color: active ? 'var(--color-brand)' : 'var(--color-ink-faint)',
+        }}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="text-[15.5px] font-bold text-ink">{title}</span>
+          {badge && (
+            <span className="rounded-full bg-cream-deep px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-ink-faint">
+              {badge}
+            </span>
+          )}
+        </span>
+        <span className="mt-0.5 block truncate text-[12.5px] text-ink-soft">
+          {subtitle}
+        </span>
+      </span>
+      {active && !disabled && (
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand text-white">
+          <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+        </span>
+      )}
+    </motion.button>
   )
 }
 
@@ -427,45 +495,37 @@ export function Battle() {
         </div>
       </motion.div>
 
-      {/* mode tabs — the third one is the teacher-hosted mode, not built yet */}
-      <motion.div
-        variants={staggerItem}
-        className="rail-scroll -mx-4 mt-5 flex gap-2 overflow-x-auto px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0"
-      >
-        <FilterChip
+      {/* mode picker — the third row is the teacher-hosted mode, not built yet */}
+      <motion.div variants={staggerItem} className="mt-5 flex flex-col gap-2.5">
+        <ModeOption
           active={mode === 'casual'}
+          icon={<Zap className="h-5 w-5" strokeWidth={2} />}
+          title={t(s.battle.modeCasual)}
+          subtitle={t(s.battle.modeCasualSub)}
           onClick={() => {
             if (inDuel) return
             setMode('casual')
           }}
-          layoutGroup="battle-mode"
-        >
-          {t(s.battle.modeCasual)}
-        </FilterChip>
-        <FilterChip
+        />
+        <ModeOption
           active={mode === 'ranked'}
+          icon={<Trophy className="h-5 w-5" strokeWidth={2} />}
+          title={t(s.battle.modeRanked)}
+          subtitle={t(s.battle.modeRankedSub)}
           onClick={() => {
             if (inDuel) return
             setMode('ranked')
           }}
-          layoutGroup="battle-mode"
-        >
-          {t(s.battle.modeRanked)}
-        </FilterChip>
-        <button
-          type="button"
+        />
+        <ModeOption
+          active={false}
           disabled
-          className={cn(
-            'relative flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2',
-            'bg-surface text-sm font-medium text-ink-faint ring-1 ring-line',
-            'cursor-default opacity-70',
-          )}
-        >
-          {t(s.battle.modeKahoot)}
-          <span className="rounded-full bg-cream-deep px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-ink-faint">
-            {t(s.battle.soon)}
-          </span>
-        </button>
+          icon={<Users className="h-5 w-5" strokeWidth={2} />}
+          title={t(s.battle.modeKahoot)}
+          subtitle={t(s.battle.modeKahootSub)}
+          badge={t(s.battle.soon)}
+          onClick={() => {}}
+        />
       </motion.div>
 
       <motion.div
