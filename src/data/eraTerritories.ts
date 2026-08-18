@@ -94,6 +94,30 @@ function ringPath(points: [number, number][]): string {
 const kazakhstanPath =
   centralAsiaCountries.find((c) => c.id === KAZAKHSTAN_ID)?.path ?? ''
 
+/**
+ * Three shapes below are the real Kazakhstan/Uzbekistan/Kyrgyzstan borders
+ * (the same Natural Earth source as `geo.ts`, so they line up exactly with
+ * `kazakhstanPath` and the country outlines already on the map) clipped
+ * against a rough historical claim zone — Shapely intersection/difference,
+ * run once offline and pasted here as a static path, the same "real source
+ * data, simplified once" pipeline `geo.ts`'s own header describes for every
+ * country path in this app. This is far more accurate than a hand-picked
+ * lon/lat point list for a polity whose extent really is "the modern country,
+ * minus/plus one named region": Ak Orda and the Kazakh Khanate below were
+ * previously drawn as crude 15-point polygons that undershot the real
+ * Kazakhstan coastline everywhere, which is what prompted redrawing them
+ * this way.
+ */
+/** `kazakhstanPath` minus the Zhetysu / Almaty corner (south-east) — see `goldenHorde`. */
+const akOrdaPath =
+  'M514.1,357.9L539.3,365.4L555.3,348.0L577.6,350.9L577.6,271.1L706.1,271.1L710.2,254.8L737.8,263.3L752.8,253.4L754.3,226.6L781.4,210.0L769.1,197.8L745.0,196.6L713.1,165.3L680.5,171.2L670.3,158.4L655.0,170.4L590.9,87.0L559.5,102.5L501.6,89.3L495.5,63.4L465.2,61.5L399.3,85.8L333.3,93.1L326.6,134.8L311.6,141.9L333.8,154.6L334.3,168.3L307.1,174.9L282.1,163.6L249.8,164.6L237.9,174.5L214.1,170.2L195.5,153.7L151.6,147.8L117.4,174.5L110.9,192.6L91.9,182.2L80.3,226.1L105.3,241.6L124.7,274.9L158.3,256.7L192.6,267.1L181.6,297.0L162.4,298.0L152.8,315.2L160.3,342.3L182.8,359.3L180.9,382.4L209.0,369.2L241.0,393.2L241.0,306.7L285.5,293.3L344.7,342.1L395.0,336.9L415.5,353.9L414.0,377.2L422.4,377.4L427.8,397.5L447.2,396.1L453.3,408.8Z'
+/** `kazakhstanPath` minus the south (Syr Darya cities + Zhetysu) strip — see `alash`. */
+const alashNorthPath =
+  'M710.2,254.8L737.8,263.3L752.8,253.4L754.3,226.6L781.4,210.0L769.1,197.8L745.0,196.6L713.1,165.3L680.5,171.2L670.3,158.4L655.0,170.4L590.9,87.0L559.5,102.5L501.6,89.3L495.5,63.4L465.2,61.5L399.3,85.8L333.3,93.1L326.6,134.8L311.6,141.9L333.8,154.6L334.3,168.3L307.1,174.9L282.1,163.6L249.8,164.6L237.9,174.5L214.1,170.2L195.5,153.7L151.6,147.8L117.4,174.5L110.9,192.6L91.9,182.2L80.3,226.1L105.3,241.6L124.7,274.9L158.3,256.7L192.6,267.1L181.6,297.0L158.3,305.3L241.0,307.8L285.5,293.3L305.4,309.7L517.2,318.3L637.9,292.3L700.7,292.3Z'
+/** That south strip, plus Uzbekistan and Kyrgyzstan, minus Khiva and Bukhara — see `alash`. */
+const turkestanAutonomyPath =
+  'M697.9,303.6L700.7,292.3L637.9,292.3L517.2,318.3L362.1,312.0L362.1,400.8L448.3,400.8L448.3,434.0L456.2,435.2L459.5,420.1L490.3,400.3L489.3,413.7L499.3,418.7L482.2,419.6L469.5,430.0L475.9,434.5L545.3,437.3L551.6,423.4L579.0,410.0L594.5,413.7L600.3,401.2L622.8,398.9L658.8,372.7L668.8,349.8L656.2,306.2Z'
+
 export const eraTerritories: Partial<Record<EraKey, EraTerritory>> = {
   /**
    * Saka horizon, 1st millennium BCE. Drawn over most of the modern country:
@@ -251,7 +275,10 @@ export const eraTerritories: Partial<Record<EraKey, EraTerritory>> = {
    *    Aral Sea and Syr Darya (Sygnak, its capital, and the other Syr Darya
    *    cities), stopping short of Lake Balkhash and the Zhetysu/Mogulistan
    *    lands to the south-east. It is the direct predecessor of the Kazakh
-   *    Khanate (1465) drawn next.
+   *    Khanate (1465) drawn next. Drawn with `akOrdaPath` (real Kazakhstan
+   *    border, minus the Zhetysu corner — see the module doc comment above)
+   *    rather than a hand-picked point list, so it actually hugs the coastline
+   *    and the Altai/Tarbagatai border instead of a rough hexagon.
    */
   goldenHorde: {
     shapes: [
@@ -272,25 +299,7 @@ export const eraTerritories: Partial<Record<EraKey, EraTerritory>> = {
           [39.4, 47.1],
         ]),
       },
-      {
-        path: ringPath([
-          [51.7, 47.0],
-          [51.5, 50.3],
-          [56, 52.4],
-          [65, 53.2],
-          [70, 52.4],
-          [74, 50],
-          [76, 47],
-          [74, 45.5],
-          [69, 44.5],
-          [66.96, 44.16],
-          [67.77, 43.5],
-          [64, 43.8],
-          [60, 44.8],
-          [56, 45.6],
-          [54, 46.3],
-        ]),
-      },
+      { path: akOrdaPath },
     ],
     label: {
       kz: 'Ашық түс — Алтын Орданың (Жошы ұлысы) Өзбек хан тұсындағы (XIV ғ.) ең кең шегі: Оралдан Дунайға, Қара теңізден Кавказға дейін, астанасы — Еділдегі Сарай. Қанық түс — оның шығыс қанаты, Ақ Орда: қазіргі Қазақстанның Жетісудан басқа дерлік барлық аумағы, астанасы Сығанақ. Ақ Орда — 1465 жылғы Қазақ хандығының тікелей алдындағы мемлекет.',
@@ -340,30 +349,14 @@ export const eraTerritories: Partial<Record<EraKey, EraTerritory>> = {
    * Saraishyq in the north-west, Mangystau and the Adai in the south-west,
    * Ulytau and the Irtysh in the north, Tarbagatai and Zhetysu in the east, the
    * Syr Darya cities and Sayram in the south. By 1822–1824 no khanate territory
-   * remained in law.
+   * remained in law. Drawn with `kazakhstanPath` (the real modern border) rather
+   * than a hand-picked point list — at this khanate's own greatest extent it
+   * tracked essentially the whole of modern Kazakhstan, the same "почти вся
+   * территория" already said of Ak Orda above, so the real coastline is a more
+   * accurate stand-in than a rough hexagon ever was.
    */
   khanate: {
-    shapes: [
-      {
-        path: ringPath([
-          [51.7, 47.5],
-          [54, 50.5],
-          [62, 51.5],
-          [70.5, 52],
-          [76.5, 51.5],
-          [82.5, 50],
-          [84.5, 47.5],
-          [81.5, 45],
-          [78, 43.3],
-          [71, 42.5],
-          [68.3, 42.9],
-          [65.5, 43.5],
-          [60, 44.3],
-          [54, 44],
-          [51.3, 44.5],
-        ]),
-      },
-    ],
+    shapes: [{ path: kazakhstanPath }],
     label: {
       kz: 'Қасым хан тұсындағы ең кең шек (1511–1521), үш жүздің шамамен орналасуымен. 1822–1824 жылдары хан билігі жойылды.',
       ru: 'Наибольшие пределы при Касым хане (1511–1521), с примерным расположением трёх жузов. В 1822–1824 годах ханская власть была упразднена.',
@@ -437,43 +430,22 @@ export const eraTerritories: Partial<Record<EraKey, EraTerritory>> = {
    * crushed by force in February 1918. They adjoined around Türkistan/Sayram.
    * Neither ever controlled its claimed area — these are claims on paper.
    * Khiva and Bukhara stayed separate states and are not drawn.
+   *
+   * Both shapes are `alashNorthPath` / `turkestanAutonomyPath` (real Kazakh,
+   * Uzbek and Kyrgyz borders, split roughly along that Türkistan/Sayram
+   * boundary — see the module doc comment above) rather than a hand-picked
+   * point list, so Alash Autonomy actually stops at Kazakhstan's own real
+   * north-west border instead of a straight line that used to cut deep into
+   * Russia.
    */
   alash: {
     shapes: [
-      {
-        // Alash Autonomy — north
-        path: ringPath([
-          [51.3, 46.8],
-          [50.5, 51.5],
-          [59, 54],
-          [69, 55.5],
-          [74, 55.2],
-          [82, 53.5],
-          [84.5, 50],
-          [82, 47],
-          [75, 45.5],
-          [68, 44.2],
-          [62, 44.8],
-          [55, 45],
-        ]),
-      },
+      { path: alashNorthPath },
       {
         // Turkestan (Kokand) Autonomy — south. Lighter, so the two adjoining
         // governments do not read as one region.
         variant: 'soft',
-        path: ringPath([
-          [59.5, 44.5],
-          [68, 44.2],
-          [75, 45.3],
-          [81, 45.5],
-          [81.5, 42.5],
-          [76, 40.5],
-          [73.5, 39.2],
-          [70.5, 38.5],
-          [67, 37.8],
-          [66, 40],
-          [61.5, 42.5],
-        ]),
+        path: turkestanAutonomyPath,
       },
     ],
     label: {
