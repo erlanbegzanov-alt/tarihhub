@@ -67,6 +67,8 @@ export function KahootCreate() {
   const [flaw, setFlaw] = useState<KahootFlaw | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  /** Which question's photo square is being dragged over, for the highlight. */
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!editId) return
@@ -239,8 +241,31 @@ export function KahootCreate() {
 
                 <div className="flex items-start gap-3">
                   {/* photo square — dashed while empty, the picture itself once
-                      one is attached */}
-                  <div className="relative shrink-0">
+                      one is attached. Accepts a click, a drag-and-drop from
+                      another tab, or a paste (Ctrl+V) of a copied image, all
+                      three funnelling into the same `pickPhoto`. */}
+                  <div
+                    className="relative shrink-0"
+                    onDragOver={(event) => {
+                      event.preventDefault()
+                      setDragOverId(question.id)
+                    }}
+                    onDragLeave={() =>
+                      setDragOverId((current) => (current === question.id ? null : current))
+                    }
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      setDragOverId(null)
+                      void pickPhoto(index, event.dataTransfer.files?.[0])
+                    }}
+                    onPaste={(event) => {
+                      const item = Array.from(event.clipboardData?.items ?? []).find(
+                        (candidate) => candidate.type.startsWith('image/'),
+                      )
+                      const file = item?.getAsFile()
+                      if (file) void pickPhoto(index, file)
+                    }}
+                  >
                     {question.photoURL ? (
                       <>
                         <img
@@ -259,11 +284,15 @@ export function KahootCreate() {
                       </>
                     ) : (
                       <label
+                        tabIndex={0}
                         className={cn(
-                          'grid h-[60px] w-[60px] cursor-pointer place-items-center gap-0.5',
-                          'rounded-tile border-[1.5px] border-dashed border-line bg-cream',
+                          'focus-ring grid h-[60px] w-[60px] cursor-pointer place-items-center gap-0.5',
+                          'rounded-tile border-[1.5px] border-dashed bg-cream',
                           'text-[10px] font-bold text-ink-faint',
                           'transition-colors hover:border-brand hover:text-brand',
+                          dragOverId === question.id
+                            ? 'border-brand bg-brand-tint text-brand'
+                            : 'border-line',
                         )}
                       >
                         {uploading === question.id ? (
@@ -297,6 +326,11 @@ export function KahootCreate() {
                     className={cn(FIELD, 'flex-1 resize-none bg-cream font-semibold')}
                   />
                 </div>
+                {!question.photoURL && (
+                  <p className="mt-1.5 pl-[72px] text-[10.5px] text-ink-faint">
+                    {t(s.kahoot.photoDropHint)}
+                  </p>
+                )}
 
                 <ul className="mt-2.5 grid gap-2">
                   {question.options.map((option, optionIndex) => {

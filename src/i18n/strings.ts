@@ -343,6 +343,11 @@ export const s = {
       kz: 'Фото тым үлкен — 5 МБ дейін болсын.',
       ru: 'Фото слишком большое — до 5 МБ.',
     },
+    /** Under the empty photo square — the click-to-browse picker also takes a drag or a paste. */
+    photoDropHint: {
+      kz: 'Немесе фотоны осы жерге сүйреңіз, не Ctrl+V арқылы қойыңыз',
+      ru: 'Или перетащи фото сюда, или вставь через Ctrl+V',
+    },
     publish: { kz: 'Жариялау', ru: 'Опубликовать' },
     saveFailed: {
       kz: 'Ойын сақталмады. Қайталап көріңіз.',
