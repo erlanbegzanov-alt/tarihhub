@@ -12,6 +12,7 @@ import type { DocumentReference } from 'firebase/firestore'
 import { db } from './firebase'
 import {
   getProfile,
+  loadProfileForUser,
   normalizeProfile,
   replaceProfile,
   setRemoteWriter,
@@ -95,6 +96,11 @@ export function mergeProfiles(
  * to it. Safe to call when Firestore is unavailable — it simply does nothing.
  */
 export async function startProfileSync(uid: string): Promise<void> {
+  // Scope the local cache to this account *before* touching it below, so the
+  // merge only ever sees this account's own device history — never a
+  // previous account's numbers left over from the same browser.
+  loadProfileForUser(uid)
+
   const ref = profileDoc(uid)
   if (!ref) return
 
@@ -120,7 +126,8 @@ export async function startProfileSync(uid: string): Promise<void> {
   replaceProfile(mergeProfiles(remote, getProfile()))
 }
 
-/** Detaches the cloud mirror; local progress keeps working untouched. */
+/** Detaches the cloud mirror and clears the account-scoped local cache. */
 export function stopProfileSync(): void {
   setRemoteWriter(null)
+  loadProfileForUser(null)
 }

@@ -4,7 +4,18 @@ import type { AvatarGender } from '../data/ranks'
 // Bumped from 'tarihhub_profile' — the old key held pre-launch seed data
 // (fake XP/streak/badges baked in during earlier development) that isn't
 // anyone's real progress. Switching keys gives every browser a clean start.
-const STORAGE_KEY = 'tarihhub_profile_v2'
+//
+// Namespaced per Firebase uid (see `storageKeyFor`) so two accounts signed
+// into the same browser never share a cache: without the uid suffix, a
+// brand-new signup on a device that already had another account's progress
+// sitting in localStorage would inherit those numbers wholesale and — since
+// `startProfileSync` merges local into a fresh account's empty cloud doc —
+// permanently write them into that new account's Firestore profile too.
+const STORAGE_KEY_BASE = 'tarihhub_profile_v2'
+
+function storageKeyFor(uid: string | null): string {
+  return uid ? `${STORAGE_KEY_BASE}_${uid}` : STORAGE_KEY_BASE
+}
 
 export const XP_PER_LEVEL = 200
 
@@ -211,10 +222,10 @@ export function normalizeProfile(value: unknown): ProfileState {
   }
 }
 
-function read(): ProfileState {
+function readFor(uid: string | null): ProfileState {
   if (typeof window === 'undefined') return DEFAULT_STATE
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(storageKeyFor(uid))
     if (!raw) return DEFAULT_STATE
     return normalizeProfile(JSON.parse(raw))
   } catch {
@@ -222,7 +233,12 @@ function read(): ProfileState {
   }
 }
 
-let state: ProfileState = read()
+// No uid is known yet at import time (auth hasn't resolved), so the module
+// starts neutral rather than eagerly reading the old shared key. `session.ts`
+// resolving to a signed-in user is what first calls `loadProfileForUser`,
+// through `profileSync.startProfileSync`.
+let currentUid: string | null = null
+let state: ProfileState = DEFAULT_STATE
 const listeners = new Set<() => void>()
 
 function emit() {
@@ -244,7 +260,7 @@ export function setRemoteWriter(writer: RemoteWriter | null): void {
 function write(next: ProfileState) {
   state = next
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    window.localStorage.setItem(storageKeyFor(currentUid), JSON.stringify(next))
   } catch {
     /* storage unavailable — keep the in-memory value */
   }
@@ -261,6 +277,20 @@ function write(next: ProfileState) {
 /** Current profile, for non-React callers (the cloud sync layer). */
 export function getProfile(): ProfileState {
   return state
+}
+
+/**
+ * Points local reads/writes at one account's own cache — `uid`'s namespaced
+ * key, or the neutral default state when `uid` is `null` (signed out).
+ * Called from `profileSync.ts` on sign-in (before merging the cloud copy, so
+ * the merge only ever sees *this* account's own local history) and on
+ * sign-out (so no trace of one account's numbers is left for the next one to
+ * sign into on the same device).
+ */
+export function loadProfileForUser(uid: string | null): void {
+  currentUid = uid
+  state = readFor(uid)
+  emit()
 }
 
 /** Replaces the whole profile (used after merging the cloud copy on sign-in). */
