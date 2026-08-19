@@ -171,13 +171,10 @@ async function callGemini(
       { role: 'user' as const, parts: [{ text: question }] },
     ],
     {
-      // Budget for a 2-5 sentence in-character reply, plus real headroom: the
-      // model (gemini-3.6-flash) always spends some of this same budget on an
-      // internal "thinking" pass before the visible answer — anywhere from
-      // ~50 to 450+ tokens depending on the question, measured directly
-      // against the live API — so this can't be sized for the reply alone
-      // the way the retired gemini-2.0-flash could be.
-      maxOutputTokens: 1200,
+      // gemini-3.5-flash-lite has thinking off by default, so unlike the
+      // old gemini-3.6-flash this budget goes entirely to the visible
+      // reply — no headroom needed for a hidden reasoning pass.
+      maxOutputTokens: 700,
       temperature: 0.8,
     },
   )
@@ -240,6 +237,6 @@ export async function explainSection(
   return callGeminiProxy(
     buildExplainPrompt(lang),
     [{ role: 'user', parts: [{ text: `${heading}\n\n${body}` }] }],
-    { maxOutputTokens: 900, temperature: 0.5 },
+    { maxOutputTokens: 500, temperature: 0.5 },
   )
 }

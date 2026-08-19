@@ -19,8 +19,17 @@
  * The `{ fetch }` export (not `export default function handler(req, res)`)
  * is the Web-standard shape Vercel Functions expect outside a Next.js app —
  * this project is plain Vite, so that's the one that applies here.
+ *
+ * Model: `gemini-3.5-flash-lite`, not `gemini-3.6-flash`. The 3.6 model is
+ * reasoning-first and always spends part of its token budget "thinking"
+ * before answering — measured at 20-40s per reply here, even at the lowest
+ * available thinking level. flash-lite ships with thinking off by default,
+ * which is what actually removes that delay (verified directly against the
+ * live API, since docs list several flash-lite generations inconsistently).
+ * Answers are a bit shorter/plainer, which is fine for short in-character
+ * replies and lesson rephrasing — this isn't a complex-reasoning use case.
  */
-const MODEL = 'gemini-3.6-flash'
+const MODEL = 'gemini-3.5-flash-lite'
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 
 const MAX_CONTENTS = 12
@@ -120,14 +129,7 @@ export default {
       return new Response('Bad Request', { status: 400 })
     }
 
-    // A reasoning-first model: the thinking phase eats into the same token
-    // budget as the actual reply, and how much it eats varies a lot by
-    // prompt (52 tokens for a one-word reply, 450+ for a multi-sentence one,
-    // measured directly against this key). "low" is the smallest lever the
-    // API exposes — it can't be switched off outright on this model the way
-    // the old gemini-2.0-flash could — so the caller's own token budget
-    // already carries headroom for it (see src/lib/ai.ts).
-    const maxOutputTokens = Math.min(Math.max(Math.round(body.config?.maxOutputTokens ?? 900), 1), 2000)
+    const maxOutputTokens = Math.min(Math.max(Math.round(body.config?.maxOutputTokens ?? 500), 1), 2000)
     const temperature = Math.min(Math.max(body.config?.temperature ?? 0.6, 0), 1)
 
     try {
@@ -140,7 +142,6 @@ export default {
           generationConfig: {
             maxOutputTokens,
             temperature,
-            thinkingConfig: { thinkingLevel: 'low' },
           },
         }),
       })
