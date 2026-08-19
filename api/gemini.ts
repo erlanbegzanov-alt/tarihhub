@@ -143,16 +143,19 @@ export default {
             maxOutputTokens,
             temperature,
           },
-          // Strictest common threshold: this is an educational app aimed at
-          // students, so profanity, harassment, hate speech etc. get blocked
-          // by Google's own moderation before a reply ever reaches the
-          // client, on top of the persona's own in-character refusal below.
+          // This is an educational app about Kazakh history, so ordinary
+          // lesson content (wars, conquest, khans dying in battle) sits
+          // naturally in "medium" harassment/dangerous-content territory —
+          // BLOCK_LOW_AND_ABOVE blocked a plain "tell me about your life"
+          // question here (measured directly), so MEDIUM is the strictest
+          // threshold that still lets real history through while still
+          // catching profanity, hate speech and explicit content.
           safetySettings: [
             'HARM_CATEGORY_HARASSMENT',
             'HARM_CATEGORY_HATE_SPEECH',
             'HARM_CATEGORY_SEXUALLY_EXPLICIT',
             'HARM_CATEGORY_DANGEROUS_CONTENT',
-          ].map((category) => ({ category, threshold: 'BLOCK_LOW_AND_ABOVE' })),
+          ].map((category) => ({ category, threshold: 'BLOCK_MEDIUM_AND_ABOVE' })),
         }),
       })
 
