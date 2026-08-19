@@ -1,35 +1,39 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
-import { CourseOutline } from './screens/CourseOutline'
 import { LanguageProvider } from './i18n/LanguageProvider'
 import { s } from './i18n/strings'
 import { useLang } from './i18n/useLang'
 import { pageVariants } from './lib/motion'
 import { recordVisit } from './lib/progress'
 import { completeOnboarding, sessionGate, useSession } from './lib/session'
-import { AIChat } from './screens/AIChat'
-import { Battle } from './screens/Battle'
-import { BattleCasual } from './screens/BattleCasual'
-import { BattleRanked } from './screens/BattleRanked'
-import { Explore } from './screens/Explore'
 import { Home } from './screens/Home'
-import { Kahoot } from './screens/Kahoot'
-import { KahootCreate } from './screens/KahootCreate'
-import { KahootHost } from './screens/KahootHost'
-import { KahootJoin } from './screens/KahootJoin'
-import { KahootStudent } from './screens/KahootStudent'
-import { KahootTeacher } from './screens/KahootTeacher'
-import { LessonDetail } from './screens/LessonDetail'
-import { MapScreen } from './screens/MapScreen'
 import { Onboarding } from './screens/Onboarding'
-import { PersonDetail } from './screens/PersonDetail'
-import { Profile } from './screens/Profile'
-import { Quiz } from './screens/Quiz'
 import { SignIn } from './screens/SignIn'
-import { Timeline } from './screens/Timeline'
+
+// Every other screen is its own chunk, fetched only when a visitor actually
+// navigates there — Home used to pull the entire app (Battle, Kahoot, every
+// lesson screen) into one bundle before showing anything.
+const CourseOutline = lazy(() => import('./screens/CourseOutline').then((m) => ({ default: m.CourseOutline })))
+const AIChat = lazy(() => import('./screens/AIChat').then((m) => ({ default: m.AIChat })))
+const Battle = lazy(() => import('./screens/Battle').then((m) => ({ default: m.Battle })))
+const BattleCasual = lazy(() => import('./screens/BattleCasual').then((m) => ({ default: m.BattleCasual })))
+const BattleRanked = lazy(() => import('./screens/BattleRanked').then((m) => ({ default: m.BattleRanked })))
+const Explore = lazy(() => import('./screens/Explore').then((m) => ({ default: m.Explore })))
+const Kahoot = lazy(() => import('./screens/Kahoot').then((m) => ({ default: m.Kahoot })))
+const KahootCreate = lazy(() => import('./screens/KahootCreate').then((m) => ({ default: m.KahootCreate })))
+const KahootHost = lazy(() => import('./screens/KahootHost').then((m) => ({ default: m.KahootHost })))
+const KahootJoin = lazy(() => import('./screens/KahootJoin').then((m) => ({ default: m.KahootJoin })))
+const KahootStudent = lazy(() => import('./screens/KahootStudent').then((m) => ({ default: m.KahootStudent })))
+const KahootTeacher = lazy(() => import('./screens/KahootTeacher').then((m) => ({ default: m.KahootTeacher })))
+const LessonDetail = lazy(() => import('./screens/LessonDetail').then((m) => ({ default: m.LessonDetail })))
+const MapScreen = lazy(() => import('./screens/MapScreen').then((m) => ({ default: m.MapScreen })))
+const PersonDetail = lazy(() => import('./screens/PersonDetail').then((m) => ({ default: m.PersonDetail })))
+const Profile = lazy(() => import('./screens/Profile').then((m) => ({ default: m.Profile })))
+const Quiz = lazy(() => import('./screens/Quiz').then((m) => ({ default: m.Quiz })))
+const Timeline = lazy(() => import('./screens/Timeline').then((m) => ({ default: m.Timeline })))
 
 function Page({ children }: { children: ReactNode }) {
   const reduce = useReducedMotion()
@@ -72,6 +76,18 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: '*', element: <Home /> },
 ]
 
+function RouteFallback() {
+  return (
+    <div className="grid min-h-[50vh] place-items-center">
+      <div
+        className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand"
+        role="status"
+        aria-hidden
+      />
+    </div>
+  )
+}
+
 function AnimatedRoutes() {
   const location = useLocation()
 
@@ -87,7 +103,11 @@ function AnimatedRoutes() {
           <Route
             key={route.path}
             path={route.path}
-            element={<Page>{route.element}</Page>}
+            element={
+              <Page>
+                <Suspense fallback={<RouteFallback />}>{route.element}</Suspense>
+              </Page>
+            }
           />
         ))}
       </Routes>
