@@ -3,13 +3,17 @@
  * of the three entry states the app should show — the intro tour, the sign-in
  * screen, or the app itself.
  *
- * Signing in with Google is mandatory: the app is only ever reachable with a
- * real account, so progress always has somewhere to sync.
+ * Signing in is mandatory: the app is only ever reachable with a real account,
+ * so progress always has somewhere to sync. Two ways in — Google, or an
+ * email/password pair for visitors without a Google account.
  */
 import {
   GoogleAuthProvider,
+  createUserWithEmailAndPassword,
   onAuthStateChanged,
-  signInWithCredential,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   updateProfile,
 } from 'firebase/auth'
@@ -124,19 +128,43 @@ export function completeOnboarding(): void {
 }
 
 /**
- * Takes the ID token Google Identity Services hands back (see `SignIn.tsx`'s
- * native Google button) and exchanges it for a Firebase session directly —
- * one client-side REST call, no popup and no cross-domain redirect. Both of
- * those were tried first and both turned out to be unreliable in practice:
- * popups silently failed across mobile browsers, and the redirect flow's
- * cross-origin handoff through Firebase's own auth-domain handler kept
- * resolving with nothing to complete, in Incognito and on real devices
- * alike, with no error to act on either way.
+ * Google sign-in through Firebase's own popup flow.
+ *
+ * This replaced the Google Identity Services one-tap credential, which took
+ * whichever Google session the browser already had and gave no way back out:
+ * a visitor wanting to switch accounts — or sign out and in as someone else —
+ * was stuck on the first one forever, with no chooser ever shown.
+ * `prompt: 'select_account'` is what fixes that; it forces Google's account
+ * picker on every single click, so switching is always one click away.
  */
-export async function signInWithGoogleIdToken(idToken: string): Promise<void> {
+export async function signInWithGooglePopup(): Promise<void> {
   if (!auth) throw new Error('firebase-not-configured')
-  await signInWithCredential(auth, GoogleAuthProvider.credential(idToken))
+  const provider = new GoogleAuthProvider()
+  provider.setCustomParameters({ prompt: 'select_account' })
+  await signInWithPopup(auth, provider)
   // The auth listener above flips the gate to the app.
+}
+
+/** Creates a brand-new account from an email/password pair. */
+export async function signUpWithEmail(email: string, password: string): Promise<void> {
+  if (!auth) throw new Error('firebase-not-configured')
+  await createUserWithEmailAndPassword(auth, email, password)
+}
+
+/** Signs an existing email/password account back in. */
+export async function signInWithEmail(email: string, password: string): Promise<void> {
+  if (!auth) throw new Error('firebase-not-configured')
+  await signInWithEmailAndPassword(auth, email, password)
+}
+
+/**
+ * Mails a password-reset link. Firebase deliberately resolves the same way
+ * whether or not the address has an account, so the screen must never phrase
+ * the confirmation as proof one exists.
+ */
+export async function sendPasswordReset(email: string): Promise<void> {
+  if (!auth) throw new Error('firebase-not-configured')
+  await sendPasswordResetEmail(auth, email)
 }
 
 /** Overrides the display name shown in the app, on top of whatever Google supplied. */

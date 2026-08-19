@@ -631,6 +631,71 @@ export const s = {
       kz: 'Кіру сәтсіз аяқталды. Қайталап көріңіз.',
       ru: 'Не удалось войти. Попробуйте ещё раз.',
     },
+
+    /* ---- the two ways in ---- */
+    tabSignIn: { kz: 'Кіру', ru: 'Войти' },
+    tabSignUp: { kz: 'Тіркелу', ru: 'Регистрация' },
+    google: { kz: 'Google арқылы жалғастыру', ru: 'Продолжить с Google' },
+    or: { kz: 'немесе', ru: 'или' },
+
+    /* ---- email + password form ---- */
+    emailLabel: { kz: 'Email', ru: 'Email' },
+    emailPlaceholder: { kz: 'pochta@example.com', ru: 'pochta@example.com' },
+    passwordLabel: { kz: 'Құпия сөз', ru: 'Пароль' },
+    passwordPlaceholder: { kz: 'Кемінде 6 таңба', ru: 'Минимум 6 символов' },
+    submitSignIn: { kz: 'Кіру', ru: 'Войти' },
+    submitSignUp: { kz: 'Тіркелу', ru: 'Зарегистрироваться' },
+    signingUp: { kz: 'Аккаунт жасалуда…', ru: 'Создаём аккаунт…' },
+
+    /* ---- password reset ---- */
+    forgot: {
+      kz: 'Құпия сөзді ұмыттыңыз ба?',
+      ru: 'Забыли пароль?',
+    },
+    resetHint: {
+      kz: 'Поштаңызды жазыңыз — қалпына келтіру сілтемесін жібереміз.',
+      ru: 'Укажите почту — пришлём ссылку для восстановления.',
+    },
+    resetSend: { kz: 'Сілтеме жіберу', ru: 'Отправить ссылку' },
+    /* Firebase answers the same way whether or not the address has an account,
+       and so does this line — it must not confirm that one exists. */
+    resetSent: {
+      kz: 'Егер мұндай мекенжай тіркелген болса, хат жіберілді.',
+      ru: 'Письмо отправлено, если такой адрес зарегистрирован.',
+    },
+
+    /* ---- Firebase error codes, in friendly form ---- */
+    errInvalidEmail: {
+      kz: 'Email дұрыс жазылмаған.',
+      ru: 'Неверный формат email.',
+    },
+    errWeakPassword: {
+      kz: 'Құпия сөз кемінде 6 таңбадан тұруы керек.',
+      ru: 'Пароль должен быть не короче 6 символов.',
+    },
+    errEmailInUse: {
+      kz: 'Бұл email тіркеліп қойған. «Кіру» бөліміне өтіңіз.',
+      ru: 'Этот email уже зарегистрирован. Перейдите во вкладку «Войти».',
+    },
+    errUserNotFound: {
+      kz: 'Мұндай аккаунт табылмады. Алдымен тіркеліңіз.',
+      ru: 'Аккаунт не найден. Сначала зарегистрируйтесь.',
+    },
+    errWrongPassword: {
+      kz: 'Email не құпия сөз дұрыс емес.',
+      ru: 'Неверный email или пароль.',
+    },
+    errTooManyRequests: {
+      kz: 'Тым көп әрекет жасалды. Сәл кейінірек қайталаңыз.',
+      ru: 'Слишком много попыток. Повторите чуть позже.',
+    },
+    /* Not the visitor's mistake: the provider is still switched off in the
+       Firebase console, so say that plainly instead of blaming the input. */
+    errNotAllowed: {
+      kz: 'Email арқылы кіру әзірге қосылмаған.',
+      ru: 'Вход по email пока не включён.',
+    },
+
     loading: { kz: 'Жүктелуде…', ru: 'Загрузка…' },
     signedInAs: { kz: 'Кірген аккаунт', ru: 'Вы вошли как' },
     syncOn: {

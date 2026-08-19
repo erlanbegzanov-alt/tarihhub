@@ -35,11 +35,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <!-- Google Identity Services: renders the native Google button and hands
-         back an ID token directly, client-side — no popup/redirect round trip
-         through Firebase's own auth-domain handler, which is what turned out
-         to be unreliable for sign-in (see src/lib/session.ts). -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
