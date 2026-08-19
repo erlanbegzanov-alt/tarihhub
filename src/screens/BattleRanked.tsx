@@ -201,7 +201,7 @@ export function BattleRanked() {
       </motion.div>
 
       <motion.div variants={staggerItem} className="mt-4">
-        <BattleDuel mode="ranked" onRankedResult={refresh} />
+        <BattleDuel mode="ranked" onRankedResult={refresh} ratingTierIndex={tierInfo.index} />
       </motion.div>
 
       <motion.div variants={staggerItem} className="mt-7">

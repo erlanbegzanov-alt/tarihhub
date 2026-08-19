@@ -21,6 +21,8 @@ import {
   QUEUE_TTL_MS,
   RATING_LOSS,
   RATING_WIN,
+  ROUND_SIZE,
+  ROUNDS,
   answerXp,
   applyRankedResult,
   clearClaim,
@@ -184,12 +186,16 @@ function TimerRing({ seconds }: { seconds: number }) {
 export function BattleDuel({
   mode,
   onRankedResult,
+  ratingTierIndex,
 }: {
   mode: BattleMode
   /** Fired once a ranked duel is scored, so the Ranked screen can refresh its
    *  rating card and the weekly board — data that lives in Firestore, not in
    *  the local profile store, so it can't just react to `useProfile()`. */
   onRankedResult?: () => void
+  /** The caller's league (`BattleRanked` reads it off its own rating card) —
+   *  biases which difficulty pool each round draws from. Unused in casual. */
+  ratingTierIndex?: number
 }) {
   const { t } = useLang()
   const session = useSession()
@@ -210,6 +216,8 @@ export function BattleDuel({
   const [timedOut, setTimedOut] = useState(false)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [weeklyTopUids, setWeeklyTopUids] = useState<Set<string>>(() => new Set())
+  /** The round number to flash centre-screen, or `null` when nothing's showing. */
+  const [roundBanner, setRoundBanner] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -220,6 +228,16 @@ export function BattleDuel({
       cancelled = true
     }
   }, [])
+
+  // Flashes "Round N — difficulty" the instant a new round's first question
+  // loads (index 0, ROUND_SIZE, 2*ROUND_SIZE, …), then clears itself — the
+  // banner is purely a beat between rounds, never something to dismiss by hand.
+  useEffect(() => {
+    if (phase !== 'duel' || index % ROUND_SIZE !== 0) return
+    setRoundBanner(index / ROUND_SIZE + 1)
+    const timer = window.setTimeout(() => setRoundBanner(null), 1400)
+    return () => window.clearTimeout(timer)
+  }, [phase, index])
 
   /**
    * Guards the one-time scoring of a finished duel. Kept in a ref rather than
@@ -309,7 +327,7 @@ export function BattleDuel({
     // …and in parallel, keep sweeping the queue ourselves. There is no
     // server-side matchmaker, so both sides look for each other.
     const sweep = () => {
-      void findMatch(uid, mode).then((foundId) => {
+      void findMatch(uid, mode, ratingTierIndex ?? null).then((foundId) => {
         if (stopped || !foundId) return
         stopped = true
         openMatch(foundId)
@@ -325,7 +343,7 @@ export function BattleDuel({
       void leaveQueue(uid)
       void clearClaim(uid)
     }
-  }, [phase, mode, uid, openMatch])
+  }, [phase, mode, uid, openMatch, ratingTierIndex])
 
   /* ---------------------------- live match ---------------------------- */
 
@@ -479,8 +497,41 @@ export function BattleDuel({
   const inDuel = phase === 'duel' || phase === 'waiting' || phase === 'result'
   const foeXp = outcome?.foeXp ?? foeSlot?.xp ?? 0
 
+  const roundDifficultyLabel = [s.battle.roundLight, s.battle.roundMedium, s.battle.roundHard][
+    Math.min((roundBanner ?? 1) - 1, 2)
+  ]
+
   return (
-    <div className="overflow-hidden rounded-card bg-surface shadow-soft ring-1 ring-line/60">
+    <div className="relative overflow-hidden rounded-card bg-surface shadow-soft ring-1 ring-line/60">
+      {/* the beat between rounds — appears the instant a new round's first
+          question loads, then clears itself; nothing to dismiss by hand */}
+      <AnimatePresence>
+        {roundBanner !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: easeOut }}
+            className="absolute inset-0 z-20 grid place-items-center bg-ink/55 backdrop-blur-[2px]"
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              transition={springSoft}
+              className="rounded-card bg-surface px-7 py-5 text-center shadow-lift"
+            >
+              <p className="text-[12.5px] font-bold tracking-wide text-ink-faint uppercase">
+                {t(s.battle.roundLabel)} {roundBanner} / {ROUNDS}
+              </p>
+              <p className="mt-1 text-[19px] font-bold text-ink">
+                {t(roundDifficultyLabel)}
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* duel head + racing bars, once there is a duel to watch */}
       {inDuel && (
         <>

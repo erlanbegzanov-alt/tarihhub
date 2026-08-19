@@ -37,7 +37,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore'
-import { pickBattleQuestionIds } from '../data/battleQuestions'
+import { pickRoundQuestionIds } from '../data/battleQuestions'
 import type { AvatarGender } from '../data/ranks'
 import type { LocalizedText } from '../data/types'
 import { db } from './firebase'
@@ -46,8 +46,12 @@ import { db } from './firebase'
 
 export type BattleMode = 'casual' | 'ranked'
 
+/** Questions per round — round 1 light, round 2 medium, round 3 hard (see `pickRoundQuestionIds`). */
+export const ROUND_SIZE = 3
+/** Rounds in one duel. */
+export const ROUNDS = 3
 /** Questions in one duel. */
-export const BATTLE_QUESTIONS = 5
+export const BATTLE_QUESTIONS = ROUND_SIZE * ROUNDS
 /** Seconds allowed per question before it is answered as a miss. */
 export const QUESTION_SECONDS = 12
 /** Flat XP for a correct answer, before the speed bonus. */
@@ -483,6 +487,7 @@ export function watchClaim(
 export async function findMatch(
   uid: string,
   mode: BattleMode,
+  ratingTierIndex: number | null = null,
 ): Promise<string | null> {
   if (!db) return null
   let candidates: string[] = []
@@ -504,7 +509,7 @@ export async function findMatch(
   }
 
   for (const candidateUid of candidates) {
-    const matchId = await claimCandidate(uid, candidateUid, mode)
+    const matchId = await claimCandidate(uid, candidateUid, mode, ratingTierIndex)
     if (matchId) return matchId
   }
   return null
@@ -522,6 +527,7 @@ async function claimCandidate(
   uid: string,
   candidateUid: string,
   mode: BattleMode,
+  ratingTierIndex: number | null,
 ): Promise<string | null> {
   if (!db) return null
   const database = db
@@ -543,7 +549,11 @@ async function claimCandidate(
       transaction.set(matchRef, {
         mode,
         players: [uid, candidateUid],
-        questionIds: pickBattleQuestionIds(BATTLE_QUESTIONS),
+        // Matchmaking pairs by join order, not rating, so the initiator's own
+        // league stands in for "this match's" league — casual duels (and
+        // ranked ones before a rating exists) pass `null` for the plain
+        // light → medium → hard climb.
+        questionIds: pickRoundQuestionIds(ROUND_SIZE, mode === 'ranked' ? ratingTierIndex : null),
         p1: emptySlot(),
         p2: emptySlot(),
         createdAt: Date.now(),
