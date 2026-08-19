@@ -73,32 +73,79 @@ export function PersonDetail() {
 
   return (
     <motion.div variants={staggerContainer} initial="initial" animate="animate">
-      {/* ---------- top bar ---------- */}
-      <motion.div variants={staggerItem} className="mb-5 flex items-center justify-between">
-        <IconButton label={t(s.common.back)} onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-5 w-5" strokeWidth={2} />
-        </IconButton>
-        <div className="flex items-center gap-2">
-          <IconButton label={t(s.person.share)} onClick={share}>
-            <Share2 className="h-[18px] w-[18px]" strokeWidth={2} />
-          </IconButton>
+      {/* ---------- mobile/tablet: full-bleed hero photo, buttons floating on top —
+          no card edge between the portrait and the name/bio below it. Desktop
+          keeps the framed, sticky portrait in the 2-column layout instead. */}
+      <motion.div
+        variants={staggerItem}
+        className="relative -mx-4 -mt-5 mb-5 overflow-hidden sm:-mx-6 md:-mx-8 md:-mt-8 lg:hidden"
+      >
+        <PortraitPanel
+          initial={person.initial}
+          eraKey={person.eraKey}
+          motif={person.motif}
+          portrait={person.portrait}
+          name={t(person.name)}
+          size="lg"
+          className="aspect-4/5 w-full sm:aspect-16/10"
+        />
+        <div className="absolute inset-x-4 top-4 flex items-center justify-between sm:inset-x-6">
           <IconButton
-            label={t(s.person.bookmark)}
-            onClick={() => setSaved((prev) => !prev)}
-            className={saved ? 'text-gold' : undefined}
+            label={t(s.common.back)}
+            onClick={() => navigate(-1)}
+            className="bg-surface/90 backdrop-blur-sm"
           >
-            <Bookmark
-              className="h-[18px] w-[18px]"
-              strokeWidth={2}
-              fill={saved ? 'currentColor' : 'none'}
-            />
+            <ArrowLeft className="h-5 w-5" strokeWidth={2} />
           </IconButton>
+          <div className="flex items-center gap-2">
+            <IconButton
+              label={t(s.person.share)}
+              onClick={share}
+              className="bg-surface/90 backdrop-blur-sm"
+            >
+              <Share2 className="h-[18px] w-[18px]" strokeWidth={2} />
+            </IconButton>
+            <IconButton
+              label={t(s.person.bookmark)}
+              onClick={() => setSaved((prev) => !prev)}
+              className={cn('bg-surface/90 backdrop-blur-sm', saved && 'text-gold')}
+            >
+              <Bookmark
+                className="h-[18px] w-[18px]"
+                strokeWidth={2}
+                fill={saved ? 'currentColor' : 'none'}
+              />
+            </IconButton>
+          </div>
         </div>
       </motion.div>
 
       {/* ---------- 2-column on laptop ---------- */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:gap-10">
-        <motion.div variants={staggerItem} className="lg:sticky lg:top-8 lg:self-start">
+        <motion.div variants={staggerItem} className="hidden lg:sticky lg:top-8 lg:block lg:self-start">
+          {/* ---------- desktop-only top bar, sits above the framed portrait ---------- */}
+          <div className="mb-5 flex items-center justify-between">
+            <IconButton label={t(s.common.back)} onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-5 w-5" strokeWidth={2} />
+            </IconButton>
+            <div className="flex items-center gap-2">
+              <IconButton label={t(s.person.share)} onClick={share}>
+                <Share2 className="h-[18px] w-[18px]" strokeWidth={2} />
+              </IconButton>
+              <IconButton
+                label={t(s.person.bookmark)}
+                onClick={() => setSaved((prev) => !prev)}
+                className={saved ? 'text-gold' : undefined}
+              >
+                <Bookmark
+                  className="h-[18px] w-[18px]"
+                  strokeWidth={2}
+                  fill={saved ? 'currentColor' : 'none'}
+                />
+              </IconButton>
+            </div>
+          </div>
+
           <PortraitPanel
             initial={person.initial}
             eraKey={person.eraKey}
@@ -106,11 +153,11 @@ export function PersonDetail() {
             portrait={person.portrait}
             name={t(person.name)}
             size="lg"
-            className="aspect-4/5 w-full rounded-card shadow-soft ring-1 ring-line/50 sm:aspect-16/10 lg:aspect-4/5"
+            className="aspect-4/5 w-full rounded-card shadow-soft ring-1 ring-line/50"
           />
 
-          {/* actions — sit under the portrait on desktop, full width on phone */}
-          <div className="mt-4 flex flex-col gap-2.5 sm:flex-row lg:flex-col">
+          {/* actions — sit under the portrait on desktop */}
+          <div className="mt-4 flex flex-col gap-2.5">
             <motion.button
               type="button"
               onClick={() => navigate(`/ai/${person.id}`)}
@@ -172,6 +219,40 @@ export function PersonDetail() {
                   </span>
                 </span>
               ))}
+            </div>
+
+            {/* actions — desktop shows these under the sticky portrait instead */}
+            <div className="mt-5 flex gap-2.5 sm:mt-6 lg:hidden">
+              <motion.button
+                type="button"
+                onClick={() => navigate(`/ai/${person.id}`)}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.97 }}
+                transition={springSoft}
+                className={cn(
+                  'focus-ring flex flex-1 items-center justify-center gap-2 rounded-full',
+                  'bg-brand px-5 py-3.5 text-[15px] font-semibold text-white shadow-soft',
+                  'transition-colors hover:bg-brand-dark',
+                )}
+              >
+                <MessageCircle className="h-[18px] w-[18px]" strokeWidth={2.2} />
+                {t(s.person.chat)}
+              </motion.button>
+              <motion.button
+                type="button"
+                onClick={() => navigate(`/quiz/${person.id}`)}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.97 }}
+                transition={springSoft}
+                className={cn(
+                  'focus-ring flex flex-1 items-center justify-center gap-2 rounded-full',
+                  'bg-surface px-5 py-3.5 text-[15px] font-semibold text-brand',
+                  'ring-[1.5px] ring-brand/45 transition-colors hover:bg-brand-tint',
+                )}
+              >
+                <Trophy className="h-[18px] w-[18px]" strokeWidth={2.2} />
+                {t(s.person.quiz)}
+              </motion.button>
             </div>
           </motion.div>
 
