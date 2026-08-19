@@ -9,7 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Crown, Loader2, Trophy } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RankBadge } from '../components/RankBadge'
-import { ProgressBar } from '../components/ui'
+import { ProgressBar, WeeklyTopBadge } from '../components/ui'
 import { battleQuestion } from '../data/battleQuestions'
 import type { AvatarGender } from '../data/ranks'
 import type { QuizQuestion } from '../data/types'
@@ -26,6 +26,7 @@ import {
   clearClaim,
   closeMatch,
   fetchBattlePlayer,
+  fetchWeeklyTopUids,
   findMatch,
   joinQueue,
   leaveQueue,
@@ -78,6 +79,7 @@ function Fighter({
   avatarGender,
   avatarTierIndex,
   rankTitle,
+  isWeeklyTop,
 }: {
   name: string
   photoURL: string
@@ -86,30 +88,40 @@ function Fighter({
   avatarGender: AvatarGender | null
   avatarTierIndex: number
   rankTitle: string
+  isWeeklyTop: boolean
 }) {
   const { t } = useLang()
   return (
     <div className="flex min-w-0 flex-col items-center gap-2 text-center">
-      {avatarGender ? (
-        <RankBadge tierIndex={avatarTierIndex} gender={avatarGender} title={rankTitle} size={56} />
-      ) : photoURL ? (
-        <img
-          src={photoURL}
-          alt=""
-          referrerPolicy="no-referrer"
-          className="h-14 w-14 rounded-full object-cover ring-2 ring-surface"
-          style={{ boxShadow: `0 0 0 3px color-mix(in srgb, ${color} 35%, transparent)` }}
-        />
-      ) : (
-        <span
-          className="grid h-14 w-14 place-items-center rounded-full text-lg font-bold text-white ring-2 ring-surface"
-          style={{
-            background: `linear-gradient(155deg, ${color} 0%, color-mix(in srgb, ${color} 62%, #17211e) 100%)`,
-          }}
-        >
-          {name.charAt(0).toUpperCase() || '?'}
-        </span>
-      )}
+      <div className="relative">
+        {avatarGender ? (
+          <RankBadge tierIndex={avatarTierIndex} gender={avatarGender} title={rankTitle} size={56} />
+        ) : photoURL ? (
+          <img
+            src={photoURL}
+            alt=""
+            referrerPolicy="no-referrer"
+            className="h-14 w-14 rounded-full object-cover ring-2 ring-surface"
+            style={{ boxShadow: `0 0 0 3px color-mix(in srgb, ${color} 35%, transparent)` }}
+          />
+        ) : (
+          <span
+            className="grid h-14 w-14 place-items-center rounded-full text-lg font-bold text-white ring-2 ring-surface"
+            style={{
+              background: `linear-gradient(155deg, ${color} 0%, color-mix(in srgb, ${color} 62%, #17211e) 100%)`,
+            }}
+          >
+            {name.charAt(0).toUpperCase() || '?'}
+          </span>
+        )}
+        {isWeeklyTop && (
+          <WeeklyTopBadge
+            label={t(s.battle.weeklyTopBadge)}
+            compact
+            className="absolute -right-1 -bottom-1 ring-2 ring-surface"
+          />
+        )}
+      </div>
       <span className="max-w-full truncate text-[13.5px] font-bold text-ink">
         {name}
       </span>
@@ -197,6 +209,17 @@ export function BattleDuel({
   const [myXp, setMyXp] = useState(0)
   const [timedOut, setTimedOut] = useState(false)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
+  const [weeklyTopUids, setWeeklyTopUids] = useState<Set<string>>(() => new Set())
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchWeeklyTopUids().then((uids) => {
+      if (!cancelled) setWeeklyTopUids(uids)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   /**
    * Guards the one-time scoring of a finished duel. Kept in a ref rather than
@@ -470,6 +493,7 @@ export function BattleDuel({
               avatarGender={rankIdentity.avatarGender}
               avatarTierIndex={rankIdentity.avatarTierIndex}
               rankTitle={myRankTitle}
+              isWeeklyTop={uid !== null && weeklyTopUids.has(uid)}
             />
             <span className="grid h-9 w-9 place-items-center rounded-full bg-cream-deep text-[13px] font-bold text-ink-faint">
               VS
@@ -482,6 +506,7 @@ export function BattleDuel({
               avatarGender={opponent?.avatarGender ?? null}
               avatarTierIndex={opponent?.avatarTierIndex ?? 0}
               rankTitle={foeRankTitle}
+              isWeeklyTop={opponent !== null && weeklyTopUids.has(opponent.uid)}
             />
           </div>
 

@@ -398,6 +398,19 @@ export async function fetchWeeklyLeaderboard(count = 10): Promise<BattlePlayer[]
   }
 }
 
+/** The default cutoff for "this week's top players" everywhere the app shows the badge. */
+export const WEEKLY_TOP_COUNT = 10
+
+/**
+ * Uids of this week's top `count` battle players, as a set for O(1) lookups —
+ * every screen that shows the 🔥 weekly-top badge (Profile, a live duel,
+ * Кахут) reads from this instead of re-deriving position from the full board.
+ */
+export async function fetchWeeklyTopUids(count = WEEKLY_TOP_COUNT): Promise<Set<string>> {
+  const board = await fetchWeeklyLeaderboard(count)
+  return new Set(board.map((player) => player.uid))
+}
+
 /* ----------------------------- matchmaking ----------------------------- */
 
 /** Announces that this player is waiting for a duel in `mode`. */

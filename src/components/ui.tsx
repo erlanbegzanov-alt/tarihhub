@@ -1,6 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import type { ReactNode } from 'react'
-import { Search } from 'lucide-react'
+import { Flame, Search } from 'lucide-react'
 import { eraColor } from '../data/eras'
 import type { EraKey } from '../data/types'
 import { cn } from '../lib/cn'
@@ -35,6 +35,37 @@ export function EraBadge({
         style={{ background: color }}
       />
       {children}
+    </span>
+  )
+}
+
+/**
+ * Marks an account as this week's top-N in rated battle (see
+ * `fetchWeeklyTopUids` in `lib/battle.ts`) — shown in Profile and next to a
+ * name in a live duel or Кахут. `compact` drops the label text down to just
+ * the flame, for the tight space beside a name badge.
+ */
+export function WeeklyTopBadge({
+  label,
+  compact = false,
+  className,
+}: {
+  label: string
+  compact?: boolean
+  className?: string
+}) {
+  return (
+    <span
+      title={label}
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-full',
+        'bg-gold-tint text-gold ring-1 ring-gold/40',
+        compact ? 'p-1' : 'px-2 py-0.5 text-[11px] font-bold whitespace-nowrap',
+        className,
+      )}
+    >
+      <Flame className={compact ? 'h-3 w-3' : 'h-3 w-3 shrink-0'} strokeWidth={2.4} fill="currentColor" />
+      {!compact && label}
     </span>
   )
 }

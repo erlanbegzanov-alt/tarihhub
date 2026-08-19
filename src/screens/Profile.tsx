@@ -17,12 +17,13 @@ import { useEffect, useState } from 'react'
 import { MotifIcon } from '../components/Motif'
 import { RankBadge, RankStatusPill } from '../components/RankBadge'
 import { RankSheet } from '../components/RankSheet'
-import { IconButton, ProgressBar } from '../components/ui'
+import { IconButton, ProgressBar, WeeklyTopBadge } from '../components/ui'
 import { eraColor } from '../data/eras'
 import { badges } from '../data/lessons'
 import { rankInfo, ranks } from '../data/ranks'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
+import { fetchWeeklyTopUids } from '../lib/battle'
 import { cn } from '../lib/cn'
 import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import {
@@ -133,6 +134,20 @@ export function Profile() {
   useEffect(() => {
     setJsonDraft(JSON.stringify(profile, null, 2))
   }, [profile])
+
+  // ---------- this week's top-10 badge ----------
+  const [isWeeklyTop, setIsWeeklyTop] = useState(false)
+  useEffect(() => {
+    const uid = session.user?.uid
+    if (!uid) return
+    let cancelled = false
+    void fetchWeeklyTopUids().then((uids) => {
+      if (!cancelled) setIsWeeklyTop(uids.has(uid))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [session.user?.uid])
 
   const disableDevMode = () => {
     try {
@@ -323,15 +338,18 @@ export function Profile() {
                     )}
                   </div>
                 )}
-                <RankStatusPill
-                  tierIndex={displayedTitleTierIndex}
-                  title={displayedTitle}
-                  expanded={rankSheetOpen}
-                  onClick={() => {
-                    setRankSheetMode('title')
-                    setRankSheetOpen(true)
-                  }}
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <RankStatusPill
+                    tierIndex={displayedTitleTierIndex}
+                    title={displayedTitle}
+                    expanded={rankSheetOpen}
+                    onClick={() => {
+                      setRankSheetMode('title')
+                      setRankSheetOpen(true)
+                    }}
+                  />
+                  {isWeeklyTop && <WeeklyTopBadge label={t(s.battle.weeklyTopBadge)} />}
+                </div>
               </div>
             </div>
 
