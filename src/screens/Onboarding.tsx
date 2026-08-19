@@ -3,18 +3,42 @@ import type { PanInfo } from 'framer-motion'
 import { Clock, Map, Sparkles, Trophy } from 'lucide-react'
 import { useState } from 'react'
 import type { ReactElement } from 'react'
-import { MotifIcon } from '../components/Motif'
+import { RankBadge } from '../components/RankBadge'
 import { Wordmark } from '../components/Wordmark'
+import type { AvatarGender } from '../data/ranks'
+import { ranks } from '../data/ranks'
 import { eraColor } from '../data/eras'
 import type { LocalizedText } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import { easeOut, pressable, springSoft } from '../lib/motion'
+import { setAvatarGender } from '../lib/progress'
 
 /* ------------------------------- artwork ------------------------------- */
 
-/** Slide 1: warm steppe horizon with a yurt — pure SVG, no image assets. */
+/**
+ * Slide 1: a real hero photo, if one has been dropped in. Same graceful
+ * fallback pattern as `RankBadge`'s avatar art — until `/onboarding/hero.jpg`
+ * exists the request 404s and the SVG steppe scene below takes over, so this
+ * slide never has to ship broken while waiting on real photography.
+ */
+function HeroArt() {
+  const [failed, setFailed] = useState(false)
+  if (!failed) {
+    return (
+      <img
+        src="/onboarding/hero.jpg"
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover"
+        onError={() => setFailed(true)}
+      />
+    )
+  }
+  return <SteppeArt />
+}
+
+/** Fallback for `HeroArt`: warm steppe horizon with a yurt — pure SVG, no image assets. */
 function SteppeArt() {
   return (
     <svg
@@ -68,34 +92,35 @@ function SteppeArt() {
   )
 }
 
-/** Slide 2: two portrait tiles, standing in for the historical-figure cards. */
+/** Slide 2: a 2x2 grid of real portraits already in the app, not abstract icon tiles. */
 function FiguresArt() {
   const tiles = [
-    { motif: 'crown', era: 'khanate', rotate: -5 },
-    { motif: 'feather', era: 'alash', rotate: 5 },
+    { file: 'abylai', era: 'khanate', rotate: -4 },
+    { file: 'tomiris', era: 'saka', rotate: 3 },
+    { file: 'alfarabi', era: 'turkic', rotate: 4 },
+    { file: 'abai', era: 'alash', rotate: -3 },
   ] as const
 
   return (
-    <div className="flex items-center justify-center gap-4">
-      {tiles.map((tile) => {
+    <div className="grid grid-cols-2 gap-3">
+      {tiles.map((tile, i) => {
         const color = eraColor(tile.era)
         return (
           <motion.div
-            key={tile.motif}
-            initial={{ opacity: 0, y: 16, rotate: 0 }}
+            key={tile.file}
+            initial={{ opacity: 0, y: 14, rotate: 0 }}
             animate={{ opacity: 1, y: 0, rotate: tile.rotate }}
-            transition={{ ...springSoft, delay: 0.1 }}
-            className="grid h-28 w-24 place-items-center rounded-tile shadow-soft ring-1 ring-line/50 sm:h-32 sm:w-28"
+            transition={{ ...springSoft, delay: 0.06 * i }}
+            className="h-16 w-16 overflow-hidden rounded-tile shadow-soft ring-1 ring-line/50 sm:h-[4.75rem] sm:w-[4.75rem]"
             style={{
               background: `linear-gradient(150deg, color-mix(in srgb, ${color} 24%, white), color-mix(in srgb, ${color} 8%, white))`,
             }}
           >
-            <span
-              className="grid h-14 w-14 place-items-center rounded-full bg-surface/85"
-              style={{ color }}
-            >
-              <MotifIcon motif={tile.motif} className="h-6 w-6" strokeWidth={1.9} />
-            </span>
+            <img
+              src={`/portraits/${tile.file}.png`}
+              alt=""
+              className="h-full w-full object-cover"
+            />
           </motion.div>
         )
       })}
@@ -175,6 +200,37 @@ function FeaturesArt() {
   )
 }
 
+/** Slide 5: a tier-1 preview of each avatar/title track, as a teaser for what picking one unlocks. */
+function GenderArt() {
+  const { t } = useLang()
+  const tracks: { gender: AvatarGender; label: LocalizedText }[] = [
+    { gender: 'm', label: s.profile.rankMale },
+    { gender: 'f', label: s.profile.rankFemale },
+  ]
+
+  return (
+    <div className="flex items-center justify-center gap-6">
+      {tracks.map((track, i) => (
+        <motion.div
+          key={track.gender}
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...springSoft, delay: 0.08 * i }}
+          className="flex flex-col items-center gap-2"
+        >
+          <RankBadge
+            tierIndex={0}
+            gender={track.gender}
+            title={t(ranks[0].title[track.gender])}
+            size={72}
+          />
+          <span className="text-[12.5px] font-semibold text-ink-soft">{t(track.label)}</span>
+        </motion.div>
+      ))}
+    </div>
+  )
+}
+
 /* -------------------------------- slides ------------------------------- */
 
 interface Slide {
@@ -191,7 +247,7 @@ interface Slide {
 const SLIDES: Slide[] = [
   {
     id: 'hero',
-    art: SteppeArt,
+    art: HeroArt,
     hero: true,
     text: s.onboarding.heroTagline,
     caption: s.onboarding.heroCaption,
@@ -216,6 +272,13 @@ const SLIDES: Slide[] = [
     art: FeaturesArt,
     title: s.onboarding.learnTitle,
     text: s.onboarding.learnText,
+    cta: s.onboarding.next,
+  },
+  {
+    id: 'gender',
+    art: GenderArt,
+    title: s.onboarding.genderTitle,
+    text: s.onboarding.genderText,
     cta: s.onboarding.enter,
   },
 ]
@@ -240,7 +303,6 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const [[index, direction], setPage] = useState<[number, number]>([0, 0])
 
   const slide = SLIDES[index]
-  const isLast = index === SLIDES.length - 1
 
   const go = (delta: number) => {
     const next = index + delta
@@ -261,10 +323,12 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     <div className="flex min-h-dvh flex-col bg-cream">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pt-5 pb-8 sm:px-6">
         <div className="flex h-9 items-center justify-end">
-          {!isLast && (
+          {/* Skip jumps straight to the gender slide rather than exiting outright —
+              every account still leaves onboarding with an avatar assigned. */}
+          {index < SLIDES.length - 1 && (
             <button
               type="button"
-              onClick={onDone}
+              onClick={() => setPage([SLIDES.length - 1, 1])}
               className="focus-ring rounded-full px-3 py-1.5 text-[13px] font-medium text-ink-faint transition-colors hover:text-ink"
             >
               {t(s.onboarding.skip)}
@@ -349,18 +413,46 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
         {/* ---------- cta ---------- */}
         <div className="mt-5 text-center">
-          <motion.button
-            type="button"
-            onClick={() => go(1)}
-            {...pressable}
-            className={cn(
-              'focus-ring w-full rounded-full bg-brand px-6 py-3.5',
-              'text-[15px] font-semibold text-white shadow-soft',
-              'transition-colors hover:bg-brand-dark',
-            )}
-          >
-            {t(slide.cta)}
-          </motion.button>
+          {slide.id === 'gender' ? (
+            <div className="flex gap-2.5">
+              {(
+                [
+                  { gender: 'm' as AvatarGender, label: s.profile.rankMale },
+                  { gender: 'f' as AvatarGender, label: s.profile.rankFemale },
+                ] as const
+              ).map((track) => (
+                <motion.button
+                  key={track.gender}
+                  type="button"
+                  onClick={() => {
+                    setAvatarGender(track.gender)
+                    onDone()
+                  }}
+                  {...pressable}
+                  className={cn(
+                    'focus-ring flex-1 rounded-full bg-brand px-6 py-3.5',
+                    'text-[15px] font-semibold text-white shadow-soft',
+                    'transition-colors hover:bg-brand-dark',
+                  )}
+                >
+                  {t(track.label)}
+                </motion.button>
+              ))}
+            </div>
+          ) : (
+            <motion.button
+              type="button"
+              onClick={() => go(1)}
+              {...pressable}
+              className={cn(
+                'focus-ring w-full rounded-full bg-brand px-6 py-3.5',
+                'text-[15px] font-semibold text-white shadow-soft',
+                'transition-colors hover:bg-brand-dark',
+              )}
+            >
+              {t(slide.cta)}
+            </motion.button>
+          )}
           {slide.caption && (
             <p className="mt-3 text-[12.5px] text-ink-faint">{t(slide.caption)}</p>
           )}

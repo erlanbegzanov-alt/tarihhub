@@ -6,7 +6,7 @@ import { AppShell } from './components/AppShell'
 import { LanguageProvider } from './i18n/LanguageProvider'
 import { s } from './i18n/strings'
 import { useLang } from './i18n/useLang'
-import { pageVariants } from './lib/motion'
+import { easeOut, pageVariants } from './lib/motion'
 import { recordVisit } from './lib/progress'
 import { completeOnboarding, sessionGate, useSession } from './lib/session'
 import { Home } from './screens/Home'
@@ -132,22 +132,7 @@ function Splash() {
   )
 }
 
-/**
- * Entry gate. A first-ever visitor gets the intro tour, then the mandatory
- * sign-in screen; a signed-in visitor goes straight into the app on every
- * later load. The tour and sign-in render outside the router, so a deep link
- * survives the flow and lands once the visitor is through.
- */
-function Gate() {
-  const session = useSession()
-  const gate = sessionGate(session)
-
-  // Once per calendar day: bump the visit count and recompute the real streak.
-  // Held until the visitor is actually in the app so the intro doesn't count.
-  useEffect(() => {
-    if (gate === 'app') recordVisit()
-  }, [gate])
-
+function GateContent({ gate }: { gate: ReturnType<typeof sessionGate> }) {
   if (gate === 'loading') return <Splash />
   if (gate === 'onboarding') return <Onboarding onDone={completeOnboarding} />
   if (gate === 'signin') return <SignIn />
@@ -158,6 +143,43 @@ function Gate() {
         <AnimatedRoutes />
       </AppShell>
     </BrowserRouter>
+  )
+}
+
+/**
+ * Entry gate. A first-ever visitor gets the intro tour, then the mandatory
+ * sign-in screen; a signed-in visitor goes straight into the app on every
+ * later load. The tour and sign-in render outside the router, so a deep link
+ * survives the flow and lands once the visitor is through.
+ *
+ * The crossfade below only fires at these gate transitions (loading→onboarding,
+ * onboarding→app, etc.) — `AnimatedRoutes` inside the `app` branch keeps its
+ * own separate `AnimatePresence` for in-app route changes, so this one never
+ * re-triggers on ordinary navigation.
+ */
+function Gate() {
+  const session = useSession()
+  const gate = sessionGate(session)
+  const reduce = useReducedMotion()
+
+  // Once per calendar day: bump the visit count and recompute the real streak.
+  // Held until the visitor is actually in the app so the intro doesn't count.
+  useEffect(() => {
+    if (gate === 'app') recordVisit()
+  }, [gate])
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={gate}
+        initial={reduce ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={reduce ? undefined : { opacity: 0 }}
+        transition={{ duration: 0.3, ease: easeOut }}
+      >
+        <GateContent gate={gate} />
+      </motion.div>
+    </AnimatePresence>
   )
 }
 

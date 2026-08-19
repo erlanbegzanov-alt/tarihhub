@@ -638,6 +638,12 @@ export const s = {
     learnTimeline: { kz: 'Уақыт сызығы', ru: 'Лента времени' },
     learnQuiz: { kz: 'Викторина', ru: 'Викторина' },
     learnBadges: { kz: 'Жетістіктер', ru: 'Достижения' },
+
+    genderTitle: { kz: 'Кім боласыз?', ru: 'Кем вы будете?' },
+    genderText: {
+      kz: 'Атақ пен аватар осыған қарай өседі — кейін профильде ауыстыруға болады',
+      ru: 'От этого зависит ваш титул и аватар — образ можно будет сменить позже в профиле',
+    },
   },
 
   /** Google sign-in screen and the account row in the profile. */
