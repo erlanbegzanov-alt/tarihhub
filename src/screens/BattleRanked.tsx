@@ -7,7 +7,7 @@
  */
 import { Award, Crown, Gem, Medal, Shield, Trophy } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KahootHeader } from '../components/kahoot'
@@ -24,6 +24,7 @@ import {
 import type { BattlePlayer } from '../lib/battle'
 import { cn } from '../lib/cn'
 import { staggerContainer, staggerItem } from '../lib/motion'
+import { BADGE_SPARKLES } from '../lib/rankStyle'
 import { useSession } from '../lib/session'
 import { BattleDuel } from './BattleDuel'
 
@@ -37,6 +38,28 @@ const TIER_COLORS = [
   'var(--color-gold)',
   'var(--tier-4)',
   'var(--tier-6)',
+]
+
+/**
+ * Same escalating glow/shimmer/sparkle language `TIER_EFFECTS` gives the
+ * Profile rank badges (see `src/lib/rankStyle.ts`), recalibrated for this
+ * ladder's 5 rungs instead of 8: Қола stays plain, and the spectacle builds
+ * up to Алмас. The keyframes themselves already exist globally (index.css) —
+ * this only decides which tier gets how much of them.
+ */
+interface RatingTierEffect {
+  glow?: 'rank-glow-soft' | 'rank-glow' | 'rank-glow-rich'
+  glowDuration?: string
+  shimmer?: 'plain' | 'rich'
+  sparkles?: number
+}
+
+const RATING_TIER_EFFECTS: RatingTierEffect[] = [
+  {},
+  { glow: 'rank-glow-soft', glowDuration: '4.4s' },
+  { glow: 'rank-glow', glowDuration: '3s', shimmer: 'plain' },
+  { glow: 'rank-glow', glowDuration: '2.6s', shimmer: 'plain', sparkles: 2 },
+  { glow: 'rank-glow-rich', glowDuration: '2.2s', shimmer: 'rich', sparkles: 4 },
 ]
 
 /** The instant the current week's board resets — a week after its start. */
@@ -77,10 +100,13 @@ export function BattleRanked() {
     return () => window.clearInterval(tick)
   }, [])
 
+  const reduceMotion = useReducedMotion()
   const rating = me?.rating ?? 0
   const tierInfo = useMemo(() => ratingTierFor(rating), [rating])
   const TierIcon = TIER_ICONS[tierInfo.index]
   const tierColor = TIER_COLORS[tierInfo.index]
+  const tierFx = RATING_TIER_EFFECTS[tierInfo.index]
+  const animateTier = !reduceMotion
 
   const countdown = useMemo(
     () => formatCountdown(nextWeekStart().getTime() - now, t(s.battle.dayShort), t(s.battle.hourShort)),
@@ -109,10 +135,50 @@ export function BattleRanked() {
       >
         <div className="flex items-center gap-4">
           <span
-            className="grid h-14 w-14 shrink-0 place-items-center rounded-full"
-            style={{ background: `color-mix(in srgb, ${tierColor} 16%, var(--color-surface))` }}
+            className="relative grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full"
+            style={{
+              background: `color-mix(in srgb, ${tierColor} 16%, var(--color-surface))`,
+              ...(animateTier && tierFx.glow
+                ? {
+                    animation: `${tierFx.glow} ${tierFx.glowDuration} ease-in-out infinite`,
+                    ['--tier-glow' as string]: tierColor,
+                  }
+                : null),
+            }}
           >
-            <TierIcon className="h-6 w-6" strokeWidth={1.8} style={{ color: tierColor }} />
+            <TierIcon
+              className="relative z-10 h-6 w-6"
+              strokeWidth={1.8}
+              style={{ color: tierColor }}
+            />
+            {animateTier && tierFx.shimmer && (
+              <span
+                aria-hidden
+                className={cn(
+                  'animate-rank-shimmer pointer-events-none absolute inset-y-0 left-0',
+                  tierFx.shimmer === 'rich' ? 'w-[65%]' : 'w-1/2',
+                )}
+                style={{
+                  background: `linear-gradient(90deg, transparent 0%, rgb(255 255 255 / ${
+                    tierFx.shimmer === 'rich' ? 0.85 : 0.55
+                  }) 50%, transparent 100%)`,
+                  ...(tierFx.shimmer === 'rich' ? { animationDuration: '2.7s' } : null),
+                }}
+              />
+            )}
+            {animateTier &&
+              BADGE_SPARKLES.slice(0, tierFx.sparkles ?? 0).map((sparkle) => (
+                <span
+                  key={sparkle.delay}
+                  aria-hidden
+                  className="animate-rank-twinkle pointer-events-none absolute h-1.5 w-1.5 rounded-full bg-gold"
+                  style={{
+                    left: sparkle.left,
+                    top: sparkle.top,
+                    animationDelay: `${sparkle.delay}s`,
+                  }}
+                />
+              ))}
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[12.5px] font-semibold text-ink-faint">
