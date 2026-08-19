@@ -1,3 +1,4 @@
+/// <reference types="node" />
 /**
  * Server-side Gemini proxy.
  *
@@ -13,10 +14,12 @@
  * Firebase session: the caller sends its ID token, and this handler confirms
  * it with Google's own `accounts:lookup` endpoint before ever touching
  * Gemini. No `firebase-admin` needed for that one check, so this stays a
- * dependency-free Edge Function.
+ * dependency-free function.
+ *
+ * The `{ fetch }` export (not `export default function handler(req, res)`)
+ * is the Web-standard shape Vercel Functions expect outside a Next.js app —
+ * this project is plain Vite, so that's the one that applies here.
  */
-export const config = { runtime: 'edge' }
-
 const MODEL = 'gemini-3.6-flash'
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 
@@ -88,75 +91,77 @@ interface GeminiResponse {
   candidates?: { content?: { parts?: { text?: string }[] } }[]
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 })
-  }
-
-  const authHeader = req.headers.get('authorization') ?? ''
-  const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
-  if (!idToken || !(await verifyFirebaseToken(idToken))) {
-    return new Response('Unauthorized', { status: 401 })
-  }
-
-  const geminiKey = process.env.GEMINI_API_KEY
-  if (!geminiKey) {
-    return new Response('Server not configured', { status: 500 })
-  }
-
-  let raw: unknown
-  try {
-    raw = await req.json()
-  } catch {
-    return new Response('Bad Request', { status: 400 })
-  }
-
-  const body = validateBody(raw)
-  if (!body) {
-    return new Response('Bad Request', { status: 400 })
-  }
-
-  // A reasoning-first model: the thinking phase eats into the same token
-  // budget as the actual reply, and how much it eats varies a lot by prompt
-  // (52 tokens for a one-word reply, 450+ for a multi-sentence one, measured
-  // directly against this key). "low" is the smallest lever the API exposes
-  // — it can't be switched off outright on this model the way the old
-  // gemini-2.0-flash could — so the caller's own token budget already carries
-  // headroom for it (see src/lib/ai.ts).
-  const maxOutputTokens = Math.min(Math.max(Math.round(body.config?.maxOutputTokens ?? 900), 1), 2000)
-  const temperature = Math.min(Math.max(body.config?.temperature ?? 0.6, 0), 1)
-
-  try {
-    const geminiResponse = await fetch(GEMINI_ENDPOINT, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': geminiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: body.systemPrompt }] },
-        contents: body.contents,
-        generationConfig: {
-          maxOutputTokens,
-          temperature,
-          thinkingConfig: { thinkingLevel: 'low' },
-        },
-      }),
-    })
-
-    if (!geminiResponse.ok) {
-      return new Response('Upstream error', { status: 502 })
+export default {
+  async fetch(req: Request): Promise<Response> {
+    if (req.method !== 'POST') {
+      return new Response('Method Not Allowed', { status: 405 })
     }
 
-    const data = (await geminiResponse.json()) as GeminiResponse
-    const text = (data.candidates?.[0]?.content?.parts ?? [])
-      .map((part) => part.text)
-      .filter((part): part is string => Boolean(part))
-      .join('\n')
-      .trim()
+    const authHeader = req.headers.get('authorization') ?? ''
+    const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+    if (!idToken || !(await verifyFirebaseToken(idToken))) {
+      return new Response('Unauthorized', { status: 401 })
+    }
 
-    return new Response(JSON.stringify({ text }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })
-  } catch {
-    return new Response('Upstream error', { status: 502 })
-  }
+    const geminiKey = process.env.GEMINI_API_KEY
+    if (!geminiKey) {
+      return new Response('Server not configured', { status: 500 })
+    }
+
+    let raw: unknown
+    try {
+      raw = await req.json()
+    } catch {
+      return new Response('Bad Request', { status: 400 })
+    }
+
+    const body = validateBody(raw)
+    if (!body) {
+      return new Response('Bad Request', { status: 400 })
+    }
+
+    // A reasoning-first model: the thinking phase eats into the same token
+    // budget as the actual reply, and how much it eats varies a lot by
+    // prompt (52 tokens for a one-word reply, 450+ for a multi-sentence one,
+    // measured directly against this key). "low" is the smallest lever the
+    // API exposes — it can't be switched off outright on this model the way
+    // the old gemini-2.0-flash could — so the caller's own token budget
+    // already carries headroom for it (see src/lib/ai.ts).
+    const maxOutputTokens = Math.min(Math.max(Math.round(body.config?.maxOutputTokens ?? 900), 1), 2000)
+    const temperature = Math.min(Math.max(body.config?.temperature ?? 0.6, 0), 1)
+
+    try {
+      const geminiResponse = await fetch(GEMINI_ENDPOINT, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': geminiKey },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: body.systemPrompt }] },
+          contents: body.contents,
+          generationConfig: {
+            maxOutputTokens,
+            temperature,
+            thinkingConfig: { thinkingLevel: 'low' },
+          },
+        }),
+      })
+
+      if (!geminiResponse.ok) {
+        return new Response('Upstream error', { status: 502 })
+      }
+
+      const data = (await geminiResponse.json()) as GeminiResponse
+      const text = (data.candidates?.[0]?.content?.parts ?? [])
+        .map((part) => part.text)
+        .filter((part): part is string => Boolean(part))
+        .join('\n')
+        .trim()
+
+      return new Response(JSON.stringify({ text }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    } catch {
+      return new Response('Upstream error', { status: 502 })
+    }
+  },
 }
