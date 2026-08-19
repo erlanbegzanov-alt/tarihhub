@@ -9,12 +9,23 @@ import type { LocalizedText } from '../data/types'
 /**
  * The owner tier, one step past the real ladder. It deliberately sits outside
  * `ranks` so no amount of XP can compute its way into it: it is granted by
- * identity alone (see `OWNER_EMAIL` in `src/screens/Profile.tsx`), and the only
- * reason this index exists is so `profile.displayedRankTier` can point at it.
- * Anyone else's saved profile carrying this number falls back to their real
- * tier, so it is not something a hand-edited localStorage entry can claim.
+ * identity alone (see `OWNER_EMAIL` below), and the only reason this index
+ * exists is so `profile.displayedRankTier` can point at it. Anyone else's
+ * saved profile carrying this number falls back to their real tier, so it is
+ * not something a hand-edited localStorage entry can claim.
  */
 export const OWNER_TIER_INDEX = ranks.length
+
+/**
+ * The one account the owner tier is granted to. Checked against the *signed-in
+ * Firebase session*, not against anything the browser can set — unlike a
+ * localStorage flag, which anyone could flip. Email rather than UID because
+ * the UID isn't knowable without reading it out of a live session first, and
+ * this address is already Google-verified by the time Firebase reports it.
+ * The single source of truth for every screen that grants the owner tier
+ * (Profile, Battle, Кахут) — never re-declare this elsewhere.
+ */
+export const OWNER_EMAIL = 'erlanbegzanov@gmail.com'
 
 /**
  * The one title in the app that isn't a real Kazakh historical term — it is an

@@ -35,7 +35,7 @@ import {
   setDisplayedRankTier,
   useProfile,
 } from '../lib/progress'
-import { OWNER_TIER_INDEX, OWNER_TITLE } from '../lib/rankStyle'
+import { OWNER_EMAIL, OWNER_TIER_INDEX, OWNER_TITLE } from '../lib/rankStyle'
 import { signOutUser, updateDisplayName, useSession } from '../lib/session'
 import { useTheme } from '../lib/theme'
 import type { ThemePreference } from '../lib/theme'
@@ -53,16 +53,6 @@ const THEME_OPTIONS: { value: ThemePreference; label: typeof s.profile.themeLigh
  * only happens via the `?dev=1` query param or a previous dev session.
  */
 const DEV_MODE_KEY = 'tarihhub_dev'
-
-/**
- * The one account the owner tier is granted to. Checked against the *signed-in
- * Firebase session*, not against anything the browser can set — unlike
- * `DEV_MODE_KEY` above, which is a plain localStorage flag anyone with the
- * `?dev=1` link can flip. Email rather than UID because the UID isn't knowable
- * without reading it out of a live session first, and this address is already
- * Google-verified by the time Firebase reports it.
- */
-const OWNER_EMAIL = 'erlanbegzanov@gmail.com'
 
 function readDevModeFlag(): boolean {
   if (typeof window === 'undefined') return false

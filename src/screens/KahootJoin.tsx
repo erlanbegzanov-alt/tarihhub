@@ -29,7 +29,9 @@ import {
 } from '../lib/kahoot'
 import type { KahootPlayer, KahootSession } from '../lib/kahoot'
 import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
-import { recordBattleResult } from '../lib/progress'
+import { recordBattleResult, useProfile } from '../lib/progress'
+import { resolveRankIdentity } from '../lib/rankIdentity'
+import { OWNER_EMAIL } from '../lib/rankStyle'
 import { useSession } from '../lib/session'
 
 /** Why this student can't play, when they can't. */
@@ -52,6 +54,14 @@ export function KahootJoin() {
   const auth = useSession()
   const user = auth.user
   const uid = user?.uid ?? null
+  const profile = useProfile()
+  const rankIdentity = resolveRankIdentity({
+    xp: profile.xp,
+    avatarGender: profile.avatarGender,
+    displayedAvatarTier: profile.displayedAvatarTier,
+    displayedRankTier: profile.displayedRankTier,
+    isOwner: user?.email === OWNER_EMAIL,
+  })
 
   const [room, setRoom] = useState<KahootSession | null>(null)
   const [players, setPlayers] = useState<KahootPlayer[]>([])
@@ -96,10 +106,17 @@ export function KahootJoin() {
       const ok = await joinSession(code, uid, {
         displayName: user.displayName,
         photoURL: user.photoURL,
+        avatarGender: rankIdentity.avatarGender,
+        avatarTierIndex: rankIdentity.avatarTierIndex,
+        titleTierIndex: rankIdentity.titleTierIndex,
       })
       if (ok) setJoined(true)
       else setBlocked('failed')
     })()
+    // Only ever joins once (guarded by `joinedRef`), so `rankIdentity` is read
+    // fresh from the closure rather than tracked as a dependency — the room
+    // this writes into never needs the identity re-sent after the join.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid, user, code])
 
   useEffect(() => {

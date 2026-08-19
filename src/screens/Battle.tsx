@@ -3,8 +3,10 @@ import { Check, Crown, Loader2, Swords, Trophy, Users, Zap } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { RankBadge } from '../components/RankBadge'
 import { ProgressBar, SectionHeading } from '../components/ui'
 import { battleQuestion } from '../data/battleQuestions'
+import type { AvatarGender } from '../data/ranks'
 import type { QuizQuestion } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
@@ -39,6 +41,8 @@ import { cn } from '../lib/cn'
 import { isFirebaseReady } from '../lib/firebase'
 import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { levelInfo, recordBattleResult, useProfile } from '../lib/progress'
+import { rankTitleText, resolveRankIdentity } from '../lib/rankIdentity'
+import { OWNER_EMAIL } from '../lib/rankStyle'
 import { useSession } from '../lib/session'
 
 /** The opponent's accent, kept apart from the brand green the reader owns. */
@@ -66,22 +70,30 @@ interface Outcome {
 
 /* ------------------------------------------------------------------ */
 
-/** One side of the duel head: avatar, name, level chip. */
+/** One side of the duel head: avatar, name, rank title, level chip. */
 function Fighter({
   name,
   photoURL,
   level,
   color,
+  avatarGender,
+  avatarTierIndex,
+  rankTitle,
 }: {
   name: string
   photoURL: string
   level: number
   color: string
+  avatarGender: AvatarGender | null
+  avatarTierIndex: number
+  rankTitle: string
 }) {
   const { t } = useLang()
   return (
     <div className="flex min-w-0 flex-col items-center gap-2 text-center">
-      {photoURL ? (
+      {avatarGender ? (
+        <RankBadge tierIndex={avatarTierIndex} gender={avatarGender} title={rankTitle} size={56} />
+      ) : photoURL ? (
         <img
           src={photoURL}
           alt=""
@@ -102,6 +114,11 @@ function Fighter({
       <span className="max-w-full truncate text-[13.5px] font-bold text-ink">
         {name}
       </span>
+      {avatarGender && (
+        <span className="max-w-full truncate text-[11px] font-semibold text-ink-faint">
+          {rankTitle}
+        </span>
+      )}
       <span
         className="rounded-full px-2.5 py-0.5 text-[10.5px] font-bold tabular-nums"
         style={{
@@ -238,17 +255,42 @@ export function Battle() {
   const scoredRef = useRef(false)
   const revealRef = useRef(0)
 
+  const rankIdentity = useMemo(
+    () =>
+      resolveRankIdentity({
+        xp: profile.xp,
+        avatarGender: profile.avatarGender,
+        displayedAvatarTier: profile.displayedAvatarTier,
+        displayedRankTier: profile.displayedRankTier,
+        isOwner: user?.email === OWNER_EMAIL,
+      }),
+    [
+      profile.xp,
+      profile.avatarGender,
+      profile.displayedAvatarTier,
+      profile.displayedRankTier,
+      user?.email,
+    ],
+  )
+
   const meta = useMemo<BattlePlayerMeta>(
     () => ({
       displayName: user?.displayName ?? '',
       photoURL: user?.photoURL ?? '',
       level,
+      avatarGender: rankIdentity.avatarGender,
+      avatarTierIndex: rankIdentity.avatarTierIndex,
+      titleTierIndex: rankIdentity.titleTierIndex,
     }),
-    [user?.displayName, user?.photoURL, level],
+    [user?.displayName, user?.photoURL, level, rankIdentity],
   )
 
   const myName = meta.displayName || t(s.battle.you)
   const foeName = opponent?.displayName || t(s.battle.opponent)
+  const myRankTitle = t(rankIdentity.titleText)
+  const foeRankTitle = opponent
+    ? t(rankTitleText(opponent.avatarGender, opponent.titleTierIndex))
+    : ''
 
   const loadBoard = useCallback(() => {
     void fetchWeeklyLeaderboard().then(setBoard)
@@ -532,6 +574,9 @@ export function Battle() {
                 photoURL={meta.photoURL}
                 level={level}
                 color="var(--color-brand)"
+                avatarGender={rankIdentity.avatarGender}
+                avatarTierIndex={rankIdentity.avatarTierIndex}
+                rankTitle={myRankTitle}
               />
               <span className="grid h-9 w-9 place-items-center rounded-full bg-cream-deep text-[13px] font-bold text-ink-faint">
                 VS
@@ -541,6 +586,9 @@ export function Battle() {
                 photoURL={opponent?.photoURL ?? ''}
                 level={opponent?.level ?? 1}
                 color={FOE_COLOR}
+                avatarGender={opponent?.avatarGender ?? null}
+                avatarTierIndex={opponent?.avatarTierIndex ?? 0}
+                rankTitle={foeRankTitle}
               />
             </div>
 
@@ -850,7 +898,14 @@ export function Battle() {
                   >
                     {position + 1}
                   </span>
-                  {player.photoURL ? (
+                  {player.avatarGender ? (
+                    <RankBadge
+                      tierIndex={player.avatarTierIndex}
+                      gender={player.avatarGender}
+                      title={player.displayName || t(s.battle.opponent)}
+                      size={30}
+                    />
+                  ) : player.photoURL ? (
                     <img
                       src={player.photoURL}
                       alt=""

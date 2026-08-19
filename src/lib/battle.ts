@@ -38,6 +38,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { pickBattleQuestionIds } from '../data/battleQuestions'
+import type { AvatarGender } from '../data/ranks'
 import { db } from './firebase'
 
 /* ----------------------------- the rules of a duel ----------------------------- */
@@ -112,6 +113,11 @@ export interface BattlePlayer {
   /** `YYYY-MM-DD` of the Monday whose week `weekXp` was accumulated in. */
   weekStart: string
   updatedAt: number
+  /** Same rank identity Profile.tsx shows — see `src/lib/rankIdentity.ts`.
+   *  `null` when this player never picked a gender on their own profile. */
+  avatarGender: AvatarGender | null
+  avatarTierIndex: number
+  titleTierIndex: number
 }
 
 /** Which half of the match doc a given player owns. */
@@ -171,6 +177,10 @@ export function normalizeBattlePlayer(uid: string, value: unknown): BattlePlayer
         : 0,
     weekStart: currentWeek,
     updatedAt: numberOr(data.updatedAt, 0),
+    avatarGender:
+      data.avatarGender === 'm' || data.avatarGender === 'f' ? data.avatarGender : null,
+    avatarTierIndex: Math.max(0, Math.round(numberOr(data.avatarTierIndex, 0))),
+    titleTierIndex: Math.max(0, Math.round(numberOr(data.titleTierIndex, 0))),
   }
 }
 
@@ -224,6 +234,9 @@ export interface BattlePlayerMeta {
   displayName: string
   photoURL: string
   level: number
+  avatarGender: AvatarGender | null
+  avatarTierIndex: number
+  titleTierIndex: number
 }
 
 /** Reads one player's public mirror, or `null` when there isn't one yet. */
@@ -261,6 +274,9 @@ export async function syncBattlePlayer(
     weekXp: current?.weekXp ?? 0,
     weekStart: isoWeekStart(),
     updatedAt: Date.now(),
+    avatarGender: meta.avatarGender,
+    avatarTierIndex: meta.avatarTierIndex,
+    titleTierIndex: meta.titleTierIndex,
   }
   try {
     await setDoc(doc(db, 'battlePlayers', uid), next)
@@ -294,6 +310,9 @@ export async function applyRankedResult(
     weekXp: (current?.weekXp ?? 0) + Math.max(0, Math.round(xpEarned)),
     weekStart: isoWeekStart(),
     updatedAt: Date.now(),
+    avatarGender: meta.avatarGender,
+    avatarTierIndex: meta.avatarTierIndex,
+    titleTierIndex: meta.titleTierIndex,
   }
   try {
     await setDoc(doc(db, 'battlePlayers', uid), next)

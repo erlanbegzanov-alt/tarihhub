@@ -41,6 +41,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore'
+import type { AvatarGender } from '../data/ranks'
 import { uploadImage } from './cloudinary'
 import { db } from './firebase'
 
@@ -135,6 +136,11 @@ export interface KahootPlayer {
   lastAnswerIndex: number | null
   lastAnswerAt: number | null
   joinedAt: number
+  /** Same rank identity Profile.tsx shows — see `src/lib/rankIdentity.ts`.
+   *  `null` when this player never picked a gender on their own profile. */
+  avatarGender: AvatarGender | null
+  avatarTierIndex: number
+  titleTierIndex: number
 }
 
 /* ------------------------------ authoring ------------------------------ */
@@ -313,6 +319,10 @@ function normalizePlayer(uid: string, value: unknown): KahootPlayer {
     lastAnswerIndex: nullableNumber(data.lastAnswerIndex),
     lastAnswerAt: nullableNumber(data.lastAnswerAt),
     joinedAt: numberOr(data.joinedAt, 0),
+    avatarGender:
+      data.avatarGender === 'm' || data.avatarGender === 'f' ? data.avatarGender : null,
+    avatarTierIndex: Math.max(0, Math.round(numberOr(data.avatarTierIndex, 0))),
+    titleTierIndex: Math.max(0, Math.round(numberOr(data.titleTierIndex, 0))),
   }
 }
 
@@ -574,6 +584,9 @@ export async function closeSession(code: string): Promise<void> {
 export interface KahootJoinMeta {
   displayName: string
   photoURL: string
+  avatarGender: AvatarGender | null
+  avatarTierIndex: number
+  titleTierIndex: number
 }
 
 /** Writes this student's own row into the room. Returns success. */
@@ -592,6 +605,9 @@ export async function joinSession(
       lastAnswerIndex: null,
       lastAnswerAt: null,
       joinedAt: Date.now(),
+      avatarGender: meta.avatarGender,
+      avatarTierIndex: meta.avatarTierIndex,
+      titleTierIndex: meta.titleTierIndex,
     })
     return true
   } catch (error) {

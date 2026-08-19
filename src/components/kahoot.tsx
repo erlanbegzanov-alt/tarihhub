@@ -6,11 +6,14 @@
 import { motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { ReactNode } from 'react'
+import type { AvatarGender } from '../data/ranks'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import type { KahootPlayer } from '../lib/kahoot'
 import { springSoft, staggerItem } from '../lib/motion'
+import { rankTitleText } from '../lib/rankIdentity'
+import { RankBadge } from './RankBadge'
 import { IconButton } from './ui'
 
 /** Back button, round icon and title — the top of every Кахут screen. */
@@ -90,21 +93,33 @@ export function RoleOption({
 }
 
 /**
- * A player's Google avatar, or their initial on a coloured disc when there
- * isn't one. `me` paints the reader's own disc in the brand green so they can
- * find themselves in a class-sized list at a glance.
+ * A player's rank badge (the same avatar art Profile.tsx shows), falling back
+ * to their Google avatar or an initial on a coloured disc when `avatarGender`
+ * is `null` — a player who never picked a gender on their own profile keeps
+ * seeing exactly that plain rendering. `me` paints the reader's own disc in
+ * the brand green so they can find themselves in a class-sized list at a
+ * glance.
  */
 export function PlayerAvatar({
   name,
   photoURL,
   size = 30,
   me = false,
+  avatarGender = null,
+  avatarTierIndex = 0,
 }: {
   name: string
   photoURL: string
   size?: number
   me?: boolean
+  avatarGender?: AvatarGender | null
+  avatarTierIndex?: number
 }) {
+  if (avatarGender) {
+    return (
+      <RankBadge tierIndex={avatarTierIndex} gender={avatarGender} title={name} size={size} />
+    )
+  }
   if (photoURL) {
     return (
       <img
@@ -147,15 +162,26 @@ export function LobbyRow({
         photoURL={player.photoURL}
         size={26}
         me={me}
+        avatarGender={player.avatarGender}
+        avatarTierIndex={player.avatarTierIndex}
       />
-      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">
-        {player.displayName || t(s.battle.opponent)}
-      </span>
-      {me && (
-        <span className="shrink-0 text-[10.5px] font-bold text-brand">
-          {t(s.battle.boardYou)}
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline gap-1.5">
+          <span className="truncate text-[13px] font-semibold text-ink">
+            {player.displayName || t(s.battle.opponent)}
+          </span>
+          {me && (
+            <span className="shrink-0 text-[10.5px] font-bold text-brand">
+              {t(s.battle.boardYou)}
+            </span>
+          )}
         </span>
-      )}
+        {player.avatarGender && (
+          <span className="block truncate text-[11px] font-semibold text-ink-faint">
+            {t(rankTitleText(player.avatarGender, player.titleTierIndex))}
+          </span>
+        )}
+      </span>
     </li>
   )
 }
@@ -195,6 +221,8 @@ export function PlayerBoard({
               photoURL={player.photoURL}
               size={28}
               me={isMe}
+              avatarGender={player.avatarGender}
+              avatarTierIndex={player.avatarTierIndex}
             />
             <span className="flex min-w-0 items-baseline gap-1.5">
               <span className="truncate text-[13.5px] font-bold text-ink">
