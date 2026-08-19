@@ -191,7 +191,7 @@ export function KahootHost() {
   const close = () => {
     if (code) void closeSession(code)
     if (gameId) forgetCode(gameId)
-    navigate('/battle/kahoot')
+    navigate('/battle/kahoot/teacher')
   }
 
   const ready = isFirebaseReady && Boolean(uid)
@@ -207,7 +207,7 @@ export function KahootHost() {
         icon={<Users className="h-5 w-5" strokeWidth={2} />}
         title={game?.title || t(s.kahoot.hostTitle)}
         subtitle={t(s.kahoot.hostTitle)}
-        onBack={() => navigate('/battle/kahoot')}
+        onBack={() => navigate('/battle/kahoot/teacher')}
       />
 
       {!ready || failed ? (

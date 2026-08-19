@@ -165,7 +165,7 @@ export function KahootCreate() {
         icon={<Plus className="h-5 w-5" strokeWidth={2.2} />}
         title={t(editId ? s.kahoot.editTitle : s.kahoot.createTitle)}
         subtitle={t(s.kahoot.subtitle)}
-        onBack={() => navigate('/battle/kahoot')}
+        onBack={() => navigate('/battle/kahoot/teacher')}
       />
 
       {!ready ? (
@@ -407,7 +407,7 @@ export function KahootCreate() {
               type="button"
               onClick={() => {
                 void save().then((ok) => {
-                  if (ok) navigate('/battle/kahoot')
+                  if (ok) navigate('/battle/kahoot/teacher')
                 })
               }}
               disabled={saving}

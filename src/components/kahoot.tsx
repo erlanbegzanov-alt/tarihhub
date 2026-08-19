@@ -4,13 +4,13 @@
  * lobby, the reveal step and the final result all draw the same row.
  */
 import { motion } from 'framer-motion'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import type { KahootPlayer } from '../lib/kahoot'
-import { staggerItem } from '../lib/motion'
+import { springSoft, staggerItem } from '../lib/motion'
 import { IconButton } from './ui'
 
 /** Back button, round icon and title — the top of every Кахут screen. */
@@ -44,6 +44,48 @@ export function KahootHeader({
       </div>
       {action}
     </motion.div>
+  )
+}
+
+/**
+ * One big full-width row navigating into a role — the same stacked-card shape
+ * as the battle mode picker (`ModeOption` in `Battle.tsx`), so the two entry
+ * points into the app's two live-play systems read as one visual language.
+ */
+export function RoleOption({
+  icon,
+  title,
+  subtitle,
+  onClick,
+}: {
+  icon: ReactNode
+  title: string
+  subtitle: string
+  onClick: () => void
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.99 }}
+      transition={springSoft}
+      className={cn(
+        'focus-ring flex w-full items-center gap-3.5 rounded-card px-4 py-3.5 text-left',
+        'bg-surface shadow-soft ring-1 ring-line/60 transition-colors duration-200',
+      )}
+    >
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-tint text-brand">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="text-[15.5px] font-bold text-ink">{title}</span>
+        <span className="mt-0.5 block truncate text-[12.5px] text-ink-soft">
+          {subtitle}
+        </span>
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={2} />
+    </motion.button>
   )
 }
 

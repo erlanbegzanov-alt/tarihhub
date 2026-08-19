@@ -200,7 +200,7 @@ export function KahootJoin() {
         icon={<Users className="h-5 w-5" strokeWidth={2} />}
         title={room?.title || t(s.kahoot.title)}
         subtitle={code}
-        onBack={() => navigate('/battle/kahoot')}
+        onBack={() => navigate('/battle/kahoot/student')}
       />
 
       {!ready || blocked ? (
@@ -210,7 +210,7 @@ export function KahootJoin() {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/battle/kahoot')}
+            onClick={() => navigate('/battle/kahoot/student')}
             className="focus-ring mx-auto mt-4 block rounded-full bg-surface px-5 py-2.5 text-[14px] font-semibold text-ink-soft ring-1 ring-line hover:text-ink"
           >
             {t(s.common.back)}
@@ -408,7 +408,7 @@ export function KahootJoin() {
 
               <motion.button
                 type="button"
-                onClick={() => navigate('/battle/kahoot')}
+                onClick={() => navigate('/battle/kahoot/student')}
                 whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.99 }}
                 transition={springSoft}

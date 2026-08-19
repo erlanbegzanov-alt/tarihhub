@@ -18,6 +18,8 @@ import { Kahoot } from './screens/Kahoot'
 import { KahootCreate } from './screens/KahootCreate'
 import { KahootHost } from './screens/KahootHost'
 import { KahootJoin } from './screens/KahootJoin'
+import { KahootStudent } from './screens/KahootStudent'
+import { KahootTeacher } from './screens/KahootTeacher'
 import { LessonDetail } from './screens/LessonDetail'
 import { MapScreen } from './screens/MapScreen'
 import { Onboarding } from './screens/Onboarding'
@@ -56,6 +58,8 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: '/map', element: <MapScreen /> },
   { path: '/battle', element: <Battle /> },
   { path: '/battle/kahoot', element: <Kahoot /> },
+  { path: '/battle/kahoot/teacher', element: <KahootTeacher /> },
+  { path: '/battle/kahoot/student', element: <KahootStudent /> },
   { path: '/battle/kahoot/create', element: <KahootCreate /> },
   { path: '/battle/kahoot/edit/:gameId', element: <KahootCreate /> },
   { path: '/battle/kahoot/host/:gameId', element: <KahootHost /> },
