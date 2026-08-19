@@ -19,7 +19,7 @@ import { setAvatarGender } from '../lib/progress'
 
 /**
  * Slide 1: a real hero photo, if one has been dropped in. Same graceful
- * fallback pattern as `RankBadge`'s avatar art — until `/onboarding/hero.jpg`
+ * fallback pattern as `RankBadge`'s avatar art — until `/onboarding/hero.png`
  * exists the request 404s and the SVG steppe scene below takes over, so this
  * slide never has to ship broken while waiting on real photography.
  */
@@ -28,7 +28,7 @@ function HeroArt() {
   if (!failed) {
     return (
       <img
-        src="/onboarding/hero.jpg"
+        src="/onboarding/hero.png"
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
         onError={() => setFailed(true)}
