@@ -1,15 +1,14 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, Send, Settings, Sparkles } from 'lucide-react'
+import { ArrowLeft, Send, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ApiKeyModal } from '../components/ApiKeyModal'
 import { PortraitPanel } from '../components/PortraitPanel'
 import { EraBadge, IconButton } from '../components/ui'
 import { getPerson, people } from '../data/people'
 import type { Person } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
-import { askPersona, hasApiKey } from '../lib/ai'
+import { askPersona } from '../lib/ai'
 import type { ChatTurn } from '../lib/ai'
 import { cn } from '../lib/cn'
 import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
@@ -21,30 +20,16 @@ interface Message extends ChatTurn {
 
 /* ------------------------- persona picker ------------------------- */
 
-function PersonaPicker({
-  onPick,
-  onSettings,
-}: {
-  onPick: (person: Person) => void
-  onSettings: () => void
-}) {
+function PersonaPicker({ onPick }: { onPick: (person: Person) => void }) {
   const { t } = useLang()
 
   return (
     <motion.div variants={staggerContainer} initial="initial" animate="animate">
-      <motion.div
-        variants={staggerItem}
-        className="flex items-start justify-between gap-4"
-      >
-        <div className="max-w-2xl">
-          <h1 className="text-2xl font-bold tracking-tight text-ink md:text-[28px]">
-            {t(s.ai.title)}
-          </h1>
-          <p className="mt-1.5 text-[14.5px] text-ink-soft">{t(s.ai.subtitle)}</p>
-        </div>
-        <IconButton label={t(s.ai.settings)} onClick={onSettings}>
-          <Settings className="h-[18px] w-[18px]" strokeWidth={2} />
-        </IconButton>
+      <motion.div variants={staggerItem}>
+        <h1 className="text-2xl font-bold tracking-tight text-ink md:text-[28px]">
+          {t(s.ai.title)}
+        </h1>
+        <p className="mt-1.5 text-[14.5px] text-ink-soft">{t(s.ai.subtitle)}</p>
       </motion.div>
 
       <motion.h2
@@ -111,8 +96,9 @@ export function AIChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
-  const [keyModal, setKeyModal] = useState(false)
-  const [liveMode, setLiveMode] = useState(hasApiKey)
+  // Neutral until the first reply actually lands — never claims a live
+  // connection before one has really happened.
+  const [liveMode, setLiveMode] = useState(false)
 
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const counter = useRef(0)
@@ -134,19 +120,7 @@ export function AIChat() {
   )
 
   if (!person) {
-    return (
-      <>
-        <PersonaPicker
-          onPick={(picked) => navigate(`/ai/${picked.id}`)}
-          onSettings={() => setKeyModal(true)}
-        />
-        <ApiKeyModal
-          open={keyModal}
-          onClose={() => setKeyModal(false)}
-          onSaved={() => setLiveMode(hasApiKey())}
-        />
-      </>
-    )
+    return <PersonaPicker onPick={(picked) => navigate(`/ai/${picked.id}`)} />
   }
 
   const send = async (raw: string) => {
@@ -215,10 +189,6 @@ export function AIChat() {
             </span>
           </p>
         </div>
-
-        <IconButton label={t(s.ai.settings)} onClick={() => setKeyModal(true)}>
-          <Settings className="h-[18px] w-[18px]" strokeWidth={2} />
-        </IconButton>
       </div>
 
       {/* ---------- transcript ---------- */}
@@ -379,12 +349,6 @@ export function AIChat() {
           </motion.button>
         </form>
       </div>
-
-      <ApiKeyModal
-        open={keyModal}
-        onClose={() => setKeyModal(false)}
-        onSaved={() => setLiveMode(hasApiKey())}
-      />
     </div>
   )
 }

@@ -14,7 +14,6 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ApiKeyModal } from '../components/ApiKeyModal'
 import { SectionCheck } from '../components/SectionCheck'
 import { EraBadge, IconButton, ProgressBar } from '../components/ui'
 import { eraColor, eras } from '../data/eras'
@@ -24,7 +23,7 @@ import { buildLessonQuiz } from '../data/quiz'
 import { getUnit } from '../data/units'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
-import { explainSection, hasApiKey } from '../lib/ai'
+import { explainSection } from '../lib/ai'
 import { cn } from '../lib/cn'
 import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { recordLessonStarted, useProfile } from '../lib/progress'
@@ -47,7 +46,6 @@ export function LessonDetail() {
   const [explainText, setExplainText] = useState<string | null>(null)
   const [explainLoading, setExplainLoading] = useState(false)
   const [explainErrored, setExplainErrored] = useState(false)
-  const [keyModalOpen, setKeyModalOpen] = useState(false)
 
   // Opening a lesson is the only progress the reader awards themselves, and it
   // can never complete anything — that takes passing the quiz below.
@@ -101,10 +99,6 @@ export function LessonDetail() {
     currentIndex === -1 ? undefined : lessonsInCourseOrder[currentIndex + 1]
 
   const handleExplain = async () => {
-    if (!hasApiKey()) {
-      setKeyModalOpen(true)
-      return
-    }
     setExplainLoading(true)
     setExplainErrored(false)
     try {
@@ -474,14 +468,6 @@ export function LessonDetail() {
           </AnimatePresence>
         </div>
       </div>
-
-      <ApiKeyModal
-        open={keyModalOpen}
-        onClose={() => setKeyModalOpen(false)}
-        onSaved={() => {
-          if (hasApiKey()) void handleExplain()
-        }}
-      />
     </motion.div>
   )
 }

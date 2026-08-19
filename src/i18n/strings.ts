@@ -509,19 +509,6 @@ export const s = {
     send: { kz: 'Жіберу', ru: 'Отправить' },
     typing: { kz: 'жазып жатыр', ru: 'печатает' },
     changePersona: { kz: 'Тұлғаны ауыстыру', ru: 'Сменить личность' },
-    settings: { kz: 'Баптаулар', ru: 'Настройки' },
-    keyTitle: { kz: 'Gemini API кілті', ru: 'Ключ Gemini API' },
-    keyDescription: {
-      kz: 'Кілт тек осы браузердің жадында сақталады және Google Gemini API-ына ғана жіберіледі. Кілт болмаса, чат дайын жауаптармен жұмыс істейді.',
-      ru: 'Ключ хранится только в памяти этого браузера и отправляется только в Google Gemini API. Без ключа чат работает на заранее подготовленных ответах.',
-    },
-    keyLink: {
-      kz: 'Google AI Studio-да тегін кілт алу',
-      ru: 'Получить бесплатный ключ в Google AI Studio',
-    },
-    keyPlaceholder: { kz: 'AIza...', ru: 'AIza...' },
-    keySaved: { kz: 'Кілт сақталды', ru: 'Ключ сохранён' },
-    keyRemove: { kz: 'Кілтті өшіру', ru: 'Удалить ключ' },
     offlineMode: { kz: 'Демо режим', ru: 'Демо-режим' },
     liveMode: { kz: 'Gemini қосулы', ru: 'Gemini подключён' },
     suggestions: [

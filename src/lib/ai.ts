@@ -1,14 +1,5 @@
+import { auth } from './firebase'
 import type { CannedKey, Lang, Person } from '../data/types'
-
-export const API_KEY_STORAGE = 'tarihhub_gemini_key'
-
-/**
- * `gemini-2.0-flash` is on Google's free tier (a Google AI Studio key needs no
- * billing setup) and — unlike the 2.5 "thinking" variants — has no internal
- * reasoning phase, so the whole output budget is spent on the actual reply.
- */
-const MODEL = 'gemini-2.0-flash'
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 
 export interface ChatTurn {
   role: 'user' | 'assistant'
@@ -21,29 +12,6 @@ export type AnswerEngine = 'live' | 'demo'
 export interface PersonaAnswer {
   text: string
   engine: AnswerEngine
-}
-
-/* ------------------------------------------------------------------ *
- * API key storage (browser-local only)
- * ------------------------------------------------------------------ */
-
-export function getApiKey(): string {
-  if (typeof window === 'undefined') return ''
-  return window.localStorage.getItem(API_KEY_STORAGE) ?? ''
-}
-
-export function setApiKey(key: string): void {
-  const trimmed = key.trim()
-  if (trimmed) window.localStorage.setItem(API_KEY_STORAGE, trimmed)
-  else window.localStorage.removeItem(API_KEY_STORAGE)
-}
-
-export function clearApiKey(): void {
-  window.localStorage.removeItem(API_KEY_STORAGE)
-}
-
-export function hasApiKey(): boolean {
-  return getApiKey().length > 0
 }
 
 /* ------------------------------------------------------------------ *
@@ -113,7 +81,7 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-/** Realistic typing pause so the demo chat feels alive without an API key. */
+/** Realistic typing pause so the demo chat feels alive when the proxy is unreachable. */
 function typingDelay(): number {
   return 700 + Math.floor(Math.random() * 500)
 }
@@ -128,7 +96,7 @@ async function scriptedAnswer(
 }
 
 /* ------------------------------------------------------------------ *
- * Google Gemini generateContent API
+ * Server-side Gemini proxy (api/gemini.ts)
  * ------------------------------------------------------------------ */
 
 function buildSystemPrompt(persona: Person, lang: Lang): string {
@@ -148,64 +116,50 @@ function buildSystemPrompt(persona: Person, lang: Lang): string {
   ].join('\n')
 }
 
-interface GeminiPart {
-  text?: string
-}
-
-interface GeminiResponse {
-  candidates?: { content?: { parts?: GeminiPart[] } }[]
-}
-
 interface GeminiContent {
   role: 'user' | 'model'
   parts: { text: string }[]
 }
 
-/** Shared low-level call: builds the request, throws on any way it can fail
- *  to produce real text, and returns the plain reply. Both `callGemini`
- *  (persona chat) and `explainSection` (in-lesson hints) go through this. */
-async function callGeminiRaw(
-  key: string,
+/**
+ * The one call every live answer goes through — `api/gemini.ts`, never
+ * Google's API directly. The key that used to live in this browser (one per
+ * visitor, entered by hand) now lives only on the server, so what this sends
+ * instead is proof of who's asking: the signed-in Firebase session's own ID
+ * token. Sign-in is mandatory app-wide, so `auth.currentUser` is only ever
+ * absent when Firebase itself isn't configured.
+ */
+async function callGeminiProxy(
   systemPrompt: string,
   contents: GeminiContent[],
   config: { maxOutputTokens: number; temperature: number },
 ): Promise<string> {
-  const response = await fetch(GEMINI_ENDPOINT, {
+  const token = await auth?.currentUser?.getIdToken()
+  if (!token) throw new Error('not-signed-in')
+
+  const response = await fetch('/api/gemini', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({
-      // Grounding goes in `systemInstruction`, not the transcript, so it
-      // stays out of the conversation the model is continuing.
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents,
-      generationConfig: config,
-    }),
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    body: JSON.stringify({ systemPrompt, contents, config }),
   })
 
   if (!response.ok) {
-    throw new Error(`Gemini API error ${response.status}`)
+    throw new Error(`Gemini proxy error ${response.status}`)
   }
 
-  const data = (await response.json()) as GeminiResponse
-  const text = (data.candidates?.[0]?.content?.parts ?? [])
-    .map((part) => part.text)
-    .filter((part): part is string => Boolean(part))
-    .join('\n')
-    .trim()
-
-  if (!text) throw new Error('Empty response from Gemini API')
+  const data = (await response.json()) as { text?: string }
+  const text = typeof data.text === 'string' ? data.text.trim() : ''
+  if (!text) throw new Error('Empty response from Gemini proxy')
   return text
 }
 
 async function callGemini(
-  key: string,
   persona: Person,
   history: ChatTurn[],
   question: string,
   lang: Lang,
 ): Promise<string> {
-  return callGeminiRaw(
-    key,
+  return callGeminiProxy(
     buildSystemPrompt(persona, lang),
     [
       ...history.slice(-10).map((turn) => ({
@@ -216,10 +170,13 @@ async function callGemini(
       { role: 'user' as const, parts: [{ text: question }] },
     ],
     {
-      // Budget for a 2-5 sentence in-character reply. The model has no
-      // internal reasoning phase (see MODEL), so every token here is spent
-      // on the answer itself rather than on thinking that never gets shown.
-      maxOutputTokens: 700,
+      // Budget for a 2-5 sentence in-character reply, plus real headroom: the
+      // model (gemini-3.6-flash) always spends some of this same budget on an
+      // internal "thinking" pass before the visible answer — anywhere from
+      // ~50 to 450+ tokens depending on the question, measured directly
+      // against the live API — so this can't be sized for the reply alone
+      // the way the retired gemini-2.0-flash could be.
+      maxOutputTokens: 1200,
       temperature: 0.8,
     },
   )
@@ -232,11 +189,11 @@ async function callGemini(
 /**
  * Ask a historical persona a question.
  *
- * Uses the Google Gemini generateContent API when a key is stored in
- * localStorage, and falls back to the scripted offline engine when there is no
- * key or the request fails, so the chat always answers. The returned `engine`
- * says which one actually replied — the UI uses it so a failing key can never
- * be presented to the user as a working Gemini connection.
+ * Tries the live proxy first and falls back to the scripted offline engine
+ * when it fails (offline, the proxy down, a rate limit), so the chat always
+ * answers. The returned `engine` says which one actually replied — the UI
+ * uses it so a failed live call can never be presented as a working
+ * connection.
  */
 export async function askPersona(
   persona: Person,
@@ -244,20 +201,11 @@ export async function askPersona(
   question: string,
   lang: Lang,
 ): Promise<PersonaAnswer> {
-  const key = getApiKey()
-  if (key) {
-    try {
-      const text = await callGemini(
-        key,
-        persona,
-        conversationHistory,
-        question,
-        lang,
-      )
-      return { text, engine: 'live' }
-    } catch (error) {
-      console.warn('[TarihHub] Falling back to scripted answers:', error)
-    }
+  try {
+    const text = await callGemini(persona, conversationHistory, question, lang)
+    return { text, engine: 'live' }
+  } catch (error) {
+    console.warn('[TarihHub] Falling back to scripted answers:', error)
   }
   return { text: await scriptedAnswer(persona, question, lang), engine: 'demo' }
 }
@@ -280,20 +228,17 @@ function buildExplainPrompt(lang: Lang): string {
  * Rephrases one lesson section in simpler language, grounded strictly in its
  * own text. Unlike `askPersona`, there is no offline fallback: a lesson has
  * no pre-written "simple version" the way a persona has canned bio/legacy
- * answers, so this throws on a missing key or a failed request, and the
- * caller (LessonDetail.tsx) shows that plainly rather than faking an answer.
+ * answers, so this throws on failure and the caller (LessonDetail.tsx) shows
+ * that plainly rather than faking an answer.
  */
 export async function explainSection(
   heading: string,
   body: string,
   lang: Lang,
 ): Promise<string> {
-  const key = getApiKey()
-  if (!key) throw new Error('no-api-key')
-  return callGeminiRaw(
-    key,
+  return callGeminiProxy(
     buildExplainPrompt(lang),
     [{ role: 'user', parts: [{ text: `${heading}\n\n${body}` }] }],
-    { maxOutputTokens: 500, temperature: 0.5 },
+    { maxOutputTokens: 900, temperature: 0.5 },
   )
 }
