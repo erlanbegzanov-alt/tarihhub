@@ -143,6 +143,16 @@ export default {
             maxOutputTokens,
             temperature,
           },
+          // Strictest common threshold: this is an educational app aimed at
+          // students, so profanity, harassment, hate speech etc. get blocked
+          // by Google's own moderation before a reply ever reaches the
+          // client, on top of the persona's own in-character refusal below.
+          safetySettings: [
+            'HARM_CATEGORY_HARASSMENT',
+            'HARM_CATEGORY_HATE_SPEECH',
+            'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+            'HARM_CATEGORY_DANGEROUS_CONTENT',
+          ].map((category) => ({ category, threshold: 'BLOCK_LOW_AND_ABOVE' })),
         }),
       })
 
