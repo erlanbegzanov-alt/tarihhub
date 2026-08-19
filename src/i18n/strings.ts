@@ -118,6 +118,16 @@ export const s = {
     /** The stepper's extra last chip — a flag icon, not a number, on purpose. */
     finalStep: { kz: 'Қорытынды тест', ru: 'Итоговый тест' },
 
+    /** The in-lesson "explain simpler" AI hint — see src/lib/ai.ts's explainSection. */
+    explainButton: { kz: 'Түсіндіріп бер', ru: 'Объясни проще' },
+    explainLoading: { kz: 'Түсіндіріп жатыр…', ru: 'Объясняю…' },
+    explainLabel: { kz: 'ИИ түсіндірмесі', ru: 'Объяснение ИИ' },
+    explainError: {
+      kz: 'Түсіндіріп болмады. Тағы байқап көріңіз.',
+      ru: 'Не получилось объяснить. Попробуйте ещё раз.',
+    },
+    explainClose: { kz: 'Жасыру', ru: 'Скрыть' },
+
     /** Inline "check yourself" mini-quiz shown under a lesson section. */
     check: {
       title: { kz: 'Өзіңді тексер', ru: 'Проверь себя' },

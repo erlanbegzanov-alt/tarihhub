@@ -7,11 +7,14 @@ import {
   ChevronRight,
   Flag,
   Lock,
+  Sparkles,
   Trophy,
   UserRound,
+  X,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ApiKeyModal } from '../components/ApiKeyModal'
 import { SectionCheck } from '../components/SectionCheck'
 import { EraBadge, IconButton, ProgressBar } from '../components/ui'
 import { eraColor, eras } from '../data/eras'
@@ -21,6 +24,7 @@ import { buildLessonQuiz } from '../data/quiz'
 import { getUnit } from '../data/units'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
+import { explainSection, hasApiKey } from '../lib/ai'
 import { cn } from '../lib/cn'
 import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { recordLessonStarted, useProfile } from '../lib/progress'
@@ -28,7 +32,7 @@ import { recordLessonStarted, useProfile } from '../lib/progress'
 export function LessonDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { t } = useLang()
+  const { t, lang } = useLang()
   const profile = useProfile()
   const lesson = getLesson(id)
 
@@ -36,6 +40,14 @@ export function LessonDetail() {
   // the lesson (like Khan Academy's per-lesson sidebar), not stacked in one
   // long scroll.
   const [activeIndex, setActiveIndex] = useState(0)
+
+  // The "explain simpler" AI hint — see src/lib/ai.ts's explainSection. Kept
+  // per-section: switching parts clears whatever was shown for the last one.
+  const [explainOpen, setExplainOpen] = useState(false)
+  const [explainText, setExplainText] = useState<string | null>(null)
+  const [explainLoading, setExplainLoading] = useState(false)
+  const [explainErrored, setExplainErrored] = useState(false)
+  const [keyModalOpen, setKeyModalOpen] = useState(false)
 
   // Opening a lesson is the only progress the reader awards themselves, and it
   // can never complete anything — that takes passing the quiz below.
@@ -45,6 +57,12 @@ export function LessonDetail() {
 
   // A fresh lesson always opens on its first part.
   useEffect(() => setActiveIndex(0), [id])
+
+  useEffect(() => {
+    setExplainOpen(false)
+    setExplainText(null)
+    setExplainErrored(false)
+  }, [activeIndex, id])
 
   // Only the count matters here: whether this lesson can be gated at all.
   const questionCount = useMemo(
@@ -81,6 +99,25 @@ export function LessonDetail() {
   const currentIndex = lessonsInCourseOrder.findIndex((item) => item.id === lesson.id)
   const nextLesson =
     currentIndex === -1 ? undefined : lessonsInCourseOrder[currentIndex + 1]
+
+  const handleExplain = async () => {
+    if (!hasApiKey()) {
+      setKeyModalOpen(true)
+      return
+    }
+    setExplainLoading(true)
+    setExplainErrored(false)
+    try {
+      const section = lesson.sections[activeIndex]
+      const text = await explainSection(t(section.heading), t(section.body), lang)
+      setExplainText(text)
+    } catch {
+      setExplainErrored(true)
+    } finally {
+      setExplainLoading(false)
+      setExplainOpen(true)
+    }
+  }
 
   return (
     <motion.div variants={staggerContainer} initial="initial" animate="animate">
@@ -213,6 +250,57 @@ export function LessonDetail() {
                       {t(lesson.sections[activeIndex].body)}
                     </p>
                   </div>
+                  <div className="mt-3 flex justify-end">
+                    <motion.button
+                      type="button"
+                      onClick={() => void handleExplain()}
+                      disabled={explainLoading}
+                      whileHover={{ y: -1 }}
+                      whileTap={{ scale: 0.97 }}
+                      transition={springSoft}
+                      className={cn(
+                        'focus-ring inline-flex items-center gap-1.5 rounded-full px-3.5 py-2',
+                        'bg-brand-tint text-[13px] font-semibold text-brand',
+                        'transition-colors hover:bg-brand-tint-strong disabled:opacity-60',
+                      )}
+                    >
+                      <Sparkles className="h-4 w-4" strokeWidth={2} />
+                      {explainLoading ? t(s.lesson.explainLoading) : t(s.lesson.explainButton)}
+                    </motion.button>
+                  </div>
+
+                  <AnimatePresence>
+                    {explainOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -6, height: 0 }}
+                        animate={{ opacity: 1, y: 0, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.22, ease: easeOut }}
+                        className="mt-3 overflow-hidden"
+                      >
+                        <div className="rounded-card bg-cream p-4 ring-1 ring-line/60 sm:p-5">
+                          <div className="mb-1.5 flex items-center justify-between gap-3">
+                            <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-brand">
+                              <Sparkles className="h-3.5 w-3.5" strokeWidth={2.4} />
+                              {t(s.lesson.explainLabel)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setExplainOpen(false)}
+                              aria-label={t(s.lesson.explainClose)}
+                              className="focus-ring text-ink-faint hover:text-ink"
+                            >
+                              <X className="h-4 w-4" strokeWidth={2} />
+                            </button>
+                          </div>
+                          <p className="text-[14.5px] leading-relaxed text-ink">
+                            {explainErrored ? t(s.lesson.explainError) : explainText}
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   {lesson.sections[activeIndex].check &&
                     lesson.sections[activeIndex].check!.length > 0 && (
                       <SectionCheck
@@ -386,6 +474,14 @@ export function LessonDetail() {
           </AnimatePresence>
         </div>
       </div>
+
+      <ApiKeyModal
+        open={keyModalOpen}
+        onClose={() => setKeyModalOpen(false)}
+        onSaved={() => {
+          if (hasApiKey()) void handleExplain()
+        }}
+      />
     </motion.div>
   )
 }

@@ -156,42 +156,31 @@ interface GeminiResponse {
   candidates?: { content?: { parts?: GeminiPart[] } }[]
 }
 
-async function callGemini(
+interface GeminiContent {
+  role: 'user' | 'model'
+  parts: { text: string }[]
+}
+
+/** Shared low-level call: builds the request, throws on any way it can fail
+ *  to produce real text, and returns the plain reply. Both `callGemini`
+ *  (persona chat) and `explainSection` (in-lesson hints) go through this. */
+async function callGeminiRaw(
   key: string,
-  persona: Person,
-  history: ChatTurn[],
-  question: string,
-  lang: Lang,
+  systemPrompt: string,
+  contents: GeminiContent[],
+  config: { maxOutputTokens: number; temperature: number },
 ): Promise<string> {
-  const response = await fetch(
-    GEMINI_ENDPOINT,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({
-        // Persona grounding goes in `systemInstruction`, not the transcript, so
-        // it stays out of the conversation the model is continuing.
-        systemInstruction: {
-          parts: [{ text: buildSystemPrompt(persona, lang) }],
-        },
-        contents: [
-          ...history.slice(-10).map((turn) => ({
-            // Gemini calls the assistant side "model".
-            role: turn.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: turn.content }],
-          })),
-          { role: 'user', parts: [{ text: question }] },
-        ],
-        generationConfig: {
-          // Budget for a 2-5 sentence in-character reply. The model has no
-          // internal reasoning phase (see MODEL), so every token here is spent
-          // on the answer itself rather than on thinking that never gets shown.
-          maxOutputTokens: 700,
-          temperature: 0.8,
-        },
-      }),
-    },
-  )
+  const response = await fetch(GEMINI_ENDPOINT, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify({
+      // Grounding goes in `systemInstruction`, not the transcript, so it
+      // stays out of the conversation the model is continuing.
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents,
+      generationConfig: config,
+    }),
+  })
 
   if (!response.ok) {
     throw new Error(`Gemini API error ${response.status}`)
@@ -206,6 +195,34 @@ async function callGemini(
 
   if (!text) throw new Error('Empty response from Gemini API')
   return text
+}
+
+async function callGemini(
+  key: string,
+  persona: Person,
+  history: ChatTurn[],
+  question: string,
+  lang: Lang,
+): Promise<string> {
+  return callGeminiRaw(
+    key,
+    buildSystemPrompt(persona, lang),
+    [
+      ...history.slice(-10).map((turn) => ({
+        // Gemini calls the assistant side "model".
+        role: turn.role === 'assistant' ? ('model' as const) : ('user' as const),
+        parts: [{ text: turn.content }],
+      })),
+      { role: 'user' as const, parts: [{ text: question }] },
+    ],
+    {
+      // Budget for a 2-5 sentence in-character reply. The model has no
+      // internal reasoning phase (see MODEL), so every token here is spent
+      // on the answer itself rather than on thinking that never gets shown.
+      maxOutputTokens: 700,
+      temperature: 0.8,
+    },
+  )
 }
 
 /* ------------------------------------------------------------------ *
@@ -243,4 +260,40 @@ export async function askPersona(
     }
   }
   return { text: await scriptedAnswer(persona, question, lang), engine: 'demo' }
+}
+
+/* ------------------------------------------------------------------ *
+ * In-lesson "explain simpler" hint
+ * ------------------------------------------------------------------ */
+
+function buildExplainPrompt(lang: Lang): string {
+  const langName = lang === 'kz' ? 'қазақ тілінде (Kazakh)' : 'на русском языке (Russian)'
+  return [
+    `You are a warm, patient Kazakhstan-history tutor helping a student who found a lesson passage hard to follow.`,
+    `Explain the passage below in much simpler words — short sentences, everyday vocabulary, no academic jargon.`,
+    `Stay strictly inside the facts the passage already states. Never add a date, name or claim that isn't in it.`,
+    `Answer strictly ${langName}. Never switch languages. 3-6 short sentences.`,
+  ].join('\n')
+}
+
+/**
+ * Rephrases one lesson section in simpler language, grounded strictly in its
+ * own text. Unlike `askPersona`, there is no offline fallback: a lesson has
+ * no pre-written "simple version" the way a persona has canned bio/legacy
+ * answers, so this throws on a missing key or a failed request, and the
+ * caller (LessonDetail.tsx) shows that plainly rather than faking an answer.
+ */
+export async function explainSection(
+  heading: string,
+  body: string,
+  lang: Lang,
+): Promise<string> {
+  const key = getApiKey()
+  if (!key) throw new Error('no-api-key')
+  return callGeminiRaw(
+    key,
+    buildExplainPrompt(lang),
+    [{ role: 'user', parts: [{ text: `${heading}\n\n${body}` }] }],
+    { maxOutputTokens: 500, temperature: 0.5 },
+  )
 }
