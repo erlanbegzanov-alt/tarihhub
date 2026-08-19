@@ -39,6 +39,7 @@ import {
 } from 'firebase/firestore'
 import { pickBattleQuestionIds } from '../data/battleQuestions'
 import type { AvatarGender } from '../data/ranks'
+import type { LocalizedText } from '../data/types'
 import { db } from './firebase'
 
 /* ----------------------------- the rules of a duel ----------------------------- */
@@ -64,6 +65,53 @@ export const MAX_BATTLE_XP =
 export const RATING_WIN = 18
 /** Rating lost on a ranked defeat — deliberately smaller than the win. */
 export const RATING_LOSS = 9
+
+/**
+ * The Рейтинг screen's own league ladder, read off `BattlePlayer.rating` —
+ * separate from Profile.tsx's XP-based rank ladder (`src/data/ranks.ts`):
+ * this one only ever moves on a ranked win or loss, so it tracks competitive
+ * standing rather than lifetime progress.
+ */
+export interface RatingTier {
+  name: LocalizedText
+  min: number
+}
+
+export const RATING_TIERS: RatingTier[] = [
+  { name: { kz: 'Қола', ru: 'Бронза' }, min: 0 },
+  { name: { kz: 'Күміс', ru: 'Серебро' }, min: 120 },
+  { name: { kz: 'Алтын', ru: 'Золото' }, min: 300 },
+  { name: { kz: 'Платина', ru: 'Платина' }, min: 600 },
+  { name: { kz: 'Алмас', ru: 'Алмаз' }, min: 1000 },
+]
+
+export interface RatingTierInfo {
+  index: number
+  tier: RatingTier
+  /** `null` at the top tier — there is nothing further to climb toward. */
+  next: RatingTier | null
+  /** 0-100 progress toward `next`; 100 when already at the top tier. */
+  progress: number
+}
+
+export function ratingTierFor(rating: number): RatingTierInfo {
+  let index = 0
+  for (let i = RATING_TIERS.length - 1; i >= 0; i -= 1) {
+    if (rating >= RATING_TIERS[i].min) {
+      index = i
+      break
+    }
+  }
+  const tier = RATING_TIERS[index]
+  const next = RATING_TIERS[index + 1] ?? null
+  const progress = next
+    ? Math.max(
+        0,
+        Math.min(100, Math.round(((rating - tier.min) / (next.min - tier.min)) * 100)),
+      )
+    : 100
+  return { index, tier, next, progress }
+}
 
 /**
  * How long a queue entry counts as somebody actually waiting.

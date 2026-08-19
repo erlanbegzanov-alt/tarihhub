@@ -218,6 +218,17 @@ export function IconButton({
 
 /* ------------------------------------------------------------------ */
 
+export function StatTile({ value, label }: { value: ReactNode; label: string }) {
+  return (
+    <div className="rounded-tile bg-surface p-3.5 text-center shadow-soft ring-1 ring-line/60">
+      <p className="text-xl font-bold tabular-nums text-ink">{value}</p>
+      <p className="mt-1 text-[11px] leading-tight text-ink-faint">{label}</p>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+
 export function XpPill({ children }: { children: ReactNode }) {
   return (
     <span

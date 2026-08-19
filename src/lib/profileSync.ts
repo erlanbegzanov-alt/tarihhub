@@ -11,6 +11,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore'
 import type { DocumentReference } from 'firebase/firestore'
 import { db } from './firebase'
 import {
+  RECENT_CASUAL_DUELS_MAX,
   getProfile,
   loadProfileForUser,
   normalizeProfile,
@@ -42,6 +43,15 @@ export function mergeProfiles(
   // Streak only makes sense together with the date it was last touched, so the
   // more recently active copy supplies both.
   const remoteIsNewer = remote.lastVisitDate >= local.lastVisitDate
+
+  // Same idea for the casual win streak: it isn't a lifetime counter like
+  // `casualWins`, so whichever side played the more recent duel supplies it.
+  const remoteCasualAt = remote.recentCasualDuels[0]?.at ?? 0
+  const localCasualAt = local.recentCasualDuels[0]?.at ?? 0
+  const casualIsNewer = remoteCasualAt >= localCasualAt
+  const recentCasualDuels = [...remote.recentCasualDuels, ...local.recentCasualDuels]
+    .sort((a, b) => b.at - a.at)
+    .slice(0, RECENT_CASUAL_DUELS_MAX)
 
   // Per lesson, the furthest either device got. A device that only just opened
   // a lesson must never push a returning user back from a finished one.
@@ -83,6 +93,10 @@ export function mergeProfiles(
     displayedRankTier: remote.displayedRankTier ?? local.displayedRankTier,
     // Same rule, independently: the cloud copy is the last deliberate pick.
     displayedAvatarTier: remote.displayedAvatarTier ?? local.displayedAvatarTier,
+    casualDuels: Math.max(remote.casualDuels, local.casualDuels),
+    casualWins: Math.max(remote.casualWins, local.casualWins),
+    casualStreak: casualIsNewer ? remote.casualStreak : local.casualStreak,
+    recentCasualDuels,
     lessonProgress,
     completedLessons: [
       ...new Set([...remote.completedLessons, ...local.completedLessons]),

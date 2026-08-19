@@ -12,6 +12,8 @@ import { recordVisit } from './lib/progress'
 import { completeOnboarding, sessionGate, useSession } from './lib/session'
 import { AIChat } from './screens/AIChat'
 import { Battle } from './screens/Battle'
+import { BattleCasual } from './screens/BattleCasual'
+import { BattleRanked } from './screens/BattleRanked'
 import { Explore } from './screens/Explore'
 import { Home } from './screens/Home'
 import { Kahoot } from './screens/Kahoot'
@@ -57,6 +59,8 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: '/timeline', element: <Timeline /> },
   { path: '/map', element: <MapScreen /> },
   { path: '/battle', element: <Battle /> },
+  { path: '/battle/casual', element: <BattleCasual /> },
+  { path: '/battle/ranked', element: <BattleRanked /> },
   { path: '/battle/kahoot', element: <Kahoot /> },
   { path: '/battle/kahoot/teacher', element: <KahootTeacher /> },
   { path: '/battle/kahoot/student', element: <KahootStudent /> },

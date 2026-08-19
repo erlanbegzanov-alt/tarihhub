@@ -38,6 +38,17 @@ export interface LessonQuizScore {
   total: number
 }
 
+/** How many of the most recent casual duels `recentCasualDuels` keeps. */
+export const RECENT_CASUAL_DUELS_MAX = 5
+
+/** One finished casual duel, newest first in `recentCasualDuels`. */
+export interface CasualDuelRecord {
+  opponentName: string
+  won: boolean
+  xp: number
+  at: number
+}
+
 export interface ProfileState {
   xp: number
   streak: number
@@ -87,6 +98,13 @@ export interface ProfileState {
    * `displayedRankTier`, resolved separately.
    */
   displayedAvatarTier: number | null
+  /** Casual (unranked) 1v1 duels finished — see `src/screens/BattleDuel.tsx`. */
+  casualDuels: number
+  casualWins: number
+  /** Current unbroken casual win streak. Resets to 0 on any loss. */
+  casualStreak: number
+  /** Newest first, capped to `RECENT_CASUAL_DUELS_MAX`. */
+  recentCasualDuels: CasualDuelRecord[]
 }
 
 export const DEFAULT_STATE: ProfileState = {
@@ -105,6 +123,10 @@ export const DEFAULT_STATE: ProfileState = {
   avatarGender: null,
   displayedRankTier: null,
   displayedAvatarTier: null,
+  casualDuels: 0,
+  casualWins: 0,
+  casualStreak: 0,
+  recentCasualDuels: [],
 }
 
 /** Share of `lessonProgress` that inline section checks alone can fill — the
@@ -147,6 +169,25 @@ function normalizeLessonQuizBest(value: unknown): Record<string, LessonQuizScore
     }
   }
   return result
+}
+
+/**
+ * Coerces an untrusted recent-duels list: only well-shaped entries survive,
+ * newest first, capped the same way `recordCasualDuelResult` caps it.
+ */
+function normalizeRecentCasualDuels(value: unknown): CasualDuelRecord[] {
+  if (!Array.isArray(value)) return []
+  const result: CasualDuelRecord[] = []
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue
+    const { opponentName, won, xp, at } = entry as Partial<CasualDuelRecord>
+    if (typeof opponentName !== 'string') continue
+    if (typeof won !== 'boolean') continue
+    if (typeof xp !== 'number' || !Number.isFinite(xp)) continue
+    if (typeof at !== 'number' || !Number.isFinite(at)) continue
+    result.push({ opponentName, won, xp: Math.max(0, Math.round(xp)), at })
+  }
+  return result.slice(0, RECENT_CASUAL_DUELS_MAX)
 }
 
 /**
@@ -219,6 +260,19 @@ export function normalizeProfile(value: unknown): ProfileState {
       parsed.displayedAvatarTier >= 0
         ? Math.round(parsed.displayedAvatarTier)
         : DEFAULT_STATE.displayedAvatarTier,
+    casualDuels:
+      typeof parsed.casualDuels === 'number' && Number.isFinite(parsed.casualDuels)
+        ? Math.max(0, Math.round(parsed.casualDuels))
+        : DEFAULT_STATE.casualDuels,
+    casualWins:
+      typeof parsed.casualWins === 'number' && Number.isFinite(parsed.casualWins)
+        ? Math.max(0, Math.round(parsed.casualWins))
+        : DEFAULT_STATE.casualWins,
+    casualStreak:
+      typeof parsed.casualStreak === 'number' && Number.isFinite(parsed.casualStreak)
+        ? Math.max(0, Math.round(parsed.casualStreak))
+        : DEFAULT_STATE.casualStreak,
+    recentCasualDuels: normalizeRecentCasualDuels(parsed.recentCasualDuels),
   }
 }
 
@@ -496,6 +550,36 @@ export function recordLessonQuizResult(
 export function recordBattleResult(xpEarned: number): void {
   if (!Number.isFinite(xpEarned) || xpEarned <= 0) return
   write({ ...state, xp: state.xp + Math.round(xpEarned) })
+}
+
+/**
+ * Records one finished casual duel for the Обычный screen's own stats and
+ * recent-opponents list. Separate from `recordBattleResult`, which already
+ * paid the real profile XP for both casual and ranked duels — this only
+ * tracks the casual-specific numbers nothing else in the profile keeps.
+ */
+export function recordCasualDuelResult(
+  opponentName: string,
+  won: boolean,
+  xpEarned: number,
+): void {
+  const safeXp = Number.isFinite(xpEarned) ? Math.max(0, Math.round(xpEarned)) : 0
+  const entry: CasualDuelRecord = {
+    opponentName: opponentName.trim(),
+    won,
+    xp: safeXp,
+    at: Date.now(),
+  }
+  write({
+    ...state,
+    casualDuels: state.casualDuels + 1,
+    casualWins: won ? state.casualWins + 1 : state.casualWins,
+    casualStreak: won ? state.casualStreak + 1 : 0,
+    recentCasualDuels: [entry, ...state.recentCasualDuels].slice(
+      0,
+      RECENT_CASUAL_DUELS_MAX,
+    ),
+  })
 }
 
 /** Records that the (unpaginated, full) timeline page was opened. */
