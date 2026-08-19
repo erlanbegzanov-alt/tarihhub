@@ -14,6 +14,9 @@ export const s = {
     timeline: { kz: 'Тарих', ru: 'История' },
     battle: { kz: 'Батл', ru: 'Батл' },
     profile: { kz: 'Профиль', ru: 'Профиль' },
+    openMenu: { kz: 'Мәзірді ашу', ru: 'Открыть меню' },
+    closeMenu: { kz: 'Мәзірді жабу', ru: 'Закрыть меню' },
+    menuTitle: { kz: 'Негізгі мәзір', ru: 'Главное меню' },
   },
 
   common: {
