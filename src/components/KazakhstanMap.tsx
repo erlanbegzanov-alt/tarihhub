@@ -339,7 +339,11 @@ export function KazakhstanMap({
           )}
         </svg>
 
-        {sites.map((site) => {
+        {/* present-day/permanent site pins — hidden once an era with its own
+            historical place callouts is active, so a Golden Horde view
+            doesn't sit next to a pin for Astana or Almaty. Eras without
+            territory data yet keep showing them, so the map isn't empty. */}
+        {(!activeEraKey || !territory) && sites.map((site) => {
           const Icon = SITE_ICONS[site.category]
           const color = siteColor(site.category)
           const isActive = activeId === site.id
