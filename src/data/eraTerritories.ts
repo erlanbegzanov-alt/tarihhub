@@ -75,6 +75,7 @@ export const eraTerritories: Partial<Record<EraKey, EraTerritory>> = {
       },
     ],
     places: [
+      { id: 'golden-horde-title', name: { kz: 'Алтын Орда', ru: 'Золотая Орда' }, lon: 55, lat: 50.5, kind: 'region' },
       { id: 'saray', name: { kz: 'Сарай', ru: 'Сарай' }, lon: 47.86, lat: 46.66, kind: 'capital' },
       { id: 'kazan', name: { kz: 'Қазан', ru: 'Казань' }, lon: 49.12, lat: 55.79, kind: 'city' },
       { id: 'moscow', name: { kz: 'Мәскеу', ru: 'Москва' }, lon: 37.62, lat: 55.75, kind: 'city' },
