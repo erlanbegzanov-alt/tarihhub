@@ -29,7 +29,6 @@ const KahootJoin = lazy(() => import('./screens/KahootJoin').then((m) => ({ defa
 const KahootStudent = lazy(() => import('./screens/KahootStudent').then((m) => ({ default: m.KahootStudent })))
 const KahootTeacher = lazy(() => import('./screens/KahootTeacher').then((m) => ({ default: m.KahootTeacher })))
 const LessonDetail = lazy(() => import('./screens/LessonDetail').then((m) => ({ default: m.LessonDetail })))
-const MapScreen = lazy(() => import('./screens/MapScreen').then((m) => ({ default: m.MapScreen })))
 const PersonDetail = lazy(() => import('./screens/PersonDetail').then((m) => ({ default: m.PersonDetail })))
 const Profile = lazy(() => import('./screens/Profile').then((m) => ({ default: m.Profile })))
 const Quiz = lazy(() => import('./screens/Quiz').then((m) => ({ default: m.Quiz })))
@@ -61,7 +60,6 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: '/quiz/:personId', element: <Quiz /> },
   { path: '/quiz/lesson/:lessonId', element: <Quiz /> },
   { path: '/timeline', element: <Timeline /> },
-  { path: '/map', element: <MapScreen /> },
   { path: '/battle', element: <Battle /> },
   { path: '/battle/casual', element: <BattleCasual /> },
   { path: '/battle/ranked', element: <BattleRanked /> },
