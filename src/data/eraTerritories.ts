@@ -5,14 +5,21 @@ import type { EraKey, LocalizedText } from './types'
  *
  * Emptied out at the user's request — every hand-drawn shape kept missing the
  * mark against their own reference maps across several rounds of redrawing.
- * `goldenHorde` is repopulated below, this time from a real georeferenced
- * source instead of freehand: the polygon comes from aourednik's
- * historical-basemaps `world_1300.geojson` ("Khanate of the Golden Horde"),
- * simplified with Ramer–Douglas–Peucker and run through the same
- * `projectLonLat` used everywhere else on this map, so it lands in the exact
- * same coordinate space as the real country borders — not eyeballed against
- * a screenshot. Re-populate the rest of `eraTerritories` below, keyed by
- * `EraKey`, to bring a shape back for another era.
+ *
+ * `goldenHorde`'s shape is traced from the user's own reference illustration
+ * rather than eyeballed or pulled from a third-party dataset: the yellow
+ * territory fill was isolated with OpenCV (color threshold + contour
+ * extraction) directly from the source image, so the polygon's vertices are
+ * the actual pixel outline of that map, not a hand-drawn approximation. Those
+ * pixel coordinates were then converted to real lon/lat via an affine
+ * transform fitted (least squares) against ~12 labelled cities on the same
+ * image whose real coordinates are known (Moscow, Kazan, Kiev, Otrar,
+ * Tashkent, Derbent, etc. — max residual ~2.8°), and finally run through the
+ * same `projectLonLat` used everywhere else on this map. So this border is
+ * the reference image's own outline, just moved into real coordinate space
+ * instead of staying locked in one bitmap. Re-populate the rest of
+ * `eraTerritories` below, keyed by `EraKey`, to bring a shape back for
+ * another era.
  */
 
 /**
@@ -71,7 +78,7 @@ export const eraTerritories: Partial<Record<EraKey, EraTerritory>> = {
     },
     shapes: [
       {
-        path: 'M-213.3,288.8L-211.9,300.4L-241.1,299.0L-242.2,324.1L-285.0,336.5L-328.9,334.9L-336.7,321.1L-252.3,274.9L-251.2,250.3L-216.3,227.1L-209.5,205.6L-126.2,222.5L-85.7,194.8L-66.5,197.9L-64.3,167.1L-22.6,165.6L28.1,136.3L19.1,77.8L64.1,64.0L68.4,6.3L280.9,-10.0L494.6,-107.0L604.1,-93.7L742.8,-3.9L896.1,26.1L827.6,186.9L753.1,181.3L641.0,202.6L491.4,185.5L310.8,368.7L254.6,392.0L208.1,450.3L186.7,413.3L190.6,399.5L214.1,408.8L219.9,397.5L202.3,374.0L190.8,376.5L189.1,397.5L185.6,359.4L143.5,321.4L165.1,317.0L156.9,309.3L164.0,297.7L194.6,298.7L187.0,294.5L190.1,261.2L157.2,257.8L97.0,289.2L82.9,317.4L95.2,341.6L98.9,333.3L100.8,362.6L56.2,366.9L-24.9,350.2L-78.0,313.7L-86.9,301.1L-61.1,281.0L-73.2,268.7L-49.0,253.0L-140.7,278.3L-119.6,298.5L-94.5,297.3L-137.7,318.4L-163.7,296.0L-146.1,279.7L-168.9,278.9L-173.3,262.5L-213.3,288.8Z',
+        path: 'M661.2,-32.9L622.4,-97.7L490.3,-114.7L313.4,-67.5L231.3,15.8L186.6,16.1L166.6,-32.2L101.1,7.2L-47.1,10.8L-67.3,52.6L-134.4,72.0L-146.9,121.0L-228.0,105.3L-278.6,170.7L-237.2,272.8L-275.2,289.2L-269.4,314.2L-161.2,266.2L-137.4,331.2L-111.1,328.8L-130.8,295.0L-34.3,261.0L-48.4,342.3L80.6,397.7L80.5,319.3L163.3,264.9L216.0,338.5L165.7,339.9L161.9,375.6L219.0,416.4L227.6,440.8L202.6,448.7L226.1,473.1L266.3,453.4L276.6,381.6L320.6,378.5L401.2,327.4L446.1,263.2L606.8,184.4L619.4,135.3L682.0,96.6Z',
       },
     ],
     places: [
