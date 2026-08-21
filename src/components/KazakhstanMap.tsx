@@ -54,14 +54,12 @@ const contextCountries = wideEurasiaCountries.filter(
 
 /**
  * Pre-made illustrated maps, one per era, dropped in whole rather than drawn
- * from `eraTerritories.ts` — the procedural SVG overlay kept missing the mark
- * against real reference maps across several rounds of redrawing (see git
- * history), so eras with a real reference image here just show it directly.
- * Not geo-referenced to `projectLonLat`, so no site pins are overlaid on top.
+ * from `eraTerritories.ts` — an escape hatch for an era whose shape isn't
+ * (yet) available as real georeferenced data. Not geo-referenced to
+ * `projectLonLat`, so no site pins, border animation, or place callouts are
+ * overlaid on top — prefer a real `eraTerritories` entry over adding one here.
  */
-export const ERA_MAP_IMAGES: Partial<Record<EraKey, string>> = {
-  goldenHorde: '/era-maps/goldenHorde.webp',
-}
+export const ERA_MAP_IMAGES: Partial<Record<EraKey, string>> = {}
 
 function unionView(territory: EraTerritory | null): View {
   if (!territory) return BASE_VIEW
