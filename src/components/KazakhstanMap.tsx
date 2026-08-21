@@ -1,4 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { Crown, Landmark } from 'lucide-react'
 import { useMemo } from 'react'
 import { eraColor, eras } from '../data/eras'
 import { eraTerritory } from '../data/eraTerritories'
@@ -61,6 +62,20 @@ const contextCountries = wideEurasiaCountries.filter(
  */
 export const ERA_MAP_IMAGES: Partial<Record<EraKey, string>> = {}
 
+/**
+ * Decorative atmosphere behind the real vector overlay — a generated relief
+ * texture, not a source of border or place data (that's still `eraTerritories`
+ * + `projectLonLat`, exactly as above). Purely a mood layer, so it doesn't
+ * need to be geo-referenced or pixel-accurate; it just needs to not fight the
+ * animated border and labels drawn on top of it.
+ */
+export const ERA_BACKGROUND_IMAGES: Partial<Record<EraKey, string>> = {
+  // goldenHorde: intentionally not wired in yet — the first draft background
+  // (public/era-maps/goldenHorde-bg.webp) has its own baked-in border that
+  // doesn't line up with the real one drawn from eraTerritories, so the two
+  // borders visibly disagreed. Re-add once a border-free replacement lands.
+}
+
 function unionView(territory: EraTerritory | null): View {
   if (!territory) return BASE_VIEW
   // Callout coordinates count too, or a label outside the shapes gets cropped.
@@ -90,6 +105,13 @@ function position(view: View, lon: number, lat: number) {
   }
 }
 
+/**
+ * `region` stays a plain floating label — it names an area, not a point, so a
+ * pin chip would be misleading. `city`/`capital` reuse the exact pin-chip
+ * language the permanent site markers use below (icon circle + pill), so a
+ * historical capital reads the same way an era-agnostic site does — just
+ * with period-appropriate names, swapped in only while that era is active.
+ */
 function PlaceCallout({
   place,
   color,
@@ -102,46 +124,72 @@ function PlaceCallout({
   const { t } = useLang()
   const reduce = useReducedMotion()
   const { left, top } = position(view, place.lon, place.lat)
-  const isRegion = place.kind === 'region'
+
+  if (place.kind === 'region') {
+    return (
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: reduce ? 0 : 0.3, ease: 'easeOut' }}
+        className="pointer-events-none absolute z-[9] -translate-x-1/2 -translate-y-full"
+        style={{ left, top }}
+      >
+        <span
+          className="rounded px-1 py-px text-[9px] font-bold tracking-wide whitespace-nowrap uppercase sm:text-[11px]"
+          style={{
+            color: `color-mix(in srgb, ${color} 82%, #17211e)`,
+            textShadow:
+              '0 0 3px #fff, 0 0 3px #fff, 0 1px 2px #fff, 0 -1px 2px #fff',
+          }}
+        >
+          {t(place.name)}
+        </span>
+      </motion.div>
+    )
+  }
+
+  const isCapital = place.kind === 'capital'
+  const Icon = isCapital ? Crown : Landmark
 
   return (
     <motion.div
-      initial={reduce ? false : { opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: reduce ? 0 : 0.3, ease: 'easeOut' }}
+      initial={reduce ? false : { opacity: 0, scale: 0.7 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ ...springSoft, delay: reduce ? 0 : 0.35 }}
       className={cn(
-        'pointer-events-none absolute z-[9] flex flex-col items-center',
-        '-translate-x-1/2 -translate-y-full',
+        'pointer-events-none absolute z-10 flex -translate-x-1/2 -translate-y-1/2',
+        'items-center gap-1 rounded-full py-0.5 pr-1.5 pl-0.5',
+        'text-[9px] font-semibold whitespace-nowrap sm:text-[10.5px]',
+        'border',
+        isCapital ? 'text-white' : 'bg-surface text-ink',
       )}
-      style={{ left, top }}
+      style={{
+        left,
+        top,
+        background: isCapital ? color : undefined,
+        borderColor: isCapital
+          ? color
+          : `color-mix(in srgb, ${color} 28%, var(--color-line))`,
+        boxShadow: isCapital
+          ? `0 6px 18px -6px ${color}`
+          : '0 1px 2px rgb(23 33 30 / 0.06), 0 6px 16px -10px rgb(23 33 30 / 0.3)',
+      }}
     >
       <span
-        className={cn(
-          'rounded px-1 py-px whitespace-nowrap',
-          isRegion
-            ? 'text-[9px] font-bold tracking-wide uppercase sm:text-[11px]'
-            : 'text-[8.5px] font-semibold sm:text-[10px]',
-        )}
+        className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full sm:h-4 sm:w-4"
         style={{
-          color: `color-mix(in srgb, ${color} 82%, #17211e)`,
-          textShadow:
-            '0 0 3px #fff, 0 0 3px #fff, 0 1px 2px #fff, 0 -1px 2px #fff',
+          background: isCapital
+            ? 'rgba(255,255,255,0.24)'
+            : `color-mix(in srgb, ${color} 16%, var(--color-surface))`,
         }}
       >
-        {t(place.name)}
-      </span>
-      {!isRegion && (
-        <span
-          className={cn(
-            'mb-[-3px] shrink-0 rounded-full ring-1 ring-white',
-            place.kind === 'capital' ? 'h-[7px] w-[7px]' : 'h-[5px] w-[5px]',
-          )}
-          style={{
-            background: place.kind === 'capital' ? color : 'var(--color-surface)',
-            border: place.kind === 'capital' ? undefined : `1.5px solid ${color}`,
-          }}
+        <Icon
+          className="h-2 w-2 shrink-0 sm:h-2.5 sm:w-2.5"
+          strokeWidth={2.2}
+          style={{ color: isCapital ? '#fff' : color }}
         />
-      )}
+      </span>
+      {t(place.name)}
     </motion.div>
   )
 }
@@ -167,6 +215,7 @@ export function KazakhstanMap({
   const overlayColor = activeEraKey ? eraColor(activeEraKey) : null
   const view = useMemo(() => unionView(territory), [territory])
   const eraImage = activeEraKey ? ERA_MAP_IMAGES[activeEraKey] : null
+  const backgroundImage = activeEraKey ? ERA_BACKGROUND_IMAGES[activeEraKey] : null
 
   /** Zoomed far enough out that a full pin chip per site would be unreadable. */
   const isWide = view.width > BASE_VIEW.width * 1.35
@@ -201,9 +250,22 @@ export function KazakhstanMap({
       )}
     >
       <div
-        className="relative w-full"
+        className={cn(
+          'relative w-full overflow-hidden',
+          backgroundImage && 'rounded-tile',
+        )}
         style={{ aspectRatio: `${view.width} / ${view.height}` }}
       >
+        {backgroundImage && (
+          <img
+            src={backgroundImage}
+            alt=""
+            aria-hidden
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
         <svg
           viewBox={`${view.minX} ${view.minY} ${view.width} ${view.height}`}
           className="absolute inset-0 h-full w-full"
@@ -217,33 +279,40 @@ export function KazakhstanMap({
             </linearGradient>
           </defs>
 
-          {/* faint graticule for depth */}
-          <g
-            stroke="var(--color-line)"
-            strokeWidth={1.2 * strokeScale}
-            strokeOpacity="0.7"
-          >
-            {[0.2, 0.4, 0.6, 0.8].map((f) => (
-              <line
-                key={`h${f}`}
-                x1={view.minX}
-                y1={view.minY + view.height * f}
-                x2={view.minX + view.width}
-                y2={view.minY + view.height * f}
-              />
-            ))}
-            {[0.2, 0.4, 0.6, 0.8].map((f) => (
-              <line
-                key={`v${f}`}
-                x1={view.minX + view.width * f}
-                y1={view.minY}
-                x2={view.minX + view.width * f}
-                y2={view.minY + view.height}
-              />
-            ))}
-          </g>
+          {/* faint graticule for depth — skipped over a photographic background, which
+              already reads as a real surface and doesn't need a vector grid on top */}
+          {!backgroundImage && (
+            <g
+              stroke="var(--color-line)"
+              strokeWidth={1.2 * strokeScale}
+              strokeOpacity="0.7"
+            >
+              {[0.2, 0.4, 0.6, 0.8].map((f) => (
+                <line
+                  key={`h${f}`}
+                  x1={view.minX}
+                  y1={view.minY + view.height * f}
+                  x2={view.minX + view.width}
+                  y2={view.minY + view.height * f}
+                />
+              ))}
+              {[0.2, 0.4, 0.6, 0.8].map((f) => (
+                <line
+                  key={`v${f}`}
+                  x1={view.minX + view.width * f}
+                  y1={view.minY}
+                  x2={view.minX + view.width * f}
+                  y2={view.minY + view.height}
+                />
+              ))}
+            </g>
+          )}
 
-          {/* present-day borders — the base layer every overlay sits on */}
+          {/* present-day borders — the base layer every overlay sits on. Over a
+              photo background this would read as a second, conflicting basemap,
+              so it's skipped there too — only the era overlay and its own
+              strokes draw on top of the texture. */}
+          {!backgroundImage && (
           <g
             fill="var(--color-line)"
             fillOpacity="0.2"
@@ -255,6 +324,7 @@ export function KazakhstanMap({
               <path key={country.id} d={country.path} />
             ))}
           </g>
+          )}
 
           {/* neighbouring 'stans next, so Kazakhstan draws on top of them */}
           {centralAsiaCountries
@@ -320,8 +390,10 @@ export function KazakhstanMap({
             )}
           </AnimatePresence>
 
-          {/* re-stroke the modern borders on top, so they read through the fill */}
-          {territory && (
+          {/* re-stroke the modern borders on top, so they read through the fill —
+              meaningless over a photo background (nothing light to read through),
+              so skipped there. */}
+          {territory && !backgroundImage && (
             <g
               fill="none"
               stroke="var(--color-surface)"
