@@ -16,6 +16,7 @@ import {
   getProfile,
   loadProfileForUser,
   normalizeProfile,
+  recordVisit,
   replaceProfile,
   setRemoteWriter,
 } from './progress'
@@ -145,26 +146,54 @@ export function mergeProfiles(
 }
 
 /**
+ * Bumped on every `startProfileSync`/`stopProfileSync` call and captured by
+ * each `startProfileSync` invocation before it awaits anything. A resume that
+ * finds the generation has moved on — a sign-out, or a *different* account
+ * signing in, while its own `getDoc` was still in flight — means its result
+ * belongs to a session that no longer exists, so it must never attach a
+ * writer or touch local storage. Without this, a slow read outlives a sign-
+ * out and reattaches its own (now-stale) writer, or lands a resolved account's
+ * profile into whatever account (or no account) is current by the time it
+ * finishes.
+ */
+let syncGeneration = 0
+
+/**
  * Adopts the signed-in user's cloud profile and starts mirroring local writes
  * to it. Safe to call when Firestore is unavailable — it simply does nothing.
+ *
+ * Records this visit once the merge (or the decision that there is nothing to
+ * merge) has actually landed, rather than the caller recording it the instant
+ * the gate reaches 'app' — recording it there raced this function's own
+ * `getDoc`: on a fresh device the visit landed first with nothing to compare
+ * against, read a blank `lastVisitDate` as "never visited", and reset the
+ * real streak to 1 the moment the merge below decided the *local* copy —
+ * the one that had just lied about being new — was the newer of the two.
  */
 export async function startProfileSync(uid: string): Promise<void> {
+  const generation = ++syncGeneration
+
   // Scope the local cache to this account *before* touching it below, so the
   // merge only ever sees this account's own device history — never a
   // previous account's numbers left over from the same browser.
   loadProfileForUser(uid)
 
   const ref = profileDoc(uid)
-  if (!ref) return
+  if (!ref) {
+    recordVisit()
+    return
+  }
 
   let remote: ProfileState | null = null
   try {
     const snapshot = await getDoc(ref)
+    if (generation !== syncGeneration) return
     if (snapshot.exists()) remote = normalizeProfile(snapshot.data())
   } catch (error) {
     // Offline or rules not deployed yet: keep working from the local copy and
     // don't attach a writer that would only fail on every keystroke.
     console.warn('[tarihhub] Could not read the cloud profile.', error)
+    if (generation === syncGeneration) recordVisit()
     return
   }
 
@@ -177,10 +206,12 @@ export async function startProfileSync(uid: string): Promise<void> {
   })
 
   replaceProfile(mergeProfiles(remote, getProfile()))
+  recordVisit()
 }
 
 /** Detaches the cloud mirror and clears the account-scoped local cache. */
 export function stopProfileSync(): void {
+  syncGeneration += 1
   setRemoteWriter(null)
   loadProfileForUser(null)
 }

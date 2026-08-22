@@ -26,7 +26,11 @@ function isIosSafari(): boolean {
 }
 
 function wasDismissed(): boolean {
-  return window.localStorage.getItem(DISMISSED_KEY) === '1'
+  try {
+    return window.localStorage.getItem(DISMISSED_KEY) === '1'
+  } catch {
+    return false
+  }
 }
 
 export function InstallPrompt() {
@@ -53,7 +57,11 @@ export function InstallPrompt() {
   }, [])
 
   const dismiss = () => {
-    window.localStorage.setItem(DISMISSED_KEY, '1')
+    try {
+      window.localStorage.setItem(DISMISSED_KEY, '1')
+    } catch {
+      /* storage unavailable — the in-memory dismissal still holds this session */
+    }
     setDismissed(true)
   }
 

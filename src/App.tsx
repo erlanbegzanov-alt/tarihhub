@@ -7,7 +7,6 @@ import { LanguageProvider } from './i18n/LanguageProvider'
 import { s } from './i18n/strings'
 import { useLang } from './i18n/useLang'
 import { easeOut, pageVariants } from './lib/motion'
-import { recordVisit } from './lib/progress'
 import { completeOnboarding, sessionGate, useSession } from './lib/session'
 import { Home } from './screens/Home'
 import { Onboarding } from './screens/Onboarding'
@@ -30,6 +29,7 @@ const KahootJoin = lazy(() => import('./screens/KahootJoin').then((m) => ({ defa
 const KahootStudent = lazy(() => import('./screens/KahootStudent').then((m) => ({ default: m.KahootStudent })))
 const KahootTeacher = lazy(() => import('./screens/KahootTeacher').then((m) => ({ default: m.KahootTeacher })))
 const LessonDetail = lazy(() => import('./screens/LessonDetail').then((m) => ({ default: m.LessonDetail })))
+const MapScreen = lazy(() => import('./screens/MapScreen').then((m) => ({ default: m.MapScreen })))
 const PersonDetail = lazy(() => import('./screens/PersonDetail').then((m) => ({ default: m.PersonDetail })))
 const Profile = lazy(() => import('./screens/Profile').then((m) => ({ default: m.Profile })))
 const Quiz = lazy(() => import('./screens/Quiz').then((m) => ({ default: m.Quiz })))
@@ -55,6 +55,7 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: '/person/:id', element: <PersonDetail /> },
   { path: '/course', element: <CourseOutline /> },
   { path: '/lesson/:id', element: <LessonDetail /> },
+  { path: '/map', element: <MapScreen /> },
   { path: '/ai', element: <AIChat /> },
   { path: '/ai/:personId', element: <AIChat /> },
   { path: '/quiz', element: <Quiz /> },
@@ -164,12 +165,6 @@ function Gate() {
   const session = useSession()
   const gate = sessionGate(session)
   const reduce = useReducedMotion()
-
-  // Once per calendar day: bump the visit count and recompute the real streak.
-  // Held until the visitor is actually in the app so the intro doesn't count.
-  useEffect(() => {
-    if (gate === 'app') recordVisit()
-  }, [gate])
 
   return (
     <AnimatePresence mode="wait" initial={false}>

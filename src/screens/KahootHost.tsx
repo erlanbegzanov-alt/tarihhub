@@ -117,9 +117,14 @@ export function KahootHost() {
   useEffect(() => {
     if (!gameId) return
     let alive = true
-    void fetchGame(gameId).then((found) => {
-      if (alive) setGame(found)
-    })
+    fetchGame(gameId)
+      .then((found) => {
+        if (alive) setGame(found)
+      })
+      .catch((error: unknown) => {
+        console.warn('[tarihhub] Could not load the kahoot game to host.', error)
+        if (alive) setFailed(true)
+      })
     return () => {
       alive = false
     }

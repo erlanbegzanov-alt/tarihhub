@@ -49,14 +49,17 @@ const THEME_OPTIONS: { value: ThemePreference; label: typeof s.profile.themeLigh
 ]
 
 /**
- * Hidden developer panel (see "🛠 Dev режим" below). Off by default for every
- * normal visitor — only active once this localStorage flag is set, which
- * only happens via the `?dev=1` query param or a previous dev session.
+ * Hidden developer panel (see "🛠 Dev режим" below): arbitrary XP, rank-tier
+ * jumps, and a raw profile JSON editor, all wired straight to `replaceProfile`
+ * and synced to Firestore. Real power, so it's built out of the production
+ * bundle entirely (`import.meta.env.DEV` is inlined `false` by Vite at build
+ * time and the whole branch is dead-code-eliminated) rather than merely
+ * hidden behind a query param a curious visitor could just type.
  */
 const DEV_MODE_KEY = 'tarihhub_dev'
 
 function readDevModeFlag(): boolean {
-  if (typeof window === 'undefined') return false
+  if (!import.meta.env.DEV || typeof window === 'undefined') return false
   try {
     return window.localStorage.getItem(DEV_MODE_KEY) === '1'
   } catch {
@@ -112,6 +115,7 @@ export function Profile() {
   // `?dev=1` flips the flag on (persisted in localStorage) and is then
   // stripped from the address bar so it doesn't linger in history/URL bar.
   useEffect(() => {
+    if (!import.meta.env.DEV) return
     const params = new URLSearchParams(window.location.search)
     if (params.get('dev') !== '1') return
     try {
@@ -187,7 +191,11 @@ export function Profile() {
     const trimmed = nameDraft.trim()
     setEditingName(false)
     if (trimmed && trimmed !== displayName) {
-      await updateDisplayName(trimmed)
+      try {
+        await updateDisplayName(trimmed)
+      } catch (error) {
+        console.warn('[tarihhub] Could not save the display name.', error)
+      }
     }
   }
 

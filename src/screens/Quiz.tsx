@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, Check, Lock, RotateCcw, Trophy, X, Zap } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PortraitPanel } from '../components/PortraitPanel'
 import { IconButton, ProgressBar, XpPill } from '../components/ui'
@@ -44,6 +44,17 @@ export function Quiz() {
   const [finished, setFinished] = useState(false)
   /** Whether the finished attempt reached the lesson pass mark. Lesson mode only. */
   const [lessonPassed, setLessonPassed] = useState(false)
+  /**
+   * Whether this mounted screen has already paid its `XP_PER_QUIZ`. Retry
+   * re-draws the questions and lets the reader practice again, but it must
+   * not reopen the XP faucet — `restart` deliberately never resets this, so
+   * finishing the same on-screen session five times pays once, not five.
+   * (`recordLessonQuizResult` doesn't need the same guard — it already only
+   * pays a lesson's completion XP the first time that lesson is ever passed.)
+   */
+  const xpAwardedRef = useRef(false)
+  /** What the result screen actually just paid — `0` on a retry's finish. */
+  const [xpEarnedThisRound, setXpEarnedThisRound] = useState(0)
 
   const question = questions[index]
   const isLast = index === questions.length - 1
@@ -58,7 +69,13 @@ export function Quiz() {
     if (isLast) {
       // `correctCount` already includes the current answer — `choose` runs first.
       // A lesson quiz is still a quiz: it earns the usual XP, streak and badges…
-      completeQuiz(correctCount, questions.length, XP_PER_QUIZ)
+      if (!xpAwardedRef.current) {
+        xpAwardedRef.current = true
+        setXpEarnedThisRound(XP_PER_QUIZ)
+        completeQuiz(correctCount, questions.length, XP_PER_QUIZ)
+      } else {
+        setXpEarnedThisRound(0)
+      }
       // …and, on top of that, decides whether the lesson itself is passed.
       if (lessonId) {
         setLessonPassed(
@@ -188,7 +205,7 @@ export function Quiz() {
             </p>
           </div>
           <div className="rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60">
-            <p className="text-3xl font-bold text-gold">+{XP_PER_QUIZ}</p>
+            <p className="text-3xl font-bold text-gold">+{xpEarnedThisRound}</p>
             <p className="mt-1 text-[12.5px] text-ink-faint">
               {t(s.quiz.xpEarned)}
             </p>

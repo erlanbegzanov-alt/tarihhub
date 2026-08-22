@@ -12,7 +12,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { SectionCheck } from '../components/SectionCheck'
 import { EraBadge, IconButton, ProgressBar } from '../components/ui'
@@ -56,10 +56,23 @@ export function LessonDetail() {
   // A fresh lesson always opens on its first part.
   useEffect(() => setActiveIndex(0), [id])
 
+  /**
+   * Bumped every time the section (or the lesson itself) changes below —
+   * `handleExplain` captures it before awaiting and checks it again after,
+   * so a reply for a part the reader has already navigated away from can't
+   * pop the panel open under whatever part is on screen by the time it
+   * resolves, showing that part's explanation under different text.
+   */
+  const explainRequestRef = useRef(0)
+
   useEffect(() => {
+    explainRequestRef.current += 1
     setExplainOpen(false)
     setExplainText(null)
     setExplainErrored(false)
+    // A request already in flight for the part just left behind must not
+    // leave this part's own button stuck showing a spinner it never started.
+    setExplainLoading(false)
   }, [activeIndex, id])
 
   // Only the count matters here: whether this lesson can be gated at all.
@@ -99,17 +112,22 @@ export function LessonDetail() {
     currentIndex === -1 ? undefined : lessonsInCourseOrder[currentIndex + 1]
 
   const handleExplain = async () => {
+    const request = explainRequestRef.current
     setExplainLoading(true)
     setExplainErrored(false)
     try {
       const section = lesson.sections[activeIndex]
       const text = await explainSection(t(section.heading), t(section.body), lang)
+      if (request !== explainRequestRef.current) return
       setExplainText(text)
     } catch {
+      if (request !== explainRequestRef.current) return
       setExplainErrored(true)
     } finally {
-      setExplainLoading(false)
-      setExplainOpen(true)
+      if (request === explainRequestRef.current) {
+        setExplainLoading(false)
+        setExplainOpen(true)
+      }
     }
   }
 

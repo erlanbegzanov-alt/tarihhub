@@ -176,10 +176,15 @@ export function KahootJoin() {
     if (!room || !uid) return
     if (room.status !== 'reveal' || room.revealedCorrectIndex === null) return
     if (scoredIndexRef.current === room.questionIndex) return
-    scoredIndexRef.current = room.questionIndex
 
     const answeredAt = answeredAtRef.current
     if (picked === null || picked < 0 || answeredAt === null) return
+    // Only claimed once there's a real, committed pick to score — reveal can
+    // land in the same commit as `submitAnswer`'s own `setPicked` before it
+    // has flushed, and claiming the index on that pass (with `picked` still
+    // `null`) used to shut the door on the re-run that would have seen the
+    // real answer once it caught up, scoring a correct, in-time answer as 0.
+    scoredIndexRef.current = room.questionIndex
 
     const gained = answerXp(
       picked === room.revealedCorrectIndex,

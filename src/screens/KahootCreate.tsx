@@ -62,6 +62,14 @@ export function KahootCreate() {
   const [questions, setQuestions] = useState<KahootQuestion[]>([emptyQuestion()])
   const [createdAt, setCreatedAt] = useState(() => Date.now())
   const [loading, setLoading] = useState(Boolean(editId))
+  /**
+   * Set only when the existing game's read genuinely failed (offline, rules
+   * rejected it) — never for "this id doesn't exist". Blocks the form rather
+   * than falling through to it: a blank one-question draft that *looked* like
+   * the real quiz used to be indistinguishable from it, and Save is a full
+   * overwrite with no undo.
+   */
+  const [loadError, setLoadError] = useState(false)
   const [uploading, setUploading] = useState<string | null>(null)
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [flaw, setFlaw] = useState<KahootFlaw | null>(null)
@@ -73,15 +81,22 @@ export function KahootCreate() {
   useEffect(() => {
     if (!editId) return
     let alive = true
-    void fetchGame(editId).then((game) => {
-      if (!alive) return
-      if (game) {
-        setTitle(game.title)
-        setQuestions(game.questions.length > 0 ? game.questions : [emptyQuestion()])
-        setCreatedAt(game.createdAt)
-      }
-      setLoading(false)
-    })
+    fetchGame(editId)
+      .then((game) => {
+        if (!alive) return
+        if (game) {
+          setTitle(game.title)
+          setQuestions(game.questions.length > 0 ? game.questions : [emptyQuestion()])
+          setCreatedAt(game.createdAt)
+        }
+        setLoading(false)
+      })
+      .catch((error: unknown) => {
+        if (!alive) return
+        console.warn('[tarihhub] Could not load the kahoot game to edit.', error)
+        setLoadError(true)
+        setLoading(false)
+      })
     return () => {
       alive = false
     }
@@ -90,6 +105,22 @@ export function KahootCreate() {
   const patch = (index: number, change: Partial<KahootQuestion>) => {
     setQuestions((prev) =>
       prev.map((question, i) => (i === index ? { ...question, ...change } : question)),
+    )
+    setFlaw(null)
+  }
+
+  /**
+   * Same as `patch`, but by the question's own id rather than its position in
+   * the array — for a write that lands after an `await`, during which the
+   * list can have been reordered or shortened out from under a captured
+   * index. `pickPhoto` is the one caller: its upload can take seconds, long
+   * enough for an earlier question to be deleted meanwhile, which used to
+   * land the finished photo on whatever question the now-stale index pointed
+   * at instead — or drop it silently if the list had shrunk past that index.
+   */
+  const patchById = (id: string, change: Partial<KahootQuestion>) => {
+    setQuestions((prev) =>
+      prev.map((question) => (question.id === id ? { ...question, ...change } : question)),
     )
     setFlaw(null)
   }
@@ -125,12 +156,17 @@ export function KahootCreate() {
       setPhotoError(t(s.kahoot.photoFailed))
       return
     }
-    patch(index, { photoURL: url })
+    patchById(question.id, { photoURL: url })
   }
 
   /** Saves the game, or reports the first thing standing in the way. */
   const save = async (): Promise<boolean> => {
     if (!uid) return false
+    // A leftover photo-upload error from earlier otherwise sits in front of
+    // `flawMessage` forever (`photoError ?? flawMessage ?? saveError`),
+    // masking the message that would actually tell the teacher which
+    // question or option is still empty.
+    setPhotoError(null)
     const found = findFlaw(title, questions)
     if (found) {
       setFlaw(found)
@@ -174,6 +210,13 @@ export function KahootCreate() {
           className="mt-5 rounded-card bg-surface p-5 text-center text-[13.5px] leading-relaxed text-ink-faint shadow-soft ring-1 ring-line/60"
         >
           {t(s.battle.unavailable)}
+        </motion.p>
+      ) : loadError ? (
+        <motion.p
+          variants={staggerItem}
+          className="mt-5 rounded-card bg-surface p-5 text-center text-[13.5px] leading-relaxed text-ink-faint shadow-soft ring-1 ring-line/60"
+        >
+          {t(s.kahoot.loadFailed)}
         </motion.p>
       ) : loading ? (
         <div className="py-16 text-center">

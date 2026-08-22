@@ -107,9 +107,20 @@ export function AIChat() {
 
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const counter = useRef(0)
+  /**
+   * Bumped every time the transcript resets below. `send` captures it before
+   * awaiting the reply and checks it again after — a reply that comes back
+   * once the reader has switched persona or language is for a conversation
+   * that no longer exists on screen, and used to land in the new, empty one
+   * instead: a Kazakh answer appearing under no question in a freshly
+   * switched-to Russian transcript, with the composer re-enabled underneath
+   * it letting a second reply interleave with whatever answers first.
+   */
+  const conversationRef = useRef(0)
 
   // Reset the transcript whenever the persona or language changes.
   useEffect(() => {
+    conversationRef.current += 1
     setMessages([])
     setInput('')
     setThinking(false)
@@ -132,6 +143,7 @@ export function AIChat() {
     const text = raw.trim()
     if (!text || thinking) return
 
+    const conversation = conversationRef.current
     counter.current += 1
     const userMessage: Message = {
       id: `u${counter.current}`,
@@ -143,6 +155,7 @@ export function AIChat() {
     setThinking(true)
 
     const answer = await askPersona(person, history, text, lang)
+    if (conversation !== conversationRef.current) return
 
     counter.current += 1
     setMessages((prev) => [

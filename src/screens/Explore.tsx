@@ -98,7 +98,13 @@ export function Explore() {
         </motion.div>
       ) : (
         <motion.ul
-          key={`${filter}-${query}`}
+          // Keyed on the filter alone, not the query too — remounting (and so
+          // replaying the whole stagger-in) on every single keystroke was
+          // visibly janky typing into the search box on a mid-range phone.
+          // Switching era filters is the deliberate, infrequent action worth
+          // replaying the entrance for; row content otherwise still updates
+          // through ordinary reconciliation via each `person.id` key below.
+          key={filter}
           variants={staggerContainer}
           initial="initial"
           animate="animate"

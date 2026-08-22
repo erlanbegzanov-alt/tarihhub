@@ -307,10 +307,13 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const go = (delta: number) => {
     const next = index + delta
     if (next < 0) return
-    if (next >= SLIDES.length) {
-      onDone()
-      return
-    }
+    // The last slide is the gender pick — the only two buttons that finish
+    // onboarding both call `setAvatarGender` first (below). Swiping past this
+    // slide the same way every earlier one advances used to call `onDone`
+    // with no gender ever chosen, so the account skipped onboarding with no
+    // avatar assigned at all — exactly what Skip's own redirect to this slide
+    // exists to prevent.
+    if (next >= SLIDES.length) return
     setPage([next, delta])
   }
 

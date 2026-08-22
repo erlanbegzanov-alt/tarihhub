@@ -13,7 +13,7 @@ export interface Rank {
  * Seven honorific tiers, in two gendered tracks. The titles are real Kazakh
  * historical and cultural terms, kept exactly as they are said.
  *
- * Tier 6 opens at 1360 XP — the 68 lessons × `XP_PER_LESSON` of the whole
+ * Tier 6 opens at 1240 XP — the 62 lessons × `XP_PER_LESSON` of the whole
  * course, so it marks finishing everything. Tier 7 deliberately sits past that
  * total: it is only reachable with the extra XP of repeat person quizzes.
  */
@@ -54,7 +54,7 @@ export const ranks: Rank[] = [
     },
   },
   {
-    minXp: 1360,
+    minXp: 1240,
     title: {
       m: { kz: 'Сұлтан', ru: 'Султан' },
       f: { kz: 'Ханым', ru: 'Ханым' },
