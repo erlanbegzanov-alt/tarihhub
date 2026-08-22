@@ -46,7 +46,7 @@ function PersonaPicker({ onPick }: { onPick: (person: Person) => void }) {
         className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
       >
         {people.map((person) => (
-          <motion.li key={person.id} variants={staggerItem}>
+          <motion.li key={person.id} variants={staggerItem} className="min-w-0">
             <motion.button
               type="button"
               onClick={() => onPick(person)}
