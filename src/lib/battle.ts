@@ -309,9 +309,20 @@ export async function fetchBattlePlayer(uid: string): Promise<BattlePlayer | nul
 
 /**
  * Publishes (or refreshes) the caller's own mirror, so an opponent and the
- * weekly board have a name, an avatar and a level to show. Rating and this
- * week's XP are carried over from whatever is already stored — this only ever
- * updates the identity half of the row.
+ * weekly board have a name, an avatar and a level to show.
+ *
+ * On an existing row this writes *only* the identity fields, via `updateDoc`
+ * rather than a full `setDoc` overwrite. That matters because this runs on
+ * its own effect keyed off `meta` (`BattleDuel.tsx`), which can re-fire the
+ * instant a duel ends — `recordBattleResult` bumps the caller's profile XP,
+ * which can change `level`/`rankIdentity` and thus `meta`'s identity — at
+ * the exact moment `applyRankedResult` is writing a fresh `rating`/`weekXp`
+ * for the same document. A full overwrite here would carry forward whatever
+ * stale `rating`/`weekXp` this call's own read happened to see and, if it
+ * lands after the ranked result's write, silently erase it. Touching only
+ * the identity fields makes that race impossible: whatever this write
+ * doesn't mention, Firestore (and firestore.rules, which evaluates
+ * `request.resource.data` against the merged result) leaves untouched.
  */
 export async function syncBattlePlayer(
   uid: string,
@@ -319,17 +330,36 @@ export async function syncBattlePlayer(
 ): Promise<BattlePlayer | null> {
   if (!db) return null
   const current = await fetchBattlePlayer(uid)
+  // Matches the `displayName.size() <= 40` cap in firestore.rules — without
+  // this, a real (if unusually long) Google account name could get this
+  // write rejected outright instead of just trimmed.
+  const displayName = meta.displayName.slice(0, 40)
+  if (current) {
+    try {
+      await updateDoc(doc(db, 'battlePlayers', uid), {
+        displayName,
+        photoURL: meta.photoURL,
+        level: meta.level,
+        updatedAt: Date.now(),
+        avatarGender: meta.avatarGender,
+        avatarTierIndex: meta.avatarTierIndex,
+        titleTierIndex: meta.titleTierIndex,
+      })
+      return { ...current, displayName, photoURL: meta.photoURL, level: meta.level }
+    } catch (error) {
+      console.warn('[tarihhub] Could not publish the battle player.', error)
+      return current
+    }
+  }
+  // First time this player is seen: no rating/weekXp to preserve yet, so the
+  // full document (including the zeroed baseline) is written in one create.
   const next: BattlePlayer = {
     uid,
-    // Matches the `displayName.size() <= 40` cap in firestore.rules — without
-    // this, a real (if unusually long) Google account name could get this
-    // write rejected outright instead of just trimmed.
-    displayName: meta.displayName.slice(0, 40),
+    displayName,
     photoURL: meta.photoURL,
     level: meta.level,
-    rating: current?.rating ?? 0,
-    // `fetchBattlePlayer` already zeroed a stale week on the way in.
-    weekXp: current?.weekXp ?? 0,
+    rating: 0,
+    weekXp: 0,
     weekStart: isoWeekStart(),
     updatedAt: Date.now(),
     avatarGender: meta.avatarGender,
@@ -341,7 +371,7 @@ export async function syncBattlePlayer(
     return next
   } catch (error) {
     console.warn('[tarihhub] Could not publish the battle player.', error)
-    return current
+    return null
   }
 }
 
