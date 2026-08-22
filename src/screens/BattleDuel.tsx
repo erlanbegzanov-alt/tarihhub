@@ -425,7 +425,14 @@ export function BattleDuel({
 
       revealRef.current = window.setTimeout(() => {
         if (last) {
-          setPhase('waiting')
+          // The scoring effect below may already have raced ahead of this
+          // timer — if the opponent had already finished, our own `doneAt`
+          // write can round-trip through `watchMatch`'s snapshot listener
+          // and score the match (phase 'result') before this fixed
+          // `REVEAL_MS` delay elapses. Only fall into 'waiting' if we are
+          // still actually mid-duel, so this stale timeout can never stomp
+          // an already-scored result back into a wait screen with no way out.
+          setPhase((prev) => (prev === 'duel' ? 'waiting' : prev))
           return
         }
         setIndex((prev) => prev + 1)
