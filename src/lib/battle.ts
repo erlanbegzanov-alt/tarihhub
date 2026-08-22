@@ -376,18 +376,39 @@ export async function syncBattlePlayer(
 }
 
 /**
+ * Where the rating stood on either side of one ranked duel.
+ *
+ * Returned rather than left for the caller to re-read, because re-reading is
+ * exactly what it cannot do: `syncBattlePlayer` may write the same document a
+ * moment later, and a second read would race it. These two numbers are the
+ * ones this write actually committed, so the result screen can say
+ * "1240 → 1258" instead of an opaque "+18", and the ranked history can store
+ * the same pair (see `recordRankedDuelResult` in `src/lib/progress.ts`).
+ *
+ * `after` is not always `before ± RATING_WIN/RATING_LOSS`: the rating floors
+ * at zero, so a loss near the bottom of the ladder moves it by less.
+ */
+export interface RatingChange {
+  before: number
+  after: number
+}
+
+/**
  * Applies one finished ranked duel to the caller's own mirror: the rating moves
  * by `RATING_WIN` / `RATING_LOSS` (never below zero) and the XP earned is added
  * to this week's total, on top of the lazy weekly reset. Casual duels never
  * reach this — they pay real profile XP and nothing else.
+ *
+ * Resolves to `null` only when there was no write to describe — Firebase
+ * unconfigured, or the write refused.
  */
 export async function applyRankedResult(
   uid: string,
   meta: BattlePlayerMeta,
   xpEarned: number,
   won: boolean,
-): Promise<void> {
-  if (!db) return
+): Promise<RatingChange | null> {
+  if (!db) return null
   const current = await fetchBattlePlayer(uid)
   const next: BattlePlayer = {
     uid,
@@ -405,8 +426,10 @@ export async function applyRankedResult(
   }
   try {
     await setDoc(doc(db, 'battlePlayers', uid), next)
+    return { before: current?.rating ?? 0, after: next.rating }
   } catch (error) {
     console.warn('[tarihhub] Could not save the battle result.', error)
+    return null
   }
 }
 

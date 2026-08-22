@@ -1,18 +1,28 @@
 /**
  * Обычный (`/battle/casual`): the duel engine plus this player's own casual
- * stats and recent-opponents history — numbers nothing else in the app
- * tracks, kept purely local/per-device (see `recordCasualDuelResult` in
+ * record and match history — numbers nothing else in the app tracks, kept
+ * purely local/per-device (see `recordCasualDuelResult` in
  * `src/lib/progress.ts`) since a casual duel never touches Firestore beyond
  * the match itself.
+ *
+ * Deliberately has no weekly leaderboard: casual is practice, it pays no
+ * rating and no week XP, and a ranking widget here would only imply otherwise.
+ * The board belongs to Рейтинг alone.
  */
 import { Zap } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { KahootHeader } from '../components/kahoot'
-import { SectionHeading, StatTile } from '../components/ui'
+import {
+  EmptyPanel,
+  FormDots,
+  MatchList,
+  MatchRow,
+  useMyIdentity,
+} from '../components/battle'
+import { SectionHeading, XpPill } from '../components/ui'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
-import { cn } from '../lib/cn'
 import { staggerContainer, staggerItem } from '../lib/motion'
 import { useProfile } from '../lib/progress'
 import { BattleDuel } from './BattleDuel'
@@ -21,6 +31,7 @@ export function BattleCasual() {
   const { t } = useLang()
   const navigate = useNavigate()
   const profile = useProfile()
+  const me = useMyIdentity()
 
   const winRate =
     profile.casualDuels > 0
@@ -41,11 +52,49 @@ export function BattleCasual() {
         onBack={() => navigate('/battle')}
       />
 
-      <motion.div variants={staggerItem} className="mt-5 grid grid-cols-3 gap-2.5">
-        <StatTile value={profile.casualDuels} label={t(s.battle.statDuels)} />
-        <StatTile value={`${winRate}%`} label={t(s.battle.statWinRate)} />
-        <StatTile value={profile.casualStreak} label={t(s.battle.statStreak)} />
-      </motion.div>
+      {/* One record card rather than three loose tiles: the three numbers only
+          mean anything read together, and the form strip below them turns the
+          same history into a shape before it is a list. */}
+      <motion.section
+        variants={staggerItem}
+        className="mt-5 overflow-hidden rounded-card bg-surface shadow-soft ring-1 ring-line/60"
+      >
+        <div className="grid grid-cols-3 divide-x divide-line-soft">
+          <div className="px-3 py-4 text-center">
+            <p className="text-2xl leading-none font-bold tabular-nums text-ink">
+              {profile.casualDuels}
+            </p>
+            <p className="mt-1.5 text-[11px] leading-tight text-ink-faint">
+              {t(s.battle.statDuels)}
+            </p>
+          </div>
+          <div className="px-3 py-4 text-center">
+            <p className="text-2xl leading-none font-bold tabular-nums text-brand">
+              {winRate}%
+            </p>
+            <p className="mt-1.5 text-[11px] leading-tight text-ink-faint">
+              {t(s.battle.statWinRate)}
+            </p>
+          </div>
+          <div className="px-3 py-4 text-center">
+            <p className="text-2xl leading-none font-bold tabular-nums text-gold">
+              {profile.casualStreak}
+            </p>
+            <p className="mt-1.5 text-[11px] leading-tight text-ink-faint">
+              {t(s.battle.statStreak)}
+            </p>
+          </div>
+        </div>
+
+        {profile.recentCasualDuels.length > 0 && (
+          <div className="flex items-center justify-between gap-3 border-t border-line-soft bg-cream/50 px-5 py-3">
+            <span className="text-[11.5px] font-semibold tracking-wide text-ink-faint uppercase">
+              {t(s.battle.formTitle)}
+            </span>
+            <FormDots results={profile.recentCasualDuels.map((duel) => duel.won)} />
+          </div>
+        )}
+      </motion.section>
 
       <motion.div variants={staggerItem} className="mt-4">
         <BattleDuel mode="casual" />
@@ -55,38 +104,24 @@ export function BattleCasual() {
         <SectionHeading title={t(s.battle.recentTitle)} />
 
         {profile.recentCasualDuels.length === 0 ? (
-          <p className="rounded-card bg-surface p-5 text-center text-[13.5px] leading-relaxed text-ink-faint shadow-soft ring-1 ring-line/60">
-            {t(s.battle.recentEmpty)}
-          </p>
+          <EmptyPanel>{t(s.battle.recentEmpty)}</EmptyPanel>
         ) : (
-          <ul className="overflow-hidden rounded-card bg-surface shadow-soft ring-1 ring-line/60">
-            {profile.recentCasualDuels.map((entry) => (
-              <li
-                key={entry.at}
-                className={cn(
-                  'grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3',
-                  'border-b border-line-soft last:border-b-0',
-                )}
-              >
-                <span
-                  className={cn(
-                    'rounded-full px-2.5 py-1 text-[11px] font-bold',
-                    entry.won
-                      ? 'bg-correct-tint text-correct'
-                      : 'bg-wrong-tint text-wrong',
-                  )}
-                >
-                  {t(entry.won ? s.battle.recentWin : s.battle.recentLose)}
-                </span>
-                <span className="min-w-0 truncate text-[13.5px] font-bold text-ink">
-                  {entry.opponentName || t(s.battle.opponent)}
-                </span>
-                <span className="text-[13px] font-bold tabular-nums text-brand">
-                  +{entry.xp} {t(s.common.xp)}
-                </span>
-              </li>
+          <MatchList>
+            {profile.recentCasualDuels.map((duel) => (
+              <MatchRow
+                key={duel.at}
+                me={me}
+                duel={duel}
+                // Casual pays real profile XP and nothing else, so the XP is
+                // the whole payout — there is no rating line to put beside it.
+                meta={
+                  <XpPill>
+                    +{duel.xp} {t(s.common.xp)}
+                  </XpPill>
+                }
+              />
             ))}
-          </ul>
+          </MatchList>
         )}
       </motion.div>
     </motion.div>

@@ -8,7 +8,14 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Crown, Loader2, Trophy } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { RankBadge } from '../components/RankBadge'
+import {
+  FOE_COLOR,
+  LeagueCrest,
+  OutcomeAvatar,
+  RatingMove,
+  ratingTierColor,
+} from '../components/battle'
+import { PlayerAvatar } from '../components/kahoot'
 import { ProgressBar, WeeklyTopBadge } from '../components/ui'
 import { battleQuestion } from '../data/battleQuestions'
 import type { AvatarGender } from '../data/ranks'
@@ -19,8 +26,6 @@ import {
   MAX_BATTLE_XP,
   QUESTION_SECONDS,
   QUEUE_TTL_MS,
-  RATING_LOSS,
-  RATING_WIN,
   ROUND_SIZE,
   ROUNDS,
   answerXp,
@@ -33,22 +38,33 @@ import {
   joinQueue,
   leaveQueue,
   pushSlot,
+  ratingTierFor,
   slotKeyFor,
   syncBattlePlayer,
   watchClaim,
   watchMatch,
 } from '../lib/battle'
-import type { BattleMatch, BattleMode, BattlePlayer, BattlePlayerMeta } from '../lib/battle'
+import type {
+  BattleMatch,
+  BattleMode,
+  BattlePlayer,
+  BattlePlayerMeta,
+  RatingChange,
+} from '../lib/battle'
 import { cn } from '../lib/cn'
 import { isFirebaseReady } from '../lib/firebase'
 import { easeOut, springSoft } from '../lib/motion'
-import { levelInfo, recordBattleResult, recordCasualDuelResult, useProfile } from '../lib/progress'
+import {
+  levelInfo,
+  recordBattleResult,
+  recordCasualDuelResult,
+  recordRankedDuelResult,
+  useProfile,
+} from '../lib/progress'
+import type { DuelOpponent } from '../lib/progress'
 import { rankTitleText, resolveRankIdentity } from '../lib/rankIdentity'
 import { OWNER_EMAIL } from '../lib/rankStyle'
 import { useSession } from '../lib/session'
-
-/** The opponent's accent, kept apart from the brand green the reader owns. */
-const FOE_COLOR = 'var(--color-era-alash)'
 
 /** How long a revealed answer stays on screen before the next question. */
 const REVEAL_MS = 950
@@ -68,59 +84,90 @@ interface Outcome {
   foeXp: number
   won: boolean
   ranked: boolean
+  /**
+   * Where the rating landed, once Firestore has confirmed the write.
+   *
+   * Deliberately filled in *after* the outcome is set rather than awaited
+   * before it: the result screen must appear the instant the duel is scored,
+   * so a slow (or refused) `applyRankedResult` can never leave the reader
+   * staring at a wait screen. Until it arrives the rating block shows a
+   * spinner, and on a failed write it simply stays absent.
+   */
+  rating: RatingChange | null
 }
 
 /* ------------------------------------------------------------------ */
 
-/** One side of the duel head: avatar, name, rank title, level chip. */
+/**
+ * One side of the duel head: avatar, name, rank title, level chip.
+ *
+ * The avatar is `PlayerAvatar` — the one rendering the whole app uses for a
+ * player (rank art, else the Google photo, else an initial on a disc) — with
+ * this side's accent as a ring around it. Once `won` is decided the ring turns
+ * into the verdict itself (`OutcomeAvatar`), so the head that ran the duel is
+ * also what announces who took it, rather than the result screen restating the
+ * same two faces underneath it.
+ */
 function Fighter({
   name,
   photoURL,
   level,
   color,
+  me,
   avatarGender,
   avatarTierIndex,
   rankTitle,
   isWeeklyTop,
+  won,
 }: {
   name: string
   photoURL: string
   level: number
   color: string
+  me: boolean
   avatarGender: AvatarGender | null
   avatarTierIndex: number
   rankTitle: string
   isWeeklyTop: boolean
+  /** `null` until the duel is scored. */
+  won: boolean | null
 }) {
   const { t } = useLang()
   return (
     <div className="flex min-w-0 flex-col items-center gap-2 text-center">
       <div className="relative">
-        {avatarGender ? (
-          <RankBadge tierIndex={avatarTierIndex} gender={avatarGender} title={rankTitle} size={56} />
-        ) : photoURL ? (
-          <img
-            src={photoURL}
-            alt=""
-            referrerPolicy="no-referrer"
-            className="h-14 w-14 rounded-full object-cover ring-2 ring-surface"
-            style={{ boxShadow: `0 0 0 3px color-mix(in srgb, ${color} 35%, transparent)` }}
-          />
-        ) : (
+        {won === null ? (
           <span
-            className="grid h-14 w-14 place-items-center rounded-full text-lg font-bold text-white ring-2 ring-surface"
-            style={{
-              background: `linear-gradient(155deg, ${color} 0%, color-mix(in srgb, ${color} 62%, #17211e) 100%)`,
-            }}
+            className="inline-flex rounded-full"
+            style={{ boxShadow: `0 0 0 3px color-mix(in srgb, ${color} 35%, transparent)` }}
           >
-            {name.charAt(0).toUpperCase() || '?'}
+            <PlayerAvatar
+              name={name}
+              photoURL={photoURL}
+              size={56}
+              me={me}
+              avatarGender={avatarGender}
+              avatarTierIndex={avatarTierIndex}
+            />
           </span>
+        ) : (
+          <OutcomeAvatar
+            name={name}
+            photoURL={photoURL}
+            won={won}
+            size={56}
+            me={me}
+            avatarGender={avatarGender}
+            avatarTierIndex={avatarTierIndex}
+          />
         )}
+        {/* Top-right, so it can never collide with the verdict badge the
+            avatar grows in its bottom-right corner once a duel is scored. */}
         {isWeeklyTop && (
           <WeeklyTopBadge
             label={t(s.battle.weeklyTopBadge)}
             compact
-            className="absolute -right-1 -bottom-1 ring-2 ring-surface"
+            className="absolute -top-1 -right-1 ring-2 ring-surface"
           />
         )}
       </div>
@@ -232,11 +279,21 @@ export function BattleDuel({
   // Flashes "Round N — difficulty" the instant a new round's first question
   // loads (index 0, ROUND_SIZE, 2*ROUND_SIZE, …), then clears itself — the
   // banner is purely a beat between rounds, never something to dismiss by hand.
+  //
+  // The teardown clears the banner as well as the timer: answering the round's
+  // first question in under 1400ms moves `index` on (or ends the duel), which
+  // re-runs this effect, cancels the pending timeout, and then returns early
+  // because the new index no longer starts a round. Without the reset here
+  // that leaves the banner up for good — the dimmed overlay ends up sitting
+  // over the next question, or over the whole result screen.
   useEffect(() => {
     if (phase !== 'duel' || index % ROUND_SIZE !== 0) return
     setRoundBanner(index / ROUND_SIZE + 1)
     const timer = window.setTimeout(() => setRoundBanner(null), 1400)
-    return () => window.clearTimeout(timer)
+    return () => {
+      window.clearTimeout(timer)
+      setRoundBanner(null)
+    }
   }, [phase, index])
 
   /**
@@ -469,20 +526,45 @@ export function BattleDuel({
     const won = mine.xp >= foeSlot.xp
     const ranked = match.mode === 'ranked'
 
+    // The face across the board, captured as it was at match end. Stored on
+    // the history record rather than looked up later, so a history row can
+    // draw the same avatar the duel head just showed (see `DuelOpponent`).
+    const duelOpponent: DuelOpponent = {
+      opponentName: foeName,
+      opponentPhotoURL: opponent?.photoURL ?? '',
+      opponentAvatarGender: opponent?.avatarGender ?? null,
+      opponentAvatarTierIndex: opponent?.avatarTierIndex ?? 0,
+    }
+
     // Real profile XP either way — a casual duel is worth just as much to the
     // reader's level as a ranked one. Only the rating and the weekly board are
-    // held back for ranked, and only casual keeps its own stats/history.
+    // held back for ranked; each mode keeps its own stats and history.
     recordBattleResult(mine.xp)
     if (ranked) {
-      void applyRankedResult(uid, meta, mine.xp, won).then(() => onRankedResult?.())
+      void applyRankedResult(uid, meta, mine.xp, won).then((rating) => {
+        onRankedResult?.()
+        if (!rating) return
+        recordRankedDuelResult({
+          opponent: duelOpponent,
+          won,
+          xpEarned: mine.xp,
+          foeXp: foeSlot.xp,
+          ratingBefore: rating.before,
+          ratingAfter: rating.after,
+        })
+        // Fills in the rating block the result screen already rendered a
+        // placeholder for. Guarded on the outcome still being *this* duel's,
+        // so a rematch started before the write landed can't inherit it.
+        setOutcome((prev) => (prev && prev.rating === null ? { ...prev, rating } : prev))
+      })
     } else {
-      recordCasualDuelResult(foeName, won, mine.xp)
+      recordCasualDuelResult(duelOpponent, won, mine.xp, foeSlot.xp)
     }
     void closeMatch(match.id)
 
-    setOutcome({ myXp: mine.xp, foeXp: foeSlot.xp, won, ranked })
+    setOutcome({ myXp: mine.xp, foeXp: foeSlot.xp, won, ranked, rating: null })
     setPhase('result')
-  }, [match, slot, foeSlot, uid, meta, timedOut, foeName, onRankedResult])
+  }, [match, slot, foeSlot, uid, meta, timedOut, foeName, opponent, onRankedResult])
 
   /* ------------------------------- render ------------------------------- */
 
@@ -503,6 +585,41 @@ export function BattleDuel({
 
   const inDuel = phase === 'duel' || phase === 'waiting' || phase === 'result'
   const foeXp = outcome?.foeXp ?? foeSlot?.xp ?? 0
+
+  /* ---------------------- the rating, as a movement ---------------------- */
+
+  const ratingChange = outcome?.rating ?? null
+  const oldTier = ratingTierFor(ratingChange?.before ?? 0)
+  const newTier = ratingTierFor(ratingChange?.after ?? 0)
+  const oldTierColor = ratingTierColor(oldTier.index)
+  const newTierColor = ratingTierColor(newTier.index)
+  const leagueUp = ratingChange !== null && newTier.index > oldTier.index
+
+  /**
+   * The league bar is animated in two beats so it reads as the rating *moving*
+   * rather than as a bar that was always at its new value: it lands on where
+   * the rating stood before the duel, then travels to where it stands now.
+   *
+   * A duel that crossed a tier boundary is the exception — the new tier's
+   * progress restarts near zero, so animating to it would show the bar sliding
+   * *backwards* on a promotion. Those fill to the top of the tier just left
+   * instead, and the promotion itself is carried by the banner above.
+   */
+  const [barPercent, setBarPercent] = useState(0)
+  useEffect(() => {
+    if (!ratingChange) return
+    const before = ratingTierFor(ratingChange.before).progress
+    const after = ratingTierFor(ratingChange.after)
+    setBarPercent(before)
+    const timer = window.setTimeout(
+      () =>
+        setBarPercent(
+          after.index > ratingTierFor(ratingChange.before).index ? 100 : after.progress,
+        ),
+      750,
+    )
+    return () => window.clearTimeout(timer)
+  }, [ratingChange])
 
   const roundDifficultyLabel = [s.battle.roundLight, s.battle.roundMedium, s.battle.roundHard][
     Math.min((roundBanner ?? 1) - 1, 2)
@@ -548,10 +665,12 @@ export function BattleDuel({
               photoURL={meta.photoURL}
               level={level}
               color="var(--color-brand)"
+              me
               avatarGender={rankIdentity.avatarGender}
               avatarTierIndex={rankIdentity.avatarTierIndex}
               rankTitle={myRankTitle}
               isWeeklyTop={uid !== null && weeklyTopUids.has(uid)}
+              won={outcome ? outcome.won : null}
             />
             <span className="grid h-9 w-9 place-items-center rounded-full bg-cream-deep text-[13px] font-bold text-ink-faint">
               VS
@@ -561,10 +680,12 @@ export function BattleDuel({
               photoURL={opponent?.photoURL ?? ''}
               level={opponent?.level ?? 1}
               color={FOE_COLOR}
+              me={false}
               avatarGender={opponent?.avatarGender ?? null}
               avatarTierIndex={opponent?.avatarTierIndex ?? 0}
               rankTitle={foeRankTitle}
               isWeeklyTop={opponent !== null && weeklyTopUids.has(opponent.uid)}
+              won={outcome ? !outcome.won : null}
             />
           </div>
 
@@ -785,7 +906,39 @@ export function BattleDuel({
                 {t(outcome.won ? s.battle.winText : s.battle.loseText)}
               </p>
 
-              <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+              {/* The moment the league effects in `LeagueCrest` were written
+                  for and never previously had: a rating that just crossed a
+                  tier boundary, called out on its own. */}
+              <AnimatePresence>
+                {leagueUp && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={springSoft}
+                    className="mt-5 flex items-center gap-3.5 rounded-tile p-4 text-left ring-1"
+                    style={{
+                      background: `color-mix(in srgb, ${newTierColor} 12%, var(--color-surface))`,
+                      borderColor: 'transparent',
+                      ['--tw-ring-color' as string]: `color-mix(in srgb, ${newTierColor} 40%, transparent)`,
+                    }}
+                  >
+                    <LeagueCrest tierIndex={newTier.index} size={46} celebrate />
+                    <div className="min-w-0">
+                      <p
+                        className="text-[15px] font-bold"
+                        style={{ color: newTierColor }}
+                      >
+                        {t(s.battle.leagueUp)} · {t(newTier.tier.name)}
+                      </p>
+                      <p className="mt-0.5 text-[12.5px] leading-snug text-ink-soft">
+                        {t(s.battle.leagueUpText)}
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="mt-5 grid grid-cols-2 gap-2.5">
                 <div className="rounded-tile bg-cream p-4 ring-1 ring-line/60">
                   <p className="text-xl font-bold tabular-nums text-brand">
                     +{outcome.myXp}
@@ -802,28 +955,65 @@ export function BattleDuel({
                     {t(s.battle.opponentXp)}
                   </p>
                 </div>
-                <div className="col-span-2 rounded-tile bg-cream p-4 ring-1 ring-line/60 sm:col-span-1">
-                  <p
-                    className="text-xl font-bold tabular-nums"
-                    style={{
-                      color: !outcome.ranked
-                        ? 'var(--color-ink-faint)'
-                        : outcome.won
-                          ? 'var(--color-brand)'
-                          : FOE_COLOR,
-                    }}
-                  >
-                    {outcome.ranked
-                      ? outcome.won
-                        ? `+${RATING_WIN}`
-                        : `−${RATING_LOSS}`
-                      : '—'}
-                  </p>
-                  <p className="mt-1 text-[11.5px] text-ink-faint">
-                    {t(outcome.ranked ? s.battle.ratingDelta : s.battle.noRating)}
-                  </p>
-                </div>
               </div>
+
+              {/* Ranked: the rating as a movement with the ladder it moved on,
+                  rather than a bare signed number with nothing to read it
+                  against. Casual: said plainly that nothing moved. */}
+              {outcome.ranked ? (
+                <div className="mt-2.5 rounded-tile bg-cream p-4 text-left ring-1 ring-line/60">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11.5px] font-semibold tracking-wide text-ink-faint uppercase">
+                      {t(s.battle.ratingMoved)}
+                    </span>
+                    {outcome.rating ? (
+                      <RatingMove
+                        before={outcome.rating.before}
+                        after={outcome.rating.after}
+                      />
+                    ) : (
+                      <Loader2
+                        className="h-4 w-4 animate-spin text-ink-faint"
+                        strokeWidth={2}
+                        aria-hidden
+                      />
+                    )}
+                  </div>
+
+                  {outcome.rating && (
+                    <div className="mt-3.5 flex items-center gap-3">
+                      <LeagueCrest
+                        tierIndex={leagueUp ? oldTier.index : newTier.index}
+                        size={34}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <ProgressBar
+                          percent={barPercent}
+                          height={8}
+                          color={leagueUp ? oldTierColor : newTierColor}
+                        />
+                        {/* On a promotion the bar and crest belong to the tier
+                            just filled, so the caption names the step taken
+                            rather than the next target — which the banner
+                            above has already announced. */}
+                        <p className="mt-1.5 text-[11.5px] text-ink-faint">
+                          {leagueUp
+                            ? `${t(oldTier.tier.name)} → ${t(newTier.tier.name)}`
+                            : newTier.next
+                              ? `${t(s.battle.nextTier)} ${t(newTier.next.name)}: ${
+                                  newTier.next.min - outcome.rating.after
+                                } ${t(s.battle.ratingPoints)}`
+                              : t(s.battle.maxTier)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-2.5 text-[12.5px] text-ink-faint">
+                  {t(s.battle.noRating)}
+                </p>
+              )}
 
               <motion.button
                 type="button"

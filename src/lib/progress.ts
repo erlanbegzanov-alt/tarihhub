@@ -39,13 +39,54 @@ export interface LessonQuizScore {
 }
 
 /** How many of the most recent casual duels `recentCasualDuels` keeps. */
-export const RECENT_CASUAL_DUELS_MAX = 5
+export const RECENT_CASUAL_DUELS_MAX = 8
+/** How many of the most recent ranked duels `recentRankedDuels` keeps. */
+export const RECENT_RANKED_DUELS_MAX = 10
+
+/**
+ * The opponent as they looked at the moment a duel ended.
+ *
+ * Stored on the record rather than looked up later because there is nowhere to
+ * look it up from: `battlePlayers/{uid}` is a live mirror that keeps moving,
+ * and a history row wants the face that was actually across the board. All
+ * four fields are written by `BattleDuel.tsx` off the same `BattlePlayer` the
+ * duel head already rendered, so a history row draws the identical avatar.
+ */
+export interface DuelOpponent {
+  opponentName: string
+  /** Google account photo, or '' — the `PlayerAvatar` fallback handles both. */
+  opponentPhotoURL: string
+  /** `null` for an opponent who never picked a track on their own profile. */
+  opponentAvatarGender: AvatarGender | null
+  opponentAvatarTierIndex: number
+}
 
 /** One finished casual duel, newest first in `recentCasualDuels`. */
-export interface CasualDuelRecord {
-  opponentName: string
+export interface CasualDuelRecord extends DuelOpponent {
+  won: boolean
+  /** This player's XP in that duel. */
+  xp: number
+  /** The opponent's XP — the other half of the score line. */
+  foeXp: number
+  at: number
+}
+
+/**
+ * One finished ranked duel, newest first in `recentRankedDuels`.
+ *
+ * Kept in the same local/per-device store as the casual list rather than in
+ * Firestore: `battlePlayers/{uid}` holds only a player's *current* standing,
+ * and giving every duel a document would mean a new collection and new rules
+ * for what is, today, a personal log nobody else ever reads. The rating pair
+ * is what makes a row explain itself — "1240 → 1258" instead of an opaque
+ * "+18" with nothing to read it against.
+ */
+export interface RankedDuelRecord extends DuelOpponent {
   won: boolean
   xp: number
+  foeXp: number
+  ratingBefore: number
+  ratingAfter: number
   at: number
 }
 
@@ -105,6 +146,14 @@ export interface ProfileState {
   casualStreak: number
   /** Newest first, capped to `RECENT_CASUAL_DUELS_MAX`. */
   recentCasualDuels: CasualDuelRecord[]
+  /** Ranked 1v1 duels finished. Counted separately from the casual ones so
+   *  neither mode's record can flatter the other's. */
+  rankedDuels: number
+  rankedWins: number
+  /** Current unbroken ranked win streak. Resets to 0 on any loss. */
+  rankedStreak: number
+  /** Newest first, capped to `RECENT_RANKED_DUELS_MAX`. */
+  recentRankedDuels: RankedDuelRecord[]
 }
 
 export const DEFAULT_STATE: ProfileState = {
@@ -127,6 +176,10 @@ export const DEFAULT_STATE: ProfileState = {
   casualWins: 0,
   casualStreak: 0,
   recentCasualDuels: [],
+  rankedDuels: 0,
+  rankedWins: 0,
+  rankedStreak: 0,
+  recentRankedDuels: [],
 }
 
 /** Share of `lessonProgress` that inline section checks alone can fill — the
@@ -171,6 +224,35 @@ function normalizeLessonQuizBest(value: unknown): Record<string, LessonQuizScore
   return result
 }
 
+/** Non-negative whole number, or `fallback` for anything else. */
+function countOr(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0, Math.round(value))
+    : fallback
+}
+
+/**
+ * The opponent half of a duel record.
+ *
+ * Every field here defaults rather than rejecting the row: the avatar fields
+ * were added after the first duels were already written, so a real history
+ * from before then has to survive the upgrade — it simply falls back to the
+ * initial-on-a-disc rendering `PlayerAvatar` already draws for an opponent
+ * with no photo.
+ */
+function normalizeDuelOpponent(entry: Partial<DuelOpponent>): DuelOpponent {
+  return {
+    opponentName: typeof entry.opponentName === 'string' ? entry.opponentName : '',
+    opponentPhotoURL:
+      typeof entry.opponentPhotoURL === 'string' ? entry.opponentPhotoURL : '',
+    opponentAvatarGender:
+      entry.opponentAvatarGender === 'm' || entry.opponentAvatarGender === 'f'
+        ? entry.opponentAvatarGender
+        : null,
+    opponentAvatarTierIndex: countOr(entry.opponentAvatarTierIndex, 0),
+  }
+}
+
 /**
  * Coerces an untrusted recent-duels list: only well-shaped entries survive,
  * newest first, capped the same way `recordCasualDuelResult` caps it.
@@ -180,14 +262,49 @@ function normalizeRecentCasualDuels(value: unknown): CasualDuelRecord[] {
   const result: CasualDuelRecord[] = []
   for (const entry of value) {
     if (!entry || typeof entry !== 'object') continue
-    const { opponentName, won, xp, at } = entry as Partial<CasualDuelRecord>
-    if (typeof opponentName !== 'string') continue
-    if (typeof won !== 'boolean') continue
-    if (typeof xp !== 'number' || !Number.isFinite(xp)) continue
-    if (typeof at !== 'number' || !Number.isFinite(at)) continue
-    result.push({ opponentName, won, xp: Math.max(0, Math.round(xp)), at })
+    const record = entry as Partial<CasualDuelRecord>
+    if (typeof record.opponentName !== 'string') continue
+    if (typeof record.won !== 'boolean') continue
+    if (typeof record.xp !== 'number' || !Number.isFinite(record.xp)) continue
+    if (typeof record.at !== 'number' || !Number.isFinite(record.at)) continue
+    result.push({
+      ...normalizeDuelOpponent(record),
+      won: record.won,
+      xp: Math.max(0, Math.round(record.xp)),
+      foeXp: countOr(record.foeXp, 0),
+      at: record.at,
+    })
   }
   return result.slice(0, RECENT_CASUAL_DUELS_MAX)
+}
+
+/**
+ * Same treatment for the ranked log, plus the rating pair. A row whose ratings
+ * are missing (or corrupt) is kept rather than dropped — it still carries a
+ * real result — and simply reads as no rating movement.
+ */
+function normalizeRecentRankedDuels(value: unknown): RankedDuelRecord[] {
+  if (!Array.isArray(value)) return []
+  const result: RankedDuelRecord[] = []
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue
+    const record = entry as Partial<RankedDuelRecord>
+    if (typeof record.opponentName !== 'string') continue
+    if (typeof record.won !== 'boolean') continue
+    if (typeof record.xp !== 'number' || !Number.isFinite(record.xp)) continue
+    if (typeof record.at !== 'number' || !Number.isFinite(record.at)) continue
+    const ratingBefore = countOr(record.ratingBefore, 0)
+    result.push({
+      ...normalizeDuelOpponent(record),
+      won: record.won,
+      xp: Math.max(0, Math.round(record.xp)),
+      foeXp: countOr(record.foeXp, 0),
+      ratingBefore,
+      ratingAfter: countOr(record.ratingAfter, ratingBefore),
+      at: record.at,
+    })
+  }
+  return result.slice(0, RECENT_RANKED_DUELS_MAX)
 }
 
 /**
@@ -260,19 +377,14 @@ export function normalizeProfile(value: unknown): ProfileState {
       parsed.displayedAvatarTier >= 0
         ? Math.round(parsed.displayedAvatarTier)
         : DEFAULT_STATE.displayedAvatarTier,
-    casualDuels:
-      typeof parsed.casualDuels === 'number' && Number.isFinite(parsed.casualDuels)
-        ? Math.max(0, Math.round(parsed.casualDuels))
-        : DEFAULT_STATE.casualDuels,
-    casualWins:
-      typeof parsed.casualWins === 'number' && Number.isFinite(parsed.casualWins)
-        ? Math.max(0, Math.round(parsed.casualWins))
-        : DEFAULT_STATE.casualWins,
-    casualStreak:
-      typeof parsed.casualStreak === 'number' && Number.isFinite(parsed.casualStreak)
-        ? Math.max(0, Math.round(parsed.casualStreak))
-        : DEFAULT_STATE.casualStreak,
+    casualDuels: countOr(parsed.casualDuels, DEFAULT_STATE.casualDuels),
+    casualWins: countOr(parsed.casualWins, DEFAULT_STATE.casualWins),
+    casualStreak: countOr(parsed.casualStreak, DEFAULT_STATE.casualStreak),
     recentCasualDuels: normalizeRecentCasualDuels(parsed.recentCasualDuels),
+    rankedDuels: countOr(parsed.rankedDuels, DEFAULT_STATE.rankedDuels),
+    rankedWins: countOr(parsed.rankedWins, DEFAULT_STATE.rankedWins),
+    rankedStreak: countOr(parsed.rankedStreak, DEFAULT_STATE.rankedStreak),
+    recentRankedDuels: normalizeRecentRankedDuels(parsed.recentRankedDuels),
   }
 }
 
@@ -559,15 +671,17 @@ export function recordBattleResult(xpEarned: number): void {
  * tracks the casual-specific numbers nothing else in the profile keeps.
  */
 export function recordCasualDuelResult(
-  opponentName: string,
+  opponent: DuelOpponent,
   won: boolean,
   xpEarned: number,
+  foeXp: number,
 ): void {
-  const safeXp = Number.isFinite(xpEarned) ? Math.max(0, Math.round(xpEarned)) : 0
   const entry: CasualDuelRecord = {
-    opponentName: opponentName.trim(),
+    ...normalizeDuelOpponent(opponent),
+    opponentName: opponent.opponentName.trim(),
     won,
-    xp: safeXp,
+    xp: countOr(xpEarned, 0),
+    foeXp: countOr(foeXp, 0),
     at: Date.now(),
   }
   write({
@@ -578,6 +692,47 @@ export function recordCasualDuelResult(
     recentCasualDuels: [entry, ...state.recentCasualDuels].slice(
       0,
       RECENT_CASUAL_DUELS_MAX,
+    ),
+  })
+}
+
+/**
+ * Records one finished ranked duel for the Рейтинг screen's own history.
+ *
+ * The counterpart to `recordCasualDuelResult`, and deliberately the same shape
+ * of local-only bookkeeping: the *authoritative* ranked outcome — the rating
+ * and this week's XP — is written to Firestore by `applyRankedResult` in
+ * `src/lib/battle.ts` and is untouched by this. All this keeps is the personal
+ * log that mirror has no room for: who it was against, what the score was, and
+ * where the rating stood on either side of the duel.
+ */
+export function recordRankedDuelResult(params: {
+  opponent: DuelOpponent
+  won: boolean
+  xpEarned: number
+  foeXp: number
+  ratingBefore: number
+  ratingAfter: number
+}): void {
+  const ratingBefore = countOr(params.ratingBefore, 0)
+  const entry: RankedDuelRecord = {
+    ...normalizeDuelOpponent(params.opponent),
+    opponentName: params.opponent.opponentName.trim(),
+    won: params.won,
+    xp: countOr(params.xpEarned, 0),
+    foeXp: countOr(params.foeXp, 0),
+    ratingBefore,
+    ratingAfter: countOr(params.ratingAfter, ratingBefore),
+    at: Date.now(),
+  }
+  write({
+    ...state,
+    rankedDuels: state.rankedDuels + 1,
+    rankedWins: params.won ? state.rankedWins + 1 : state.rankedWins,
+    rankedStreak: params.won ? state.rankedStreak + 1 : 0,
+    recentRankedDuels: [entry, ...state.recentRankedDuels].slice(
+      0,
+      RECENT_RANKED_DUELS_MAX,
     ),
   })
 }

@@ -12,6 +12,7 @@ import type { DocumentReference } from 'firebase/firestore'
 import { db } from './firebase'
 import {
   RECENT_CASUAL_DUELS_MAX,
+  RECENT_RANKED_DUELS_MAX,
   getProfile,
   loadProfileForUser,
   normalizeProfile,
@@ -34,6 +35,28 @@ function profileDoc(uid: string): DocumentReference | null {
  * higher value and lists take the union, so progress made on this device
  * before the cloud copy loaded is carried up rather than thrown away.
  */
+/**
+ * Newest-first union of two duel logs, capped.
+ *
+ * Deduped by `at` — the millisecond the duel was recorded, which is unique per
+ * duel and identical in both copies of the same one. Without that, every
+ * sign-in re-merges the cloud copy with the local cache that was pushed *from*
+ * that same copy and keeps a second identical row, so one duel quietly becomes
+ * two, then four; the counters beside it (merged with `Math.max`) stay right,
+ * which is what makes the drift so easy to miss.
+ */
+function mergeDuelLog<T extends { at: number }>(
+  remote: T[],
+  local: T[],
+  max: number,
+): T[] {
+  const byTime = new Map<number, T>()
+  for (const duel of [...remote, ...local]) {
+    if (!byTime.has(duel.at)) byTime.set(duel.at, duel)
+  }
+  return [...byTime.values()].sort((a, b) => b.at - a.at).slice(0, max)
+}
+
 export function mergeProfiles(
   remote: ProfileState | null,
   local: ProfileState,
@@ -49,9 +72,21 @@ export function mergeProfiles(
   const remoteCasualAt = remote.recentCasualDuels[0]?.at ?? 0
   const localCasualAt = local.recentCasualDuels[0]?.at ?? 0
   const casualIsNewer = remoteCasualAt >= localCasualAt
-  const recentCasualDuels = [...remote.recentCasualDuels, ...local.recentCasualDuels]
-    .sort((a, b) => b.at - a.at)
-    .slice(0, RECENT_CASUAL_DUELS_MAX)
+  const recentCasualDuels = mergeDuelLog(
+    remote.recentCasualDuels,
+    local.recentCasualDuels,
+    RECENT_CASUAL_DUELS_MAX,
+  )
+
+  // The ranked log merges by exactly the same rules as the casual one above.
+  const remoteRankedAt = remote.recentRankedDuels[0]?.at ?? 0
+  const localRankedAt = local.recentRankedDuels[0]?.at ?? 0
+  const rankedIsNewer = remoteRankedAt >= localRankedAt
+  const recentRankedDuels = mergeDuelLog(
+    remote.recentRankedDuels,
+    local.recentRankedDuels,
+    RECENT_RANKED_DUELS_MAX,
+  )
 
   // Per lesson, the furthest either device got. A device that only just opened
   // a lesson must never push a returning user back from a finished one.
@@ -97,6 +132,10 @@ export function mergeProfiles(
     casualWins: Math.max(remote.casualWins, local.casualWins),
     casualStreak: casualIsNewer ? remote.casualStreak : local.casualStreak,
     recentCasualDuels,
+    rankedDuels: Math.max(remote.rankedDuels, local.rankedDuels),
+    rankedWins: Math.max(remote.rankedWins, local.rankedWins),
+    rankedStreak: rankedIsNewer ? remote.rankedStreak : local.rankedStreak,
+    recentRankedDuels,
     lessonProgress,
     completedLessons: [
       ...new Set([...remote.completedLessons, ...local.completedLessons]),
