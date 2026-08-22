@@ -8,8 +8,19 @@ import { springSoft, staggerItem } from '../lib/motion'
 import { PortraitPanel } from './PortraitPanel'
 import { EraBadge } from './ui'
 
+/**
+ * The subset of `Person` this card actually renders — accepting just this
+ * (rather than the full `Person`) lets Home pass the lightweight `PersonMeta`
+ * summary instead of pulling in every figure's full bio/achievements/AI
+ * persona data just to show a name and portrait.
+ */
+type PersonCardData = Pick<
+  Person,
+  'id' | 'initial' | 'eraKey' | 'motif' | 'portrait' | 'name' | 'eraBadge' | 'role'
+>
+
 /** Portrait card used in the home rail and the desktop figure grid. */
-export function PersonCard({ person, className }: { person: Person; className?: string }) {
+export function PersonCard({ person, className }: { person: PersonCardData; className?: string }) {
   const { t } = useLang()
 
   return (

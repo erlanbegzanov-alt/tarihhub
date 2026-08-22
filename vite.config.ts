@@ -54,7 +54,7 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         runtimeCaching: [
           {
-            // Portrait PNGs (`public/portraits/*.png`) keep a stable filename even
+            // Portrait images (`public/portraits/*.webp`) keep a stable filename even
             // when the underlying image is regenerated — there's no content hash
             // in the URL to bust a stale cache. CacheFirst would then serve last
             // month's portrait forever (up to the 30-day/200-entry cap) even

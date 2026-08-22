@@ -11,8 +11,8 @@ import {
 } from '../components/ui'
 import { eraColor } from '../data/eras'
 import { todaysFeaturedEvent } from '../data/featuredEvents'
-import { allLessons } from '../data/lessons'
-import { people } from '../data/people'
+import { lessonsMeta } from '../data/lessonsMeta'
+import { peopleMeta } from '../data/peopleMeta'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
@@ -40,7 +40,10 @@ export function Home() {
   const featuredEvent = useMemo(() => todaysFeaturedEvent(), [])
 
   // Real progress, read live from the profile — never baked into the data.
-  const lessons = allLessons.map((lesson) => ({
+  // Uses `lessonsMeta` (id/title/eraKey only) rather than the full `lessons.ts`
+  // content module — Home never renders lesson body text, so it shouldn't pull
+  // in the ~3.9MB of bilingual section content that the lesson/quiz screens need.
+  const lessons = lessonsMeta.map((lesson) => ({
     lesson,
     percent: profile.lessonProgress[lesson.id] ?? 0,
   }))
@@ -50,7 +53,7 @@ export function Home() {
 
   // Course-wide stat for the CTA card, counted against the lessons that really
   // exist — the number grows on its own as content lands.
-  const passedLessons = allLessons.filter((lesson) =>
+  const passedLessons = lessonsMeta.filter((lesson) =>
     profile.completedLessons.includes(lesson.id),
   ).length
 
@@ -189,7 +192,7 @@ export function Home() {
               'md:mx-0 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 lg:grid-cols-4 xl:grid-cols-5',
             )}
           >
-            {people.slice(0, 10).map((person) => (
+            {peopleMeta.slice(0, 10).map((person) => (
               <PersonCard
                 key={person.id}
                 person={person}
@@ -314,12 +317,12 @@ export function Home() {
                 <div className="mt-2 flex items-center gap-2.5">
                   <span className="text-[13px] font-bold text-ink">
                     {passedLessons}
-                    <span className="text-ink-faint"> / {allLessons.length}</span>
+                    <span className="text-ink-faint"> / {lessonsMeta.length}</span>
                   </span>
                   <ProgressBar
                     percent={
-                      allLessons.length > 0
-                        ? (passedLessons / allLessons.length) * 100
+                      lessonsMeta.length > 0
+                        ? (passedLessons / lessonsMeta.length) * 100
                         : 0
                     }
                     className="max-w-[180px] flex-1"
