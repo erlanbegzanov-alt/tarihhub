@@ -105,7 +105,7 @@ export function Explore() {
           className="mt-3 grid gap-2.5 lg:grid-cols-2 xl:gap-3"
         >
           {results.map((person) => (
-            <li key={person.id}>
+            <li key={person.id} className="min-w-0">
               <PersonRow person={person} />
             </li>
           ))}
