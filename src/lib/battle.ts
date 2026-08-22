@@ -158,6 +158,14 @@ export const PRESENCE_STALE_MS = 16_000
  * never be mistaken for an empty chair.
  */
 export const PRESENCE_GRACE_MS = 10_000
+/**
+ * How long an opponent's heartbeat may stay missing before the still-present
+ * player's own client resolves the duel unprompted and takes the win. Well
+ * past `PRESENCE_STALE_MS` — the stamp has already been showing for a while
+ * by then — so a real hiccup (a backgrounded tab catching back up, a rough
+ * patch of signal) has room to recover before the match is decided for good.
+ */
+export const PRESENCE_AFK_CONFIRM_MS = 40_000
 
 /** XP earned for one answer, given the seconds still on the clock. */
 export function answerXp(correct: boolean, secondsLeft: number): number {

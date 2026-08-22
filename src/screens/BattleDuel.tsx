@@ -34,6 +34,7 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import {
   MAX_BATTLE_XP,
+  PRESENCE_AFK_CONFIRM_MS,
   PRESENCE_GRACE_MS,
   PRESENCE_PING_MS,
   PRESENCE_STALE_MS,
@@ -784,6 +785,25 @@ export function BattleDuel({
   }, [])
 
   /**
+   * Closes the duel where it stands once the opponent's silence is confirmed:
+   * the final slot is pushed with `done` first, so the player who walked away
+   * comes back to a match that agrees it is over rather than one they can
+   * keep answering into.
+   */
+  const endAgainstAfk = useCallback(() => {
+    if (!match || !slot || scoredRef.current || afkResolved) return
+    window.clearTimeout(revealRef.current)
+    void pushSlot(
+      match.id,
+      slot,
+      answers.length ? answers : Array.from({ length: questions.length }, () => null),
+      myXp,
+      true,
+    )
+    setAfkResolved(true)
+  }, [match, slot, afkResolved, answers, questions.length, myXp])
+
+  /**
    * …and reading the other side of it. Deliberately on a local interval rather
    * than on the snapshot listener: the whole signal here is a write that *stops*
    * arriving, so nothing would ever fire to notice it.
@@ -794,6 +814,12 @@ export function BattleDuel({
    * every right to close the tab. And `lastSeenAt === 0`, which means a match
    * document written before presence existed at all — no signal, not absence.
    * Bot duels are excluded outright: the script has no presence to report.
+   *
+   * The stamp and the forfeit fire at two different points on the same clock:
+   * `PRESENCE_STALE_MS` just raises the stamp, so the reader sees something is
+   * wrong; only past `PRESENCE_AFK_CONFIRM_MS` — plenty of room for an ordinary
+   * hiccup to catch back up on its own — does this close the duel and hand the
+   * win to whoever is still here, with no click required.
    */
   useEffect(() => {
     if (vsBot || !match || !foeSlot || afkResolved) return
@@ -813,36 +839,21 @@ export function BattleDuel({
     const check = () => {
       const now = Date.now()
       if (now - match.createdAt < PRESENCE_GRACE_MS) return
-      const stale = now - foeSlot.lastSeenAt > PRESENCE_STALE_MS
+      const silence = now - foeSlot.lastSeenAt
+      const stale = silence > PRESENCE_STALE_MS
       if (stale && neverJoined) {
         returnToSearch()
         return
       }
       setFoeAfk(stale)
+      if (stale && silence > PRESENCE_AFK_CONFIRM_MS) {
+        endAgainstAfk()
+      }
     }
     check()
     const timer = window.setInterval(check, AFK_CHECK_MS)
     return () => window.clearInterval(timer)
-  }, [vsBot, match, foeSlot, phase, afkResolved, returnToSearch])
-
-  /**
-   * Takes the offer: freeze this duel where it stands and let the ordinary
-   * scoring effect below close it out. The final slot is pushed with `done`
-   * first, so the player who walked away comes back to a match that agrees it
-   * is over rather than one they can keep answering into.
-   */
-  const endAgainstAfk = useCallback(() => {
-    if (!match || !slot || scoredRef.current || afkResolved) return
-    window.clearTimeout(revealRef.current)
-    void pushSlot(
-      match.id,
-      slot,
-      answers.length ? answers : Array.from({ length: questions.length }, () => null),
-      myXp,
-      true,
-    )
-    setAfkResolved(true)
-  }, [match, slot, afkResolved, answers, questions.length, myXp])
+  }, [vsBot, match, foeSlot, phase, afkResolved, returnToSearch, endAgainstAfk])
 
   /**
    * The other end of the same story: the player who left, coming back to a duel
@@ -1093,11 +1104,10 @@ export function BattleDuel({
             </div>
           </div>
 
-          {/* The way out, offered rather than taken: a stalled opponent might
-              be back in three seconds, and yanking someone out of a duel they
-              are still enjoying would be its own bug. So the choice is the
-              reader's — but it sits directly under the bars, in the red the
-              stamp just used, not buried behind anything. */}
+          {/* Purely informational: a stalled opponent might be back in three
+              seconds, so nothing is decided the moment this shows. It just
+              tells the reader what's happening — the duel resolves itself,
+              with no click needed, once the silence is confirmed. */}
           <AnimatePresence>
             {showAfk && (
               <motion.div
@@ -1125,17 +1135,6 @@ export function BattleDuel({
                   <p className="mx-auto mt-1.5 max-w-sm text-[12.5px] leading-relaxed text-ink-soft">
                     {t(s.battle.afkText)}
                   </p>
-                  <motion.button
-                    type="button"
-                    onClick={endAgainstAfk}
-                    whileHover={canHover ? { y: -2 } : undefined}
-                    whileTap={{ scale: 0.97 }}
-                    transition={springSoft}
-                    className="focus-ring mt-3.5 rounded-full px-5 py-2.5 text-[14px] font-semibold text-white shadow-soft"
-                    style={{ background: 'var(--color-wrong)' }}
-                  >
-                    {t(s.battle.afkAction)}
-                  </motion.button>
                 </div>
               </motion.div>
             )}
