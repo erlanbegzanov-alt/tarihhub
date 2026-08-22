@@ -760,6 +760,30 @@ export function BattleDuel({
   }, [vsBot, matchId, slot, phase])
 
   /**
+   * Drops the current duel and goes back to the search screen — no stamp, no
+   * forfeit, no rating touched. Shared by the rematch button and by the
+   * never-joined branch below, which needs the exact same reset.
+   */
+  const returnToSearch = useCallback(() => {
+    window.clearTimeout(revealRef.current)
+    scoredRef.current = false
+    botPlanRef.current = null
+    setMatchId(null)
+    setMatch(null)
+    setOpponent(null)
+    setOutcome(null)
+    setMyXp(0)
+    setIndex(0)
+    setPicked(null)
+    setAnswers([])
+    setTimedOut(false)
+    setFoeAfk(false)
+    setAfkResolved(false)
+    setBotOffered(false)
+    setPhase('searching')
+  }, [])
+
+  /**
    * …and reading the other side of it. Deliberately on a local interval rather
    * than on the snapshot listener: the whole signal here is a write that *stops*
    * arriving, so nothing would ever fire to notice it.
@@ -778,15 +802,28 @@ export function BattleDuel({
       setFoeAfk(false)
       return
     }
+    // `lastSeenAt` starts out seeded to the match's own `createdAt` (see
+    // `emptySlot`) and only ever moves forward once its owner's client
+    // actually opens this duel and starts pinging. If it's still sitting at
+    // that seed when staleness would otherwise fire, the other side never
+    // opened this match at all — most often "играть снова" pairing against a
+    // leftover queue entry from the duel that just ended. That's a failed
+    // pairing, not a walkout: no stamp, no forfeit, just a quiet re-search.
+    const neverJoined = foeSlot.lastSeenAt <= match.createdAt
     const check = () => {
       const now = Date.now()
       if (now - match.createdAt < PRESENCE_GRACE_MS) return
-      setFoeAfk(now - foeSlot.lastSeenAt > PRESENCE_STALE_MS)
+      const stale = now - foeSlot.lastSeenAt > PRESENCE_STALE_MS
+      if (stale && neverJoined) {
+        returnToSearch()
+        return
+      }
+      setFoeAfk(stale)
     }
     check()
     const timer = window.setInterval(check, AFK_CHECK_MS)
     return () => window.clearInterval(timer)
-  }, [vsBot, match, foeSlot, phase, afkResolved])
+  }, [vsBot, match, foeSlot, phase, afkResolved, returnToSearch])
 
   /**
    * Takes the offer: freeze this duel where it stands and let the ordinary
@@ -916,24 +953,7 @@ export function BattleDuel({
   /* ------------------------------- render ------------------------------- */
 
   /** "Ещё раунд": drops this duel and starts looking for the next opponent. */
-  const rematch = () => {
-    window.clearTimeout(revealRef.current)
-    scoredRef.current = false
-    botPlanRef.current = null
-    setMatchId(null)
-    setMatch(null)
-    setOpponent(null)
-    setOutcome(null)
-    setMyXp(0)
-    setIndex(0)
-    setPicked(null)
-    setAnswers([])
-    setTimedOut(false)
-    setFoeAfk(false)
-    setAfkResolved(false)
-    setBotOffered(false)
-    setPhase('searching')
-  }
+  const rematch = returnToSearch
 
   const inDuel =
     phase === 'duel' || phase === 'waiting' || phase === 'result' || phase === 'ended'
