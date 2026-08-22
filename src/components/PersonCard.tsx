@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import type { Person } from '../data/types'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
-import { springSoft, staggerItem } from '../lib/motion'
+import { canHover, springSoft, staggerItem } from '../lib/motion'
 import { PortraitPanel } from './PortraitPanel'
 import { EraBadge } from './ui'
 
@@ -26,7 +26,7 @@ export function PersonCard({ person, className }: { person: PersonCardData; clas
   return (
     <motion.div variants={staggerItem} className={cn('h-full', className)}>
       <motion.div
-        whileHover={{ y: -4 }}
+        whileHover={canHover ? { y: -4 } : undefined}
         whileTap={{ scale: 0.98 }}
         transition={springSoft}
         className="h-full"

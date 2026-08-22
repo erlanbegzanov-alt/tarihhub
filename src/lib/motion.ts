@@ -2,6 +2,19 @@ import type { Transition, Variants } from 'framer-motion'
 
 export const easeOut: Transition['ease'] = [0.22, 1, 0.36, 1]
 
+/**
+ * True only for a device that has a real hovering pointer (mouse/trackpad).
+ * A touch browser still fires `pointerenter` on first contact, so anything
+ * with `whileHover` inside a horizontally draggable rail visibly wobbles as
+ * a finger swipes past each card — the drag reads as a hover-then-leave on
+ * every card it crosses. Cheap to compute once; hover capability doesn't
+ * change mid-session.
+ */
+export const canHover =
+  typeof window !== 'undefined' && window.matchMedia
+    ? window.matchMedia('(hover: hover) and (pointer: fine)').matches
+    : true
+
 export const springSoft: Transition = {
   type: 'spring',
   stiffness: 420,
