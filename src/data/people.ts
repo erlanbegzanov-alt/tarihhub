@@ -1,4 +1,4 @@
-import type { Person } from './types'
+import type { Person } from './types.js'
 
 /**
  * Historical figures. All biography text is first-person and historically

@@ -39,8 +39,8 @@
  * Answers are a bit shorter/plainer, which is fine for short in-character
  * replies and lesson rephrasing — this isn't a complex-reasoning use case.
  */
-import { people } from '../src/data/people'
-import type { Lang, Person } from '../src/data/types'
+import { people } from '../src/data/people.js'
+import type { Lang, Person } from '../src/data/types.js'
 
 const MODEL = 'gemini-3.5-flash-lite'
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
