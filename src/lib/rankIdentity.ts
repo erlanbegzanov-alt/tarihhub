@@ -35,7 +35,12 @@ export function rankTitleText(
   tierIndex: number,
 ): LocalizedText {
   if (tierIndex === OWNER_TIER_INDEX) return OWNER_TITLE
-  return avatarGender ? ranks[tierIndex].title[avatarGender] : s.profile.rankPickTitle
+  // `tierIndex` here can come straight off a Firestore mirror another player
+  // wrote (`BattlePlayer`/`KahootPlayer`) — clamped defensively even though
+  // both writers now bound it too, since an unclamped index used to throw and
+  // take the whole lobby/leaderboard row down with it.
+  const safeIndex = Math.max(0, Math.min(ranks.length - 1, Math.round(tierIndex)))
+  return avatarGender ? ranks[safeIndex].title[avatarGender] : s.profile.rankPickTitle
 }
 
 /**

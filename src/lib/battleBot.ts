@@ -161,6 +161,7 @@ function createBotPlayer(): BattlePlayer {
     weekXp: 0,
     weekStart: isoWeekStart(),
     updatedAt: Date.now(),
+    scoredAt: 0,
     avatarGender,
     avatarTierIndex: tierIndex,
     titleTierIndex: tierIndex,

@@ -72,7 +72,11 @@ export function RankBadge({
   // The owner tier has no art to serve — it isn't part of the avatar set.
   const src = owner ? null : `/avatars/${gender}/${tierIndex + 1}.webp`
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
-  const Icon = owner ? Sparkles : TIER_ICONS[tierIndex]
+  // A `tierIndex` this stale/out-of-range still reaches here from data other
+  // players wrote (a battle or kahoot mirror row) — `TIER_ICONS[tierIndex]`
+  // being `undefined` used to throw "Element type is invalid" and take the
+  // whole leaderboard/lobby down with it for every viewer.
+  const Icon = owner ? Sparkles : (TIER_ICONS[tierIndex] ?? TIER_ICONS[0])
 
   const background = tierBackground(tierIndex)
   const iconColor = fx.color

@@ -18,66 +18,121 @@ service cloud.firestore {
      * mirror, their own queue slot, and their own half of a shared match.
      */
 
+    // Shared shape check for `battlePlayers/{uid}`: every field a client can
+    // set on its own mirror, other than the scored ones (`weekXp`, `rating`),
+    // which each allow-clause bounds separately since create and update cap
+    // them differently. `avatarTierIndex`/`titleTierIndex` top out at
+    // `ranks.length` (7, see src/lib/rankStyle.ts's `OWNER_TIER_INDEX`) — an
+    // out-of-range value used to be able to reach this collection and crash
+    // `RankBadge`/`rankTitleText` for every viewer of the leaderboard, since
+    // those only clamped the *lower* bound. `updatedAt` has to track the
+    // server's own clock (not just be *a* number) for the write-rate check
+    // below to mean anything — a client that could backdate it could otherwise
+    // reopen the throttle on every write.
+    function validBattlePlayer(d) {
+      return d.displayName is string && d.displayName.size() <= 40
+        && d.photoURL is string && d.photoURL.size() <= 300
+        && d.level is number && d.level >= 1 && d.level <= 500
+        && d.avatarTierIndex is number && d.avatarTierIndex >= 0 && d.avatarTierIndex <= 7
+        && d.titleTierIndex is number && d.titleTierIndex >= 0 && d.titleTierIndex <= 7
+        && d.updatedAt is number
+        && d.updatedAt <= request.time.toMillis() + 5000
+        && d.updatedAt >= request.time.toMillis() - 5000;
+    }
+
     // Public mirror of just what an opponent row or a leaderboard row needs —
     // never the full private profile above. Readable by any signed-in user,
     // writable only by the account it describes.
     //
-    // Every field here is otherwise self-reported (there is no server, see
-    // the file header above), which would let a client just set `weekXp` /
-    // `rating` straight to a number that tops the weekly leaderboard in one
-    // write. The per-write deltas below cap that at comfortably more than one
-    // real ranked duel can award — `applyRankedResult` in `battle.ts` shows a
-    // win is worth at most `MAX_BATTLE_XP` (594) weekXp and `RATING_WIN` (18)
-    // rating — while staying far below what it would take to leapfrog to #1
-    // in a single write. `displayName` is capped the same way the client
-    // already truncates it in `normalizeBattlePlayer`, so an oversized name
-    // can never reach Firestore in the first place.
+    // There is no server settling a duel's outcome (see the file header
+    // above), so `weekXp`/`rating` are still ultimately self-reported — the
+    // per-write delta caps below only bound *one write*. What actually closes
+    // the gap is pairing that cap with a minimum real-time interval between
+    // scoring writes: a genuine ranked duel takes well over a minute end to
+    // end, so requiring 60 real seconds (by `request.time`, not anything the
+    // client sends) between writes that change the score caps the achievable
+    // rate to roughly one duel's worth of gain per minute, the same ceiling
+    // actually playing imposes — instead of the unlimited rate an unthrottled
+    // cap allowed (hundreds of scored "wins" in the time one real duel takes).
+    // A pure identity refresh (`syncBattlePlayer`, which never touches
+    // `weekXp`/`rating`) is exempt from the throttle, so it can still ping as
+    // often as it likes.
     match /battlePlayers/{uid} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.displayName is string
-        && request.resource.data.displayName.size() <= 40
-        && request.resource.data.weekXp <= 600
-        && request.resource.data.rating <= 20;
+        && validBattlePlayer(request.resource.data)
+        && request.resource.data.weekXp is number && request.resource.data.weekXp <= 600
+        && request.resource.data.rating is number && request.resource.data.rating <= 20;
       allow update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.displayName is string
-        && request.resource.data.displayName.size() <= 40
+        && validBattlePlayer(request.resource.data)
+        && request.resource.data.weekXp is number
+        && request.resource.data.weekXp >= resource.data.weekXp
         && request.resource.data.weekXp <= resource.data.weekXp + 600
-        && request.resource.data.rating <= resource.data.rating + 20;
+        && request.resource.data.rating is number
+        && request.resource.data.rating <= resource.data.rating + 20
+        && (
+          (request.resource.data.weekXp == resource.data.weekXp
+            && request.resource.data.rating == resource.data.rating)
+          || request.time.toMillis() >= resource.data.updatedAt + 60000
+        );
     }
 
     // One waiting slot per user, doc id = uid. Anyone signed in may scan the
-    // queue to find a candidate — it carries no sensitive data. Deletes are
-    // deliberately open: the worst case is a queue entry cleared early, and it
-    // is what lets the player who created a match clean up after it without
-    // needing the other side's cooperation.
+    // queue to find a candidate — it carries no sensitive data. A slot may
+    // only ever be cleared by the player it belongs to: `leaveQueue` is only
+    // ever called with the caller's own uid (see `src/screens/BattleDuel.tsx`),
+    // so nothing legitimate needs to delete anyone else's — and an open delete
+    // let any signed-in user silently empty the whole queue.
     match /battleQueue/{uid} {
       allow read: if request.auth != null;
-      allow create, update: if request.auth != null && request.auth.uid == uid;
-      allow delete: if request.auth != null;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.mode in ['casual', 'ranked'];
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
     // The atomic matchmaking lock, doc id = the uid of the player being
     // claimed. Created inside a transaction that first checks it is absent, so
     // two players can never claim the same candidate. `claimedBy` must be the
-    // caller, so a claim can't be forged in someone else's name.
+    // caller, and the candidate must genuinely be in the queue *right now* —
+    // without that, a claim could be planted on any known uid at any time,
+    // permanently jamming their matchmaking (every `claimCandidate`
+    // transaction aborts while a claim already exists) even though they never
+    // queued. `battleQueue/$(candidateUid)` is read from outside this write's
+    // own transaction (it was written earlier, by the candidate's own
+    // client), so this holds regardless of write order within a commit —
+    // unlike cross-checking the match this claim names, which the same
+    // transaction is creating in the same breath and so can't be leaned on
+    // here without depending on same-transaction write visibility this rule
+    // has no way to verify. `clearClaim` is only ever called with the
+    // caller's own uid — the claim is the claimed player's own inbox — so
+    // only they ever need to delete it.
     match /battleClaims/{candidateUid} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
-        && request.auth.uid == request.resource.data.claimedBy;
-      allow delete: if request.auth != null;
+        && request.auth.uid == request.resource.data.claimedBy
+        && request.auth.uid != candidateUid
+        && exists(/databases/$(database)/documents/battleQueue/$(candidateUid));
+      allow delete: if request.auth != null && request.auth.uid == candidateUid;
     }
 
-    // A live duel. Readable only by its two players. On update the immutable
-    // fields have to survive untouched, and each player may only ever write
-    // their own slot: players[0] writes `p1`, players[1] writes `p2` (either
-    // may flip `status`). Neither can reach into the other's score.
+    // A live duel. Readable only by its two players. Created with two distinct
+    // players and both slots genuinely empty — closing off a match seeded with
+    // a pre-decided winner, or one that pairs a single account against itself
+    // to farm both a win and a rating gain every round. On update the
+    // immutable fields have to survive untouched, and each player may only
+    // ever write their own slot: players[0] writes `p1`, players[1] writes
+    // `p2` (either may flip `status`). Neither can reach into the other's
+    // score.
     match /battleMatches/{matchId} {
       allow read: if request.auth != null && request.auth.uid in resource.data.players;
       allow create: if request.auth != null
         && request.resource.data.players.size() == 2
         && request.auth.uid in request.resource.data.players
-        && request.resource.data.status == 'active';
+        && request.resource.data.players[0] != request.resource.data.players[1]
+        && request.resource.data.status == 'active'
+        && request.resource.data.p1.xp == 0 && request.resource.data.p2.xp == 0
+        && request.resource.data.p1.doneAt == null && request.resource.data.p2.doneAt == null;
       allow update: if request.auth != null
         && request.auth.uid in resource.data.players
         && request.resource.data.players == resource.data.players
@@ -131,13 +186,27 @@ service cloud.firestore {
         && request.auth.uid == resource.data.hostUid;
 
       // One row per student, keyed by uid so a student can only ever write
-      // their own — never another player's score. Scores are self-reported,
-      // exactly as each duelist reports their own `xp` in `battleMatches`;
-      // this is the same trust model, not a weaker one. The host may delete a
-      // row so the room can be cleaned up when the game is over.
+      // their own — never another player's score. `score` is self-reported
+      // (there is no server to settle it against), but it can only ever move
+      // up, and only by at most one question's worth at a time — the same
+      // per-write delta shape `battlePlayers` uses. `avatarTierIndex`/
+      // `titleTierIndex` are bounded the same way as there too: unbounded, a
+      // single crafted row used to crash the lobby's leaderboard for the
+      // whole class, host included, the instant it rendered.
       match /players/{uid} {
         allow read: if request.auth != null;
-        allow create, update: if request.auth != null && request.auth.uid == uid;
+        allow create: if request.auth != null && request.auth.uid == uid
+          && request.resource.data.score is number && request.resource.data.score == 0
+          && request.resource.data.avatarTierIndex is number
+          && request.resource.data.avatarTierIndex >= 0 && request.resource.data.avatarTierIndex <= 7
+          && request.resource.data.titleTierIndex is number
+          && request.resource.data.titleTierIndex >= 0 && request.resource.data.titleTierIndex <= 7;
+        allow update: if request.auth != null && request.auth.uid == uid
+          && request.resource.data.score is number
+          && request.resource.data.score >= resource.data.score
+          && request.resource.data.score <= resource.data.score + 1200
+          && request.resource.data.avatarTierIndex == resource.data.avatarTierIndex
+          && request.resource.data.titleTierIndex == resource.data.titleTierIndex;
         allow delete: if request.auth != null && (
           request.auth.uid == uid
           || request.auth.uid == get(/databases/$(database)/documents/kahootSessions/$(code)).data.hostUid

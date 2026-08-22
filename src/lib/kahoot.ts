@@ -44,6 +44,7 @@ import {
 import type { AvatarGender } from '../data/ranks'
 import { uploadImage } from './cloudinary'
 import { db } from './firebase'
+import { OWNER_TIER_INDEX } from './rankStyle'
 
 /* ------------------------------ the rules ------------------------------ */
 
@@ -321,8 +322,12 @@ function normalizePlayer(uid: string, value: unknown): KahootPlayer {
     joinedAt: numberOr(data.joinedAt, 0),
     avatarGender:
       data.avatarGender === 'm' || data.avatarGender === 'f' ? data.avatarGender : null,
-    avatarTierIndex: Math.max(0, Math.round(numberOr(data.avatarTierIndex, 0))),
-    titleTierIndex: Math.max(0, Math.round(numberOr(data.titleTierIndex, 0))),
+    // Upper-bounded, not just floored: an out-of-range value here used to
+    // reach `ranks[tierIndex]`/`TIER_ICONS[tierIndex]` with nothing after it
+    // and crash the lobby/leaderboard for the whole room, host included, the
+    // instant one student's row rendered.
+    avatarTierIndex: Math.max(0, Math.min(OWNER_TIER_INDEX, Math.round(numberOr(data.avatarTierIndex, 0)))),
+    titleTierIndex: Math.max(0, Math.min(OWNER_TIER_INDEX, Math.round(numberOr(data.titleTierIndex, 0)))),
   }
 }
 
@@ -355,16 +360,18 @@ export async function fetchMyGames(uid: string): Promise<KahootGame[]> {
   }
 }
 
+/**
+ * `null` means the game genuinely doesn't exist — a caller may treat that as
+ * "start fresh". A failed read (offline, rules rejected it) throws instead of
+ * folding into the same `null`, because at least one caller (the edit screen)
+ * used to treat "couldn't read" exactly like "doesn't exist" and hand the
+ * reader a blank form over their real quiz — saving it was a full overwrite.
+ */
 export async function fetchGame(gameId: string): Promise<KahootGame | null> {
   if (!db) return null
-  try {
-    const snapshot = await getDoc(doc(db, 'kahootGames', gameId))
-    if (!snapshot.exists()) return null
-    return normalizeGame(snapshot.id, snapshot.data())
-  } catch (error) {
-    console.warn('[tarihhub] Could not read a kahoot game.', error)
-    return null
-  }
+  const snapshot = await getDoc(doc(db, 'kahootGames', gameId))
+  if (!snapshot.exists()) return null
+  return normalizeGame(snapshot.id, snapshot.data())
 }
 
 /** Writes a game whole, under an id the caller already holds. Returns success. */

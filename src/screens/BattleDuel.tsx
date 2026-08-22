@@ -895,7 +895,15 @@ export function BattleDuel({
     // The consequence the owner asked for. A player who walks out forfeits —
     // the win goes to whoever was still there, and the row records exactly how
     // it was won so it can never pass for an ordinary one.
-    const won = afkResolved || myScore >= foeSlot.xp
+    //
+    // A tie breaks toward `p1` — deterministically, from the one piece of
+    // state both sides already agree on (`match.players`, immutable once the
+    // match exists) — rather than each side judging `>=` from its own score.
+    // `>=` let an exact tie read as a win on *both* clients at once: each one
+    // independently wrote itself a rating gain, so two players (or one pair
+    // of accounts colluding to always finish level) could both climb off the
+    // same duel forever.
+    const won = afkResolved || myScore > foeSlot.xp || (myScore === foeSlot.xp && slot === 'p1')
     const ranked = match.mode === 'ranked'
 
     // The face across the board, captured as it was at match end. Stored on

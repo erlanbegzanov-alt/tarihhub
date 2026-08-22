@@ -41,6 +41,7 @@ import { pickRoundQuestionIds } from '../data/battleQuestions'
 import type { AvatarGender } from '../data/ranks'
 import type { LocalizedText } from '../data/types'
 import { db } from './firebase'
+import { OWNER_TIER_INDEX } from './rankStyle'
 
 /* ----------------------------- the rules of a duel ----------------------------- */
 
@@ -217,6 +218,15 @@ export interface BattlePlayer {
   /** `YYYY-MM-DD` of the Monday whose week `weekXp` was accumulated in. */
   weekStart: string
   updatedAt: number
+  /**
+   * When `rating`/`weekXp` last actually changed — distinct from `updatedAt`,
+   * which also moves on a plain identity refresh (`syncBattlePlayer`). Only a
+   * write that changes the score touches this, which is what lets
+   * `firestore.rules` throttle scoring writes to roughly one real duel's
+   * worth per minute without also catching the identity pings that happen to
+   * land in between.
+   */
+  scoredAt: number
   /** Same rank identity Profile.tsx shows — see `src/lib/rankIdentity.ts`.
    *  `null` when this player never picked a gender on their own profile. */
   avatarGender: AvatarGender | null
@@ -284,10 +294,15 @@ export function normalizeBattlePlayer(uid: string, value: unknown): BattlePlayer
         : 0,
     weekStart: currentWeek,
     updatedAt: numberOr(data.updatedAt, 0),
+    scoredAt: numberOr(data.scoredAt, 0),
     avatarGender:
       data.avatarGender === 'm' || data.avatarGender === 'f' ? data.avatarGender : null,
-    avatarTierIndex: Math.max(0, Math.round(numberOr(data.avatarTierIndex, 0))),
-    titleTierIndex: Math.max(0, Math.round(numberOr(data.titleTierIndex, 0))),
+    // Upper-bounded at `OWNER_TIER_INDEX`, not just floored at zero: an
+    // out-of-range value here used to reach `TIER_ICONS[tierIndex]` /
+    // `ranks[tierIndex]` with nothing after it and crash the leaderboard for
+    // every viewer the instant this row rendered.
+    avatarTierIndex: Math.max(0, Math.min(OWNER_TIER_INDEX, Math.round(numberOr(data.avatarTierIndex, 0)))),
+    titleTierIndex: Math.max(0, Math.min(OWNER_TIER_INDEX, Math.round(numberOr(data.titleTierIndex, 0)))),
   }
 }
 
@@ -417,6 +432,7 @@ export async function syncBattlePlayer(
     weekXp: 0,
     weekStart: isoWeekStart(),
     updatedAt: Date.now(),
+    scoredAt: 0,
     avatarGender: meta.avatarGender,
     avatarTierIndex: meta.avatarTierIndex,
     titleTierIndex: meta.titleTierIndex,
@@ -475,6 +491,11 @@ export async function applyRankedResult(
     weekXp: (current?.weekXp ?? 0) + Math.max(0, Math.round(xpEarned)),
     weekStart: isoWeekStart(),
     updatedAt: Date.now(),
+    // Only a write that actually changes the score above touches this — see
+    // the field's own doc comment. `firestore.rules` throttles how often it
+    // may advance, which is what keeps this write worth at most one real
+    // duel's outcome per minute of real time, instead of an unlimited rate.
+    scoredAt: Date.now(),
     avatarGender: meta.avatarGender,
     avatarTierIndex: meta.avatarTierIndex,
     titleTierIndex: meta.titleTierIndex,
