@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, Send, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { PortraitPanel } from '../components/PortraitPanel'
 import { EraBadge, IconButton } from '../components/ui'
 import { getPerson, people } from '../data/people'
@@ -91,6 +91,11 @@ export function AIChat() {
   const { personId } = useParams()
   const navigate = useNavigate()
   const { t, lang } = useLang()
+  // Debug-only escape hatch (?noanim=1) to test whether the "typing" dots'
+  // looping bounce is behind a reported-but-unreproduced mobile jitter,
+  // without changing anything for regular visitors.
+  const [searchParams] = useSearchParams()
+  const noDecorAnim = searchParams.get('noanim') === '1'
 
   const person = getPerson(personId)
   const [messages, setMessages] = useState<Message[]>([])
@@ -277,13 +282,21 @@ export function AIChat() {
                     <motion.span
                       key={dot}
                       className="h-2 w-2 rounded-full bg-ink-faint"
-                      animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
-                      transition={{
-                        duration: 1,
-                        repeat: Infinity,
-                        delay: dot * 0.16,
-                        ease: 'easeInOut',
-                      }}
+                      animate={
+                        noDecorAnim
+                          ? { opacity: 0.6 }
+                          : { opacity: [0.3, 1, 0.3], y: [0, -3, 0] }
+                      }
+                      transition={
+                        noDecorAnim
+                          ? undefined
+                          : {
+                              duration: 1,
+                              repeat: Infinity,
+                              delay: dot * 0.16,
+                              ease: 'easeInOut',
+                            }
+                      }
                     />
                   ))}
                 </span>
