@@ -1,9 +1,14 @@
 /**
- * Обычный (`/battle/casual`): the duel engine plus this player's own casual
- * record and match history — numbers nothing else in the app tracks, kept
+ * Обычный (`/battle/casual`): the way into a casual duel plus this player's own
+ * casual record and match history — numbers nothing else in the app tracks, kept
  * purely local/per-device (see `recordCasualDuelResult` in
  * `src/lib/progress.ts`) since a casual duel never touches Firestore beyond
  * the match itself.
+ *
+ * The duel runs on `/battle/casual/duel` rather than inline here, so none of
+ * this sits around it while it is being played (see `BattleDuelScreen.tsx`).
+ * Returning from it remounts this screen, and `useProfile()` is a live store,
+ * so the record below already counts the duel just finished.
  *
  * Deliberately has no weekly leaderboard: casual is practice, it pays no
  * rating and no week XP, and a ranking widget here would only imply otherwise.
@@ -15,6 +20,7 @@ import { useNavigate } from 'react-router-dom'
 import { KahootHeader } from '../components/kahoot'
 import {
   EmptyPanel,
+  FindMatchCard,
   FormDots,
   MatchList,
   MatchRow,
@@ -25,7 +31,6 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { staggerContainer, staggerItem } from '../lib/motion'
 import { useProfile } from '../lib/progress'
-import { BattleDuel } from './BattleDuel'
 
 export function BattleCasual() {
   const { t } = useLang()
@@ -97,7 +102,7 @@ export function BattleCasual() {
       </motion.section>
 
       <motion.div variants={staggerItem} className="mt-4">
-        <BattleDuel mode="casual" />
+        <FindMatchCard mode="casual" onFind={() => navigate('/battle/casual/duel')} />
       </motion.div>
 
       <motion.div variants={staggerItem} className="mt-7">

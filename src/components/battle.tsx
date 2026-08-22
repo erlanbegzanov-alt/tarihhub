@@ -13,7 +13,7 @@
  * show), the bar is `ProgressBar`, and the motion comes from `lib/motion.ts`.
  */
 import { motion, useReducedMotion } from 'framer-motion'
-import { Award, Check, Crown, Gem, Medal, Shield, X } from 'lucide-react'
+import { Award, Bot, Check, Crown, Gem, Medal, Shield, Trophy, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { AvatarGender } from '../data/ranks'
@@ -21,7 +21,9 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import type { LanguageValue } from '../i18n/context'
 import { RATING_LOSS, RATING_WIN, ratingTierFor } from '../lib/battle'
+import type { BattleMode } from '../lib/battle'
 import { cn } from '../lib/cn'
+import { isFirebaseReady } from '../lib/firebase'
 import { easeOut, springSoft } from '../lib/motion'
 import { levelInfo, useProfile } from '../lib/progress'
 import { resolveRankIdentity } from '../lib/rankIdentity'
@@ -296,6 +298,84 @@ export function LeagueCard({
 }
 
 /* ------------------------------------------------------------------ */
+/*                            the practice bot                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * "Бот" — the one label that keeps a practice duel honest.
+ *
+ * Shown on the bot's side of the duel head, on the result screen and on the
+ * stored history row, so a bot match can never be mistaken for a win or a loss
+ * against a person, either while it is running or months later.
+ */
+export function BotChip({ className }: { className?: string }) {
+  const { t } = useLang()
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full bg-cream-deep px-2 py-0.5',
+        'text-[10.5px] font-bold whitespace-nowrap text-ink-faint',
+        className,
+      )}
+    >
+      <Bot className="h-3 w-3" strokeWidth={2.4} aria-hidden />
+      {t(s.battle.botLabel)}
+    </span>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*                        the way into a duel                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The call to action each mode screen carries in place of the duel itself.
+ *
+ * The duel now runs on its own route (`/battle/casual/duel`, `/battle/ranked/duel`)
+ * so nothing — a rating card, a league board, a history list — sits around it
+ * while it is being played. This is what stays behind on the summary screen:
+ * the same trophy, hint and button the duel window used to open with, so the
+ * way in looks exactly as it did before the duel moved.
+ */
+export function FindMatchCard({
+  mode,
+  onFind,
+}: {
+  mode: BattleMode
+  onFind: () => void
+}) {
+  const { t } = useLang()
+  const user = useSession().user
+
+  return (
+    <div className="rounded-card bg-surface px-5 py-9 text-center shadow-soft ring-1 ring-line/60">
+      <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-gold-tint">
+        <Trophy className="h-7 w-7 text-gold" strokeWidth={1.8} />
+      </span>
+      <p className="mx-auto mt-4 max-w-sm text-[14.5px] leading-relaxed text-ink-soft">
+        {t(mode === 'ranked' ? s.battle.rankedHint : s.battle.casualHint)}
+      </p>
+      {isFirebaseReady && user ? (
+        <motion.button
+          type="button"
+          onClick={onFind}
+          whileHover={{ y: -2 }}
+          whileTap={{ scale: 0.97 }}
+          transition={springSoft}
+          className="focus-ring mt-5 rounded-full bg-brand px-6 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"
+        >
+          {t(s.battle.find)}
+        </motion.button>
+      ) : (
+        <p className="mt-5 text-[13.5px] font-medium text-ink-faint">
+          {t(s.battle.unavailable)}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*                          win / loss vocabulary                      */
 /* ------------------------------------------------------------------ */
 
@@ -493,6 +573,7 @@ export function MatchRow({
     opponentPhotoURL: string
     opponentAvatarGender: AvatarGender | null
     opponentAvatarTierIndex: number
+    opponentIsBot: boolean
     won: boolean
     xp: number
     foeXp: number
@@ -548,8 +629,9 @@ export function MatchRow({
               {foeXp}
             </span>
           </div>
-          <p className="mt-0.5 truncate text-[12px] font-semibold text-ink-soft">
-            {opponentName}
+          <p className="mt-0.5 flex items-center justify-center gap-1.5 text-[12px] font-semibold text-ink-soft">
+            <span className="truncate">{opponentName}</span>
+            {duel.opponentIsBot && <BotChip />}
           </p>
         </div>
 

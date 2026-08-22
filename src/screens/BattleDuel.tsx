@@ -1,14 +1,24 @@
 /**
  * The duel engine itself — matchmaking, the live question-by-question race,
- * and the result screen. Shared by BattleCasual.tsx and BattleRanked.tsx,
- * which each fix `mode` and wrap this with their own header and mode-specific
- * content (stats, the weekly board, …); this component only knows how to run
- * one duel in whichever mode it's told.
+ * and the result screen.
+ *
+ * Mounted by `BattleDuelScreen.tsx` alone, on its own route
+ * (`/battle/casual/duel`, `/battle/ranked/duel`), with nothing else on the
+ * page. It used to sit inline under each mode screen's rating card, league
+ * board and history list, which is exactly what got in the way of a duel being
+ * played; the decision to search is now made *before* this mounts, so there is
+ * no idle state here at all — it starts searching the moment it appears and
+ * hands control back through `onExit`.
+ *
+ * With no server-side matchmaker, an empty queue means an indefinite wait, so a
+ * casual search that finds nobody offers a bot duel instead — entirely local,
+ * always labelled, and never in ranked (see `src/lib/battleBot.ts`).
  */
 import { AnimatePresence, motion } from 'framer-motion'
 import { Crown, Loader2, Trophy } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  BotChip,
   FOE_COLOR,
   LeagueCrest,
   OutcomeAvatar,
@@ -51,6 +61,8 @@ import type {
   BattlePlayerMeta,
   RatingChange,
 } from '../lib/battle'
+import { BOT_UID, botAnswerXp, createBotDuel, isBotMatchId } from '../lib/battleBot'
+import type { BotAnswer, BotDuel } from '../lib/battleBot'
 import { cn } from '../lib/cn'
 import { isFirebaseReady } from '../lib/firebase'
 import { easeOut, springSoft } from '../lib/motion'
@@ -76,8 +88,21 @@ const POLL_MS = 1500
  * have no way out of "waiting" at all.
  */
 const WAIT_TIMEOUT_MS = 30_000
+/**
+ * How long a casual search runs before the bot is offered, and how long after
+ * that before it simply starts.
+ *
+ * The offer comes early enough that the spinner never feels like a dead end,
+ * and the auto-start is the answer to the real complaint behind this: on a
+ * quiet evening there is nobody in the queue at all, and the reader should end
+ * up in a duel rather than staring at a loader. A real opponent still wins the
+ * race — the queue keeps being swept the whole time, and whoever lands first
+ * opens the match.
+ */
+const BOT_OFFER_MS = 8_000
+const BOT_AUTO_MS = 20_000
 
-type Phase = 'idle' | 'searching' | 'duel' | 'waiting' | 'result'
+type Phase = 'searching' | 'duel' | 'waiting' | 'result'
 
 interface Outcome {
   myXp: number
@@ -118,6 +143,7 @@ function Fighter({
   avatarTierIndex,
   rankTitle,
   isWeeklyTop,
+  isBot = false,
   won,
 }: {
   name: string
@@ -129,6 +155,8 @@ function Fighter({
   avatarTierIndex: number
   rankTitle: string
   isWeeklyTop: boolean
+  /** Marks the practice bot, so its side of the head says so throughout. */
+  isBot?: boolean
   /** `null` until the duel is scored. */
   won: boolean | null
 }) {
@@ -174,6 +202,7 @@ function Fighter({
       <span className="max-w-full truncate text-[13.5px] font-bold text-ink">
         {name}
       </span>
+      {isBot && <BotChip />}
       {avatarGender && (
         <span className="max-w-full truncate text-[11px] font-semibold text-ink-faint">
           {rankTitle}
@@ -232,15 +261,20 @@ function TimerRing({ seconds }: { seconds: number }) {
 
 export function BattleDuel({
   mode,
+  onExit,
   onRankedResult,
   ratingTierIndex,
 }: {
   mode: BattleMode
-  /** Fired once a ranked duel is scored, so the Ranked screen can refresh its
-   *  rating card and the weekly board — data that lives in Firestore, not in
-   *  the local profile store, so it can't just react to `useProfile()`. */
+  /** Leaves the duel screen — cancelling the search, or done with the result.
+   *  The mode screen it returns to refetches its own numbers on mount, so the
+   *  record and the history are already up to date when the reader lands. */
+  onExit: () => void
+  /** Fired once a ranked duel is scored, so the duel screen can refresh the
+   *  rating it derives `ratingTierIndex` from — a rematch started from the
+   *  result screen then draws its questions from the league just reached. */
   onRankedResult?: () => void
-  /** The caller's league (`BattleRanked` reads it off its own rating card) —
+  /** The caller's league (`BattleDuelScreen` reads it off `battlePlayers/*`) —
    *  biases which difficulty pool each round draws from. Unused in casual. */
   ratingTierIndex?: number
 }) {
@@ -251,7 +285,10 @@ export function BattleDuel({
   const uid = user?.uid ?? null
   const level = levelInfo(profile.xp).level
 
-  const [phase, setPhase] = useState<Phase>('idle')
+  // Searching from the first frame: this screen is only ever reached by
+  // pressing "найти соперника" on the mode screen, so an idle state here would
+  // just be that same decision asked a second time.
+  const [phase, setPhase] = useState<Phase>('searching')
   const [matchId, setMatchId] = useState<string | null>(null)
   const [match, setMatch] = useState<BattleMatch | null>(null)
   const [opponent, setOpponent] = useState<BattlePlayer | null>(null)
@@ -265,6 +302,8 @@ export function BattleDuel({
   const [weeklyTopUids, setWeeklyTopUids] = useState<Set<string>>(() => new Set())
   /** The round number to flash centre-screen, or `null` when nothing's showing. */
   const [roundBanner, setRoundBanner] = useState<number | null>(null)
+  /** True once the search has run long enough to offer the bot (casual only). */
+  const [botOffered, setBotOffered] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -303,6 +342,8 @@ export function BattleDuel({
    */
   const scoredRef = useRef(false)
   const revealRef = useRef(0)
+  /** This bot duel's whole script, or `null` when the opponent is a person. */
+  const botPlanRef = useRef<BotAnswer[] | null>(null)
 
   const rankIdentity = useMemo(
     () =>
@@ -350,11 +391,18 @@ export function BattleDuel({
 
   /* --------------------------- matchmaking --------------------------- */
 
-  const openMatch = useCallback((id: string) => {
+  /**
+   * Opens a duel. A real match arrives as a bare id — its document then streams
+   * in over `watchMatch` — while a bot duel arrives whole, because there is no
+   * document to stream: its match, its opponent and its script are all built
+   * client-side and simply handed over here.
+   */
+  const openMatch = useCallback((id: string, bot?: BotDuel) => {
     scoredRef.current = false
+    botPlanRef.current = bot?.answers ?? null
     setMatchId(id)
-    setMatch(null)
-    setOpponent(null)
+    setMatch(bot?.match ?? null)
+    setOpponent(bot?.opponent ?? null)
     setIndex(0)
     setPicked(null)
     setSecondsLeft(QUESTION_SECONDS)
@@ -364,6 +412,31 @@ export function BattleDuel({
     setOutcome(null)
     setPhase('duel')
   }, [])
+
+  const startBotDuel = useCallback(() => {
+    if (!uid) return
+    const duel = createBotDuel(uid)
+    openMatch(duel.match.id, duel)
+  }, [uid, openMatch])
+
+  /**
+   * The bot fallback, casual only.
+   *
+   * Two timers on the same search: the offer, and — if the reader neither
+   * accepts it nor gets matched — the duel starting on its own. Ranked is left
+   * out deliberately: a rating that can be climbed against a script would stop
+   * meaning anything, so an empty ranked queue stays an honest wait.
+   */
+  useEffect(() => {
+    if (phase !== 'searching' || mode !== 'casual' || !uid) return
+    setBotOffered(false)
+    const offer = window.setTimeout(() => setBotOffered(true), BOT_OFFER_MS)
+    const auto = window.setTimeout(startBotDuel, BOT_AUTO_MS)
+    return () => {
+      window.clearTimeout(offer)
+      window.clearTimeout(auto)
+    }
+  }, [phase, mode, uid, startBotDuel])
 
   useEffect(() => {
     if (phase !== 'searching' || !uid) return
@@ -404,17 +477,21 @@ export function BattleDuel({
 
   /* ---------------------------- live match ---------------------------- */
 
+  /** A bot duel has no match document, so nothing here may reach Firestore. */
+  const vsBot = matchId !== null && isBotMatchId(matchId)
+
   useEffect(() => {
-    if (!matchId) return
+    if (!matchId || vsBot) return
     return watchMatch(matchId, setMatch)
-  }, [matchId])
+  }, [matchId, vsBot])
 
   const slot = match && uid ? slotKeyFor(match, uid) : null
   const foeSlot = match ? (slot === 'p1' ? match.p2 : match.p1) : null
   const foeUid = match && uid ? (match.players.find((id) => id !== uid) ?? null) : null
 
+  // The bot has no mirror to read — `openMatch` was handed its card already.
   useEffect(() => {
-    if (!foeUid) return
+    if (!foeUid || foeUid === BOT_UID) return
     let alive = true
     void fetchBattlePlayer(foeUid).then((player) => {
       if (alive) setOpponent(player)
@@ -478,10 +555,26 @@ export function BattleDuel({
       setAnswers(nextAnswers)
 
       const last = index === questions.length - 1
-      void pushSlot(match.id, slot, nextAnswers, nextXp, last)
+      if (vsBot) {
+        // No document to push to — the same numbers go straight into the local
+        // match instead. `doneAt` is deliberately *not* stamped here: against a
+        // bot the scoring effect would fire the instant it lands and replace
+        // the last question's reveal with the result screen, so the stamp waits
+        // for the reveal below, the way a Firestore round-trip does naturally.
+        setMatch((prev) =>
+          prev ? { ...prev, p1: { ...prev.p1, answers: nextAnswers, xp: nextXp } } : prev,
+        )
+      } else {
+        void pushSlot(match.id, slot, nextAnswers, nextXp, last)
+      }
 
       revealRef.current = window.setTimeout(() => {
         if (last) {
+          if (vsBot) {
+            setMatch((prev) =>
+              prev ? { ...prev, p1: { ...prev.p1, doneAt: Date.now() } } : prev,
+            )
+          }
           // The scoring effect below may already have raced ahead of this
           // timer — if the opponent had already finished, our own `doneAt`
           // write can round-trip through `watchMatch`'s snapshot listener
@@ -497,8 +590,64 @@ export function BattleDuel({
         setSecondsLeft(QUESTION_SECONDS)
       }, REVEAL_MS)
     },
-    [match, slot, picked, question, myXp, secondsLeft, answers, index, questions.length],
+    [
+      match,
+      slot,
+      picked,
+      question,
+      myXp,
+      secondsLeft,
+      answers,
+      index,
+      questions.length,
+      vsBot,
+    ],
   )
+
+  /* ------------------------------ the bot ------------------------------ */
+
+  /**
+   * Plays the bot's side of a bot duel: one planned answer at a time, its XP
+   * added to `p2` exactly as a real opponent's would arrive over the snapshot
+   * listener, so the racing bar, the wait screen and the scoring all work on
+   * the code they already had.
+   *
+   * Keyed off the match rather than the phase on purpose — the reader finishing
+   * first moves the phase to 'waiting', and the bot has to keep playing through
+   * that, which is the whole point of the wait.
+   */
+  useEffect(() => {
+    const plan = botPlanRef.current
+    if (!vsBot || !matchId || !plan) return
+    let step = 0
+    let timer = 0
+
+    const play = () => {
+      const answer = plan[step]
+      if (!answer) return
+      timer = window.setTimeout(() => {
+        const last = step === plan.length - 1
+        const gained = botAnswerXp(answer)
+        setMatch((prev) =>
+          prev
+            ? {
+                ...prev,
+                p2: {
+                  ...prev.p2,
+                  xp: prev.p2.xp + gained,
+                  doneAt: last ? Date.now() : prev.p2.doneAt,
+                },
+              }
+            : prev,
+        )
+        step += 1
+        if (!last) timer = window.setTimeout(play, REVEAL_MS)
+      }, answer.afterMs)
+    }
+    play()
+
+    return () => window.clearTimeout(timer)
+  }, [vsBot, matchId])
 
   // Running out of time is an answer too — the miss is recorded as `-1`.
   useEffect(() => {
@@ -534,6 +683,7 @@ export function BattleDuel({
       opponentPhotoURL: opponent?.photoURL ?? '',
       opponentAvatarGender: opponent?.avatarGender ?? null,
       opponentAvatarTierIndex: opponent?.avatarTierIndex ?? 0,
+      opponentIsBot: vsBot,
     }
 
     // Real profile XP either way — a casual duel is worth just as much to the
@@ -560,17 +710,20 @@ export function BattleDuel({
     } else {
       recordCasualDuelResult(duelOpponent, won, mine.xp, foeSlot.xp)
     }
-    void closeMatch(match.id)
+    // A bot duel has no document to close — it never had one.
+    if (!vsBot) void closeMatch(match.id)
 
     setOutcome({ myXp: mine.xp, foeXp: foeSlot.xp, won, ranked, rating: null })
     setPhase('result')
-  }, [match, slot, foeSlot, uid, meta, timedOut, foeName, opponent, onRankedResult])
+  }, [match, slot, foeSlot, uid, meta, timedOut, foeName, opponent, onRankedResult, vsBot])
 
   /* ------------------------------- render ------------------------------- */
 
-  const reset = () => {
+  /** "Ещё раунд": drops this duel and starts looking for the next opponent. */
+  const rematch = () => {
     window.clearTimeout(revealRef.current)
     scoredRef.current = false
+    botPlanRef.current = null
     setMatchId(null)
     setMatch(null)
     setOpponent(null)
@@ -580,7 +733,8 @@ export function BattleDuel({
     setPicked(null)
     setAnswers([])
     setTimedOut(false)
-    setPhase('idle')
+    setBotOffered(false)
+    setPhase('searching')
   }
 
   const inDuel = phase === 'duel' || phase === 'waiting' || phase === 'result'
@@ -685,6 +839,7 @@ export function BattleDuel({
               avatarTierIndex={opponent?.avatarTierIndex ?? 0}
               rankTitle={foeRankTitle}
               isWeeklyTop={opponent !== null && weeklyTopUids.has(opponent.uid)}
+              isBot={vsBot}
               won={outcome ? !outcome.won : null}
             />
           </div>
@@ -719,41 +874,6 @@ export function BattleDuel({
 
       <div className="px-5 pb-6">
         <AnimatePresence mode="wait">
-          {/* ---------------------------- idle ---------------------------- */}
-          {phase === 'idle' && (
-            <motion.div
-              key="idle"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.22, ease: easeOut }}
-              className="py-10 text-center"
-            >
-              <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-gold-tint">
-                <Trophy className="h-7 w-7 text-gold" strokeWidth={1.8} />
-              </span>
-              <p className="mx-auto mt-4 max-w-sm text-[14.5px] leading-relaxed text-ink-soft">
-                {t(mode === 'ranked' ? s.battle.rankedHint : s.battle.casualHint)}
-              </p>
-              {isFirebaseReady && user ? (
-                <motion.button
-                  type="button"
-                  onClick={() => setPhase('searching')}
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.97 }}
-                  transition={springSoft}
-                  className="focus-ring mt-5 rounded-full bg-brand px-6 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"
-                >
-                  {t(s.battle.find)}
-                </motion.button>
-              ) : (
-                <p className="mt-5 text-[13.5px] font-medium text-ink-faint">
-                  {t(s.battle.unavailable)}
-                </p>
-              )}
-            </motion.div>
-          )}
-
           {/* ------------------------- matchmaking ------------------------- */}
           {phase === 'searching' && (
             <motion.div
@@ -764,24 +884,67 @@ export function BattleDuel({
               transition={{ duration: 0.22, ease: easeOut }}
               className="py-12 text-center"
             >
-              <Loader2
-                className="mx-auto h-11 w-11 animate-spin text-brand"
-                strokeWidth={2}
-                aria-hidden
-              />
-              <p className="mt-4 text-[14.5px] font-semibold text-ink">
-                {t(s.battle.searching)}
-              </p>
-              <p className="mx-auto mt-1.5 max-w-sm text-[13px] leading-relaxed text-ink-soft">
-                {t(s.battle.searchingHint)}
-              </p>
-              <button
-                type="button"
-                onClick={reset}
-                className="focus-ring mt-5 rounded-full bg-surface px-5 py-2.5 text-[14px] font-semibold text-ink-soft ring-1 ring-line hover:text-ink"
-              >
-                {t(s.common.cancel)}
-              </button>
+              {isFirebaseReady && user ? (
+                <>
+                  <Loader2
+                    className="mx-auto h-11 w-11 animate-spin text-brand"
+                    strokeWidth={2}
+                    aria-hidden
+                  />
+                  <p className="mt-4 text-[14.5px] font-semibold text-ink">
+                    {t(s.battle.searching)}
+                  </p>
+                  <p className="mx-auto mt-1.5 max-w-sm text-[13px] leading-relaxed text-ink-soft">
+                    {t(s.battle.searchingHint)}
+                  </p>
+
+                  {/* Casual only, and only once the queue has proved empty for
+                      long enough that waiting on in it is the worse option. */}
+                  <AnimatePresence>
+                    {botOffered && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={springSoft}
+                        className="mx-auto mt-6 max-w-sm rounded-tile bg-cream p-4 ring-1 ring-line/60"
+                      >
+                        <p className="flex items-center justify-center gap-2 text-[13.5px] font-bold text-ink">
+                          {t(s.battle.botOfferTitle)}
+                          <BotChip />
+                        </p>
+                        <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-soft">
+                          {t(s.battle.botOfferText)}
+                        </p>
+                        <motion.button
+                          type="button"
+                          onClick={startBotDuel}
+                          whileHover={{ y: -2 }}
+                          whileTap={{ scale: 0.97 }}
+                          transition={springSoft}
+                          className="focus-ring mt-3.5 rounded-full bg-brand px-5 py-2.5 text-[14px] font-semibold text-white shadow-soft hover:bg-brand-dark"
+                        >
+                          {t(s.battle.botOfferAction)}
+                        </motion.button>
+                        <p className="mt-2.5 text-[11.5px] text-ink-faint">
+                          {t(s.battle.botOfferAuto)}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <button
+                    type="button"
+                    onClick={onExit}
+                    className="focus-ring mt-5 rounded-full bg-surface px-5 py-2.5 text-[14px] font-semibold text-ink-soft ring-1 ring-line hover:text-ink"
+                  >
+                    {t(s.common.cancel)}
+                  </button>
+                </>
+              ) : (
+                <p className="text-[13.5px] font-medium text-ink-faint">
+                  {t(s.battle.unavailable)}
+                </p>
+              )}
             </motion.div>
           )}
 
@@ -906,6 +1069,16 @@ export function BattleDuel({
                 {t(outcome.won ? s.battle.winText : s.battle.loseText)}
               </p>
 
+              {/* Said outright, not implied by a chip somewhere: a result the
+                  reader would read differently once they found out is a result
+                  they were misled about. */}
+              {vsBot && (
+                <p className="mx-auto mt-3 flex max-w-sm items-center justify-center gap-2 rounded-tile bg-cream px-3.5 py-2.5 text-[12.5px] leading-snug text-ink-soft ring-1 ring-line/60">
+                  <BotChip />
+                  {t(s.battle.botResultNote)}
+                </p>
+              )}
+
               {/* The moment the league effects in `LeagueCrest` were written
                   for and never previously had: a rating that just crossed a
                   tier boundary, called out on its own. */}
@@ -1015,16 +1188,28 @@ export function BattleDuel({
                 </p>
               )}
 
-              <motion.button
-                type="button"
-                onClick={reset}
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.97 }}
-                transition={springSoft}
-                className="focus-ring mt-5 rounded-full bg-brand px-6 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"
-              >
-                {t(s.battle.again)}
-              </motion.button>
+              {/* Two ways on, both explicit: straight into the next search, or
+                  back to the mode screen — which refetches its own record on
+                  mount, so this duel is already counted when it lands. */}
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+                <motion.button
+                  type="button"
+                  onClick={rematch}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={springSoft}
+                  className="focus-ring rounded-full bg-brand px-6 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"
+                >
+                  {t(s.battle.again)}
+                </motion.button>
+                <button
+                  type="button"
+                  onClick={onExit}
+                  className="focus-ring rounded-full bg-surface px-5 py-3.5 text-[14px] font-semibold text-ink-soft ring-1 ring-line hover:text-ink"
+                >
+                  {t(s.common.back)}
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

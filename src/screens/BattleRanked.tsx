@@ -1,19 +1,20 @@
 /**
- * Рейтинг (`/battle/ranked`): the duel engine, this player's league standing,
- * and — behind one segmented control — either their own match history or the
- * weekly leaderboard.
+ * Рейтинг (`/battle/ranked`): the way into a ranked duel, this player's league
+ * standing, and — behind one segmented control — either their own match history
+ * or the weekly leaderboard.
  *
  * The standing and the board live in `battlePlayers/*` (Firestore), not the
- * local profile store, so they're fetched here and refreshed on `BattleDuel`'s
- * `onRankedResult` callback rather than reacting to `useProfile()`. The
- * personal history is the other way round: it is written locally by
- * `recordRankedDuelResult` (see `src/lib/progress.ts`) and arrives through
- * `useProfile()` on its own.
+ * local profile store, so they're fetched here on mount rather than reacting to
+ * `useProfile()`. That is also what keeps them fresh after a duel: the duel runs
+ * on `/battle/ranked/duel` (see `BattleDuelScreen.tsx`), and coming back from it
+ * remounts this screen and re-runs `refresh`. The personal history is the other
+ * way round: it is written locally by `recordRankedDuelResult` (see
+ * `src/lib/progress.ts`) and arrives through `useProfile()` on its own.
  *
- * The two lists share one slot on purpose. Stacking a rating card, a duel
- * window, a personal history *and* a ten-row board down one column is what
- * made this screen feel crammed; they answer different questions ("how am I
- * doing" vs "how is everyone doing") and are never read at the same moment.
+ * The two lists share one slot on purpose. Stacking a rating card, a personal
+ * history *and* a ten-row board down one column is what made this screen feel
+ * crammed; they answer different questions ("how am I doing" vs "how is
+ * everyone doing") and are never read at the same moment.
  */
 import { History, Trophy } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -22,6 +23,7 @@ import { useNavigate } from 'react-router-dom'
 import { KahootHeader, PlayerAvatar } from '../components/kahoot'
 import {
   EmptyPanel,
+  FindMatchCard,
   FormDots,
   LeagueCard,
   MatchList,
@@ -32,18 +34,12 @@ import {
 import { SectionHeading } from '../components/ui'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
-import {
-  fetchBattlePlayer,
-  fetchWeeklyLeaderboard,
-  isoWeekStart,
-  ratingTierFor,
-} from '../lib/battle'
+import { fetchBattlePlayer, fetchWeeklyLeaderboard, isoWeekStart } from '../lib/battle'
 import type { BattlePlayer } from '../lib/battle'
 import { cn } from '../lib/cn'
 import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { useProfile } from '../lib/progress'
 import { useSession } from '../lib/session'
-import { BattleDuel } from './BattleDuel'
 
 type Tab = 'history' | 'board'
 
@@ -138,7 +134,6 @@ export function BattleRanked() {
   }, [])
 
   const rating = player?.rating ?? 0
-  const tierIndex = useMemo(() => ratingTierFor(rating).index, [rating])
 
   const countdown = useMemo(
     () =>
@@ -189,7 +184,7 @@ export function BattleRanked() {
       )}
 
       <motion.div variants={staggerItem} className="mt-4">
-        <BattleDuel mode="ranked" onRankedResult={refresh} ratingTierIndex={tierIndex} />
+        <FindMatchCard mode="ranked" onFind={() => navigate('/battle/ranked/duel')} />
       </motion.div>
 
       <motion.div variants={staggerItem} className="mt-7">

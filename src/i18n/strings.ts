@@ -258,6 +258,29 @@ export const s = {
       kz: 'Дәл қазір ешкім кезекте болмаса, күте тұрыңыз — біреу қосылғанда бірден бастаймыз.',
       ru: 'Если сейчас в очереди никого нет — подождите: как только кто-то зайдёт, батл начнётся сразу.',
     },
+    /* --------------------------- the bot opponent --------------------------- */
+
+    /** Chip on the bot's own side of the duel head, its result and its history
+     *  row. Short on purpose — it has to fit under a name without wrapping. */
+    botLabel: { kz: 'Бот', ru: 'Бот' },
+    /** Offered from the casual search once the queue turns out to be empty. */
+    botOfferTitle: { kz: 'Кезекте әзірге ешкім жоқ', ru: 'В очереди пока никого нет' },
+    botOfferText: {
+      kz: 'Ботпен ойнауға болады. Ол — нағыз ойыншы емес, бірақ сұрақтар мен XP нағыз.',
+      ru: 'Можно сыграть с ботом. Это не живой игрок, но вопросы и XP настоящие.',
+    },
+    botOfferAction: { kz: 'Ботпен ойнау', ru: 'Играть с ботом' },
+    /** Says plainly that waiting longer will start the bot duel by itself. */
+    botOfferAuto: {
+      kz: 'Ешкім табылмаса, бот ойыны өзі басталады.',
+      ru: 'Если никто не найдётся, бой с ботом начнётся сам.',
+    },
+    /** On the result screen, so a win or a loss is never mistaken for a real one. */
+    botResultNote: {
+      kz: 'Бұл бот — нағыз ойыншы емес. Рейтингке әсер етпейді.',
+      ru: 'Это был бот, а не живой игрок. На рейтинг не влияет.',
+    },
+
     /** Neutral label for the player themselves, above their own avatar. */
     you: { kz: 'Сен', ru: 'Ты' },
     opponent: { kz: 'Қарсылас', ru: 'Соперник' },

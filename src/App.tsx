@@ -21,6 +21,7 @@ const AIChat = lazy(() => import('./screens/AIChat').then((m) => ({ default: m.A
 const Battle = lazy(() => import('./screens/Battle').then((m) => ({ default: m.Battle })))
 const BattleCasual = lazy(() => import('./screens/BattleCasual').then((m) => ({ default: m.BattleCasual })))
 const BattleRanked = lazy(() => import('./screens/BattleRanked').then((m) => ({ default: m.BattleRanked })))
+const BattleDuelScreen = lazy(() => import('./screens/BattleDuelScreen').then((m) => ({ default: m.BattleDuelScreen })))
 const Explore = lazy(() => import('./screens/Explore').then((m) => ({ default: m.Explore })))
 const Kahoot = lazy(() => import('./screens/Kahoot').then((m) => ({ default: m.Kahoot })))
 const KahootCreate = lazy(() => import('./screens/KahootCreate').then((m) => ({ default: m.KahootCreate })))
@@ -63,6 +64,10 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: '/battle', element: <Battle /> },
   { path: '/battle/casual', element: <BattleCasual /> },
   { path: '/battle/ranked', element: <BattleRanked /> },
+  // The duel itself, on its own page — nothing but the duel on screen while it
+  // is being played (see `BattleDuelScreen.tsx`).
+  { path: '/battle/casual/duel', element: <BattleDuelScreen mode="casual" /> },
+  { path: '/battle/ranked/duel', element: <BattleDuelScreen mode="ranked" /> },
   { path: '/battle/kahoot', element: <Kahoot /> },
   { path: '/battle/kahoot/teacher', element: <KahootTeacher /> },
   { path: '/battle/kahoot/student', element: <KahootStudent /> },

@@ -48,9 +48,9 @@ export const RECENT_RANKED_DUELS_MAX = 10
  *
  * Stored on the record rather than looked up later because there is nowhere to
  * look it up from: `battlePlayers/{uid}` is a live mirror that keeps moving,
- * and a history row wants the face that was actually across the board. All
- * four fields are written by `BattleDuel.tsx` off the same `BattlePlayer` the
- * duel head already rendered, so a history row draws the identical avatar.
+ * and a history row wants the face that was actually across the board. The
+ * identity fields are written by `BattleDuel.tsx` off the same `BattlePlayer`
+ * the duel head already rendered, so a history row draws the identical avatar.
  */
 export interface DuelOpponent {
   opponentName: string
@@ -59,6 +59,13 @@ export interface DuelOpponent {
   /** `null` for an opponent who never picked a track on their own profile. */
   opponentAvatarGender: AvatarGender | null
   opponentAvatarTierIndex: number
+  /**
+   * True when this was the practice bot (`src/lib/battleBot.ts`) rather than a
+   * person. Stored rather than inferred so the row can keep saying so months
+   * later — a duel the reader can't tell apart from a real one afterwards is a
+   * result they were misled about.
+   */
+  opponentIsBot: boolean
 }
 
 /** One finished casual duel, newest first in `recentCasualDuels`. */
@@ -250,6 +257,9 @@ function normalizeDuelOpponent(entry: Partial<DuelOpponent>): DuelOpponent {
         ? entry.opponentAvatarGender
         : null,
     opponentAvatarTierIndex: countOr(entry.opponentAvatarTierIndex, 0),
+    // Absent on every row stored before bot duels existed, and those were all
+    // real opponents — so the honest default is `false`, not "unknown".
+    opponentIsBot: entry.opponentIsBot === true,
   }
 }
 
