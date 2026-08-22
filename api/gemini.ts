@@ -114,7 +114,7 @@ async function verifyFirebaseToken(idToken: string): Promise<{ uid: string } | n
  * taking the whole AI feature down.
  * ------------------------------------------------------------------ */
 
-const DAILY_AI_LIMIT = 10
+const DAILY_AI_LIMIT = 50
 
 let adminAppPromise: Promise<import('firebase-admin/app').App | null> | null = null
 
