@@ -244,12 +244,12 @@ export const s = {
     },
 
     casualHint: {
-      kz: '5 сұрақ. Дұрыс әрі жылдам жауап — көбірек XP. Рейтингке әсер етпейді.',
-      ru: '5 вопросов. За правильный и быстрый ответ — больше XP. Без риска для рейтинга.',
+      kz: '3 раунд, 9 сұрақ. Дұрыс әрі жылдам жауап — көбірек XP. Рейтингке әсер етпейді.',
+      ru: '3 раунда, 9 вопросов. За правильный и быстрый ответ — больше XP. Без риска для рейтинга.',
     },
     rankedHint: {
-      kz: '5 сұрақ. Нәтиже рейтингіңді өзгертеді және апталық кестеге түседі.',
-      ru: '5 вопросов. Результат меняет твой рейтинг и попадает в недельную таблицу.',
+      kz: '3 раунд, 9 сұрақ. Нәтиже рейтингіңді өзгертеді және апталық кестеге түседі.',
+      ru: '3 раунда, 9 вопросов. Результат меняет твой рейтинг и попадает в недельную таблицу.',
     },
 
     find: { kz: 'Қарсылас табу', ru: 'Найти соперника' },
@@ -329,6 +329,73 @@ export const s = {
     ratingPoints: { kz: 'ұпай', ru: 'очков' },
     nextTier: { kz: 'Келесі дәрежеге дейін', ru: 'До следующей лиги' },
     maxTier: { kz: 'Ең жоғарғы дәреже!', ru: 'Высшая лига!' },
+
+    /* ------------------------ the hub (`/battle`) ------------------------ */
+
+    /** Sits over the mode picker once there is real standing to show above it. */
+    hubModes: { kz: 'Режимді таңдаңыз', ru: 'Выберите режим' },
+    /** Empty state on the hub for an account that has never duelled. */
+    hubNoPlay: {
+      kz: 'Әзірге бірде-бір батл өткізген жоқсыз. Қарапайымнан бастаңыз — рейтингке әсер етпейді.',
+      ru: 'Вы ещё не провели ни одного батла. Начните с обычного — он не влияет на рейтинг.',
+    },
+    /**
+     * Per-mode summary line on the hub's mode cards, read as
+     * "Дуэлей: 7 · 57% побед". Deliberately a label followed by the number
+     * rather than a number followed by a noun: Russian would need three
+     * plural forms for the latter ("1 дуэль", "2 дуэли", "5 дуэлей"), and
+     * this reads correctly for every count in both languages.
+     */
+    hubDuelsLabel: { kz: 'Дуэль', ru: 'Дуэлей' },
+    hubWinsLabel: { kz: 'жеңіс', ru: 'побед' },
+    hubNeverPlayed: { kz: 'әлі ойналмаған', ru: 'ещё не играли' },
+
+    /* --------------------- the rating, explained --------------------- */
+
+    /** Heading over the plain-language rating rules on the league card. */
+    ratingHow: { kz: 'Рейтинг қалай саналады', ru: 'Как считается рейтинг' },
+    /** Follows the `+18` / `−9` numbers, so both read as one sentence. */
+    ratingPerWin: { kz: 'жеңіске', ru: 'за победу' },
+    ratingPerLoss: { kz: 'жеңіліске', ru: 'за поражение' },
+    /** Says plainly that the rating cannot go negative. */
+    ratingFloor: {
+      kz: 'Рейтинг ешқашан нөлден төмен түспейді.',
+      ru: 'Рейтинг никогда не опускается ниже нуля.',
+    },
+    /** Тhe league the rating currently sits in. */
+    leagueLabel: { kz: 'Лига', ru: 'Лига' },
+    /** Celebration on the result screen when the duel moved the player up a league. */
+    leagueUp: { kz: 'Жаңа лига!', ru: 'Новая лига!' },
+    leagueUpText: {
+      kz: 'Рейтингіңіз келесі лигаға жетті.',
+      ru: 'Ваш рейтинг дорос до следующей лиги.',
+    },
+    /** Label under the was → is rating pair on the result screen. */
+    ratingMoved: { kz: 'Рейтинг', ru: 'Рейтинг' },
+    ratingUnchanged: { kz: 'өзгерген жоқ', ru: 'без изменений' },
+
+    /* ------------------ personal history / the two boards ------------------ */
+
+    /** Segmented control over the ranked screen's two lists. */
+    tabHistory: { kz: 'Менің матчтарым', ru: 'Мои матчи' },
+    tabBoard: { kz: 'Апта кестесі', ru: 'Таблица недели' },
+    historyEmpty: {
+      kz: 'Рейтингтік матчтар әлі жоқ. Бірінші дуэльден кейін осында тарихыңыз шығады.',
+      ru: 'Рейтинговых матчей пока нет. После первой дуэли здесь появится ваша история.',
+    },
+    /** Screen-reader name for the avatar-vs-avatar history row. */
+    historyRowLabel: { kz: 'Дуэль нәтижесі', ru: 'Результат дуэли' },
+    /** Heading over the win/loss dots. */
+    formTitle: { kz: 'Соңғы нәтижелер', ru: 'Последние результаты' },
+    /** The score line between the two avatars, e.g. "324 : 288". */
+    scoreLabel: { kz: 'Есеп', ru: 'Счёт' },
+
+    /* --------------------------- relative time --------------------------- */
+
+    timeNow: { kz: 'жаңа ғана', ru: 'только что' },
+    /** Follows a number + unit, e.g. "2 сағ бұрын" / "2 ч назад". */
+    timeAgo: { kz: 'бұрын', ru: 'назад' },
+    minShort: { kz: 'мин', ru: 'мин' },
 
     unavailable: {
       kz: 'Батл әзірге қолжетімсіз: желі немесе сервер қосылымы жоқ.',
