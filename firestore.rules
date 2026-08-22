@@ -21,9 +21,29 @@ service cloud.firestore {
     // Public mirror of just what an opponent row or a leaderboard row needs —
     // never the full private profile above. Readable by any signed-in user,
     // writable only by the account it describes.
+    //
+    // Every field here is otherwise self-reported (there is no server, see
+    // the file header above), which would let a client just set `weekXp` /
+    // `rating` straight to a number that tops the weekly leaderboard in one
+    // write. The per-write deltas below cap that at comfortably more than one
+    // real ranked duel can award — `applyRankedResult` in `battle.ts` shows a
+    // win is worth at most `MAX_BATTLE_XP` (594) weekXp and `RATING_WIN` (18)
+    // rating — while staying far below what it would take to leapfrog to #1
+    // in a single write. `displayName` is capped the same way the client
+    // already truncates it in `normalizeBattlePlayer`, so an oversized name
+    // can never reach Firestore in the first place.
     match /battlePlayers/{uid} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 40
+        && request.resource.data.weekXp <= 600
+        && request.resource.data.rating <= 20;
+      allow update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 40
+        && request.resource.data.weekXp <= resource.data.weekXp + 600
+        && request.resource.data.rating <= resource.data.rating + 20;
     }
 
     // One waiting slot per user, doc id = uid. Anyone signed in may scan the

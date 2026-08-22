@@ -219,7 +219,10 @@ export function normalizeBattlePlayer(uid: string, value: unknown): BattlePlayer
   const currentWeek = isoWeekStart()
   return {
     uid,
-    displayName: stringOr(data.displayName, ''),
+    // Defense in depth, not the security boundary — `firestore.rules` caps
+    // the same field server-side. Kept in sync so the UI never shows a name
+    // the rules would have rejected in the first place.
+    displayName: stringOr(data.displayName, '').slice(0, 40),
     photoURL: stringOr(data.photoURL, ''),
     level: Math.max(1, Math.round(numberOr(data.level, 1))),
     rating: Math.max(0, Math.round(numberOr(data.rating, 0))),
@@ -318,7 +321,10 @@ export async function syncBattlePlayer(
   const current = await fetchBattlePlayer(uid)
   const next: BattlePlayer = {
     uid,
-    displayName: meta.displayName,
+    // Matches the `displayName.size() <= 40` cap in firestore.rules — without
+    // this, a real (if unusually long) Google account name could get this
+    // write rejected outright instead of just trimmed.
+    displayName: meta.displayName.slice(0, 40),
     photoURL: meta.photoURL,
     level: meta.level,
     rating: current?.rating ?? 0,
@@ -355,7 +361,8 @@ export async function applyRankedResult(
   const current = await fetchBattlePlayer(uid)
   const next: BattlePlayer = {
     uid,
-    displayName: meta.displayName,
+    // Matches the `displayName.size() <= 40` cap in firestore.rules.
+    displayName: meta.displayName.slice(0, 40),
     photoURL: meta.photoURL,
     level: meta.level,
     rating: Math.max(0, (current?.rating ?? 0) + (won ? RATING_WIN : -RATING_LOSS)),
