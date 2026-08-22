@@ -4,7 +4,7 @@ import { Flame, Search } from 'lucide-react'
 import { eraColor } from '../data/eras'
 import type { EraKey } from '../data/types'
 import { cn } from '../lib/cn'
-import { easeOut, springSoft } from '../lib/motion'
+import { canHover, easeOut, springSoft } from '../lib/motion'
 
 /* ------------------------------------------------------------------ */
 
@@ -232,7 +232,7 @@ export function IconButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      whileHover={{ y: -1 }}
+      whileHover={canHover ? { y: -1 } : undefined}
       whileTap={{ scale: 0.92 }}
       transition={springSoft}
       className={cn(

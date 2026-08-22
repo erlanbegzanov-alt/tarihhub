@@ -17,7 +17,7 @@ import { cn } from '../lib/cn'
 import { isFirebaseReady } from '../lib/firebase'
 import { deleteGame, fetchMyGames } from '../lib/kahoot'
 import type { KahootGame } from '../lib/kahoot'
-import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { useSession } from '../lib/session'
 
 export function KahootTeacher() {
@@ -70,7 +70,7 @@ export function KahootTeacher() {
           <motion.button
             type="button"
             onClick={() => navigate('/battle/kahoot/create')}
-            whileHover={{ y: -2 }}
+            whileHover={canHover ? { y: -2 } : undefined}
             whileTap={{ scale: 0.99 }}
             transition={springSoft}
             className="focus-ring flex w-full items-center justify-center gap-2 rounded-card bg-brand px-5 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"

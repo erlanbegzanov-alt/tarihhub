@@ -8,7 +8,7 @@ import type { EraKey } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
-import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { recordTimelineViewed } from '../lib/progress'
 
 type Filter = EraKey | 'all'
@@ -100,7 +100,7 @@ export function Timeline() {
               </span>
 
               <motion.div
-                whileHover={{ y: -2 }}
+                whileHover={canHover ? { y: -2 } : undefined}
                 transition={springSoft}
                 className={cn(
                   'rounded-card bg-surface p-4 shadow-soft ring-1 ring-line/60',

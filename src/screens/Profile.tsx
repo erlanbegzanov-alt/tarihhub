@@ -25,7 +25,7 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { fetchWeeklyTopUids } from '../lib/battle'
 import { cn } from '../lib/cn'
-import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import {
   DEFAULT_STATE,
   levelInfo,
@@ -252,7 +252,7 @@ export function Profile() {
                     }}
                     aria-expanded={rankSheetOpen}
                     aria-label={t(s.profile.rankSheetTitle)}
-                    whileHover={reduceMotion ? undefined : { scale: 1.04 }}
+                    whileHover={canHover && !reduceMotion ? { scale: 1.04 } : undefined}
                     whileTap={reduceMotion ? undefined : { scale: 0.96 }}
                     transition={springSoft}
                     className="focus-ring block cursor-pointer rounded-full"
@@ -644,7 +644,7 @@ export function Profile() {
               return (
                 <motion.li key={badge.id} variants={staggerItem}>
                   <motion.div
-                    whileHover={unlocked ? { y: -3 } : undefined}
+                    whileHover={canHover && unlocked ? { y: -3 } : undefined}
                     transition={springSoft}
                     className={cn(
                       'flex h-full flex-col items-center rounded-card p-4 text-center',

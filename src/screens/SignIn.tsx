@@ -7,7 +7,7 @@ import type { LocalizedText } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
-import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import {
   sendPasswordReset,
   signInWithEmail,
@@ -251,7 +251,7 @@ export function SignIn() {
                 type="button"
                 onClick={google}
                 disabled={busy}
-                whileHover={busy ? undefined : { y: -2 }}
+                whileHover={canHover && !busy ? { y: -2 } : undefined}
                 whileTap={busy ? undefined : { scale: 0.97 }}
                 transition={springSoft}
                 className={cn(
@@ -311,7 +311,7 @@ export function SignIn() {
                 <motion.button
                   type="submit"
                   disabled={busy}
-                  whileHover={busy ? undefined : { y: -2 }}
+                  whileHover={canHover && !busy ? { y: -2 } : undefined}
                   whileTap={busy ? undefined : { scale: 0.97 }}
                   transition={springSoft}
                   className={cn(

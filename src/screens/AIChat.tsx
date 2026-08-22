@@ -11,7 +11,7 @@ import { useLang } from '../i18n/useLang'
 import { askPersona } from '../lib/ai'
 import type { ChatTurn } from '../lib/ai'
 import { cn } from '../lib/cn'
-import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { unlockBadge } from '../lib/progress'
 
 interface Message extends ChatTurn {
@@ -50,7 +50,7 @@ function PersonaPicker({ onPick }: { onPick: (person: Person) => void }) {
             <motion.button
               type="button"
               onClick={() => onPick(person)}
-              whileHover={{ y: -3 }}
+              whileHover={canHover ? { y: -3 } : undefined}
               whileTap={{ scale: 0.98 }}
               transition={springSoft}
               className={cn(

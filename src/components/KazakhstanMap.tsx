@@ -10,7 +10,7 @@ import type { EraKey, MapSite } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
-import { springSoft } from '../lib/motion'
+import { canHover, springSoft } from '../lib/motion'
 import { SITE_ICONS, siteColor } from './siteMeta'
 
 interface View {
@@ -428,7 +428,7 @@ export function KazakhstanMap({
               initial={reduce ? false : { opacity: 0, scale: 0.7 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ ...springSoft, delay: reduce ? 0 : 0.35 }}
-              whileHover={{ scale: 1.06, zIndex: 20 }}
+              whileHover={canHover ? { scale: 1.06, zIndex: 20 } : undefined}
               whileTap={{ scale: 0.94 }}
               aria-pressed={isActive}
               aria-label={t(site.name)}

@@ -27,7 +27,7 @@ import {
   uploadQuestionPhoto,
 } from '../lib/kahoot'
 import type { KahootFlaw, KahootQuestion } from '../lib/kahoot'
-import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { useSession } from '../lib/session'
 
 const FLAW_TEXT: Record<KahootFlaw['reason'], LocalizedText> = {
@@ -423,7 +423,7 @@ export function KahootCreate() {
                 })
               }}
               disabled={saving}
-              whileHover={saving ? undefined : { y: -2 }}
+              whileHover={canHover && !saving ? { y: -2 } : undefined}
               whileTap={saving ? undefined : { scale: 0.99 }}
               transition={springSoft}
               className={cn(

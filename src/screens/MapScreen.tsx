@@ -13,7 +13,7 @@ import type { EraKey, MapSite, SiteCategory } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
-import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 
 type Filter = SiteCategory | 'all'
 
@@ -217,7 +217,7 @@ export function MapScreen() {
                     onClick={() =>
                       setActiveId((prev) => (prev === site.id ? null : site.id))
                     }
-                    whileHover={{ y: -2 }}
+                    whileHover={canHover ? { y: -2 } : undefined}
                     whileTap={{ scale: 0.99 }}
                     transition={springSoft}
                     className={cn(

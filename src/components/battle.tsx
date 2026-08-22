@@ -24,7 +24,7 @@ import { RATING_LOSS, RATING_WIN, ratingTierFor } from '../lib/battle'
 import type { BattleMode } from '../lib/battle'
 import { cn } from '../lib/cn'
 import { isFirebaseReady } from '../lib/firebase'
-import { easeOut, springSoft } from '../lib/motion'
+import { canHover, easeOut, springSoft } from '../lib/motion'
 import { levelInfo, useProfile } from '../lib/progress'
 import { resolveRankIdentity } from '../lib/rankIdentity'
 import { BADGE_SPARKLES, OWNER_EMAIL } from '../lib/rankStyle'
@@ -359,7 +359,7 @@ export function FindMatchCard({
         <motion.button
           type="button"
           onClick={onFind}
-          whileHover={{ y: -2 }}
+          whileHover={canHover ? { y: -2 } : undefined}
           whileTap={{ scale: 0.97 }}
           transition={springSoft}
           className="focus-ring mt-5 rounded-full bg-brand px-6 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"

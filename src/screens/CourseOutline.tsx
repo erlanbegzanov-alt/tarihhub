@@ -9,7 +9,7 @@ import { units } from '../data/units'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
-import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { useProfile } from '../lib/progress'
 
 /**
@@ -120,7 +120,10 @@ export function CourseOutline() {
 
                     return (
                       <li key={lesson.id}>
-                        <motion.div whileHover={{ y: -2 }} transition={springSoft}>
+                        <motion.div
+                          whileHover={canHover ? { y: -2 } : undefined}
+                          transition={springSoft}
+                        >
                           <Link
                             to={`/lesson/${lesson.id}`}
                             className={cn(

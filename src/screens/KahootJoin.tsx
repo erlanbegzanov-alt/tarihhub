@@ -28,7 +28,7 @@ import {
   watchSession,
 } from '../lib/kahoot'
 import type { KahootPlayer, KahootSession } from '../lib/kahoot'
-import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { recordBattleResult, useProfile } from '../lib/progress'
 import { resolveRankIdentity } from '../lib/rankIdentity'
 import { OWNER_EMAIL } from '../lib/rankStyle'
@@ -315,7 +315,7 @@ export function KahootJoin() {
                         type="button"
                         onClick={() => choose(index)}
                         disabled={picked !== null || revealed}
-                        whileHover={picked !== null ? undefined : { y: -2 }}
+                        whileHover={canHover && picked === null ? { y: -2 } : undefined}
                         whileTap={picked !== null ? undefined : { scale: 0.99 }}
                         transition={springSoft}
                         className={cn(
@@ -426,7 +426,7 @@ export function KahootJoin() {
               <motion.button
                 type="button"
                 onClick={() => navigate('/battle/kahoot/student')}
-                whileHover={{ y: -2 }}
+                whileHover={canHover ? { y: -2 } : undefined}
                 whileTap={{ scale: 0.99 }}
                 transition={springSoft}
                 className="focus-ring mt-5 w-full rounded-full bg-brand px-6 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"

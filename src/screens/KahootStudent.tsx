@@ -14,7 +14,7 @@ import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import { isFirebaseReady } from '../lib/firebase'
 import { KAHOOT_CODE_LENGTH, fetchSession, normalizeCode } from '../lib/kahoot'
-import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { useSession } from '../lib/session'
 
 export function KahootStudent() {
@@ -132,7 +132,7 @@ export function KahootStudent() {
             type="button"
             onClick={() => void join()}
             disabled={checking}
-            whileHover={checking ? undefined : { y: -2 }}
+            whileHover={canHover && !checking ? { y: -2 } : undefined}
             whileTap={checking ? undefined : { scale: 0.98 }}
             transition={springSoft}
             className={cn(

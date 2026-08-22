@@ -44,7 +44,9 @@ export const staggerItem: Variants = {
 
 /** Shared press/hover feedback for buttons and cards. */
 export const pressable = {
-  whileHover: { y: -2 },
+  get whileHover() {
+    return canHover ? { y: -2 } : undefined
+  },
   whileTap: { scale: 0.97 },
   transition: springSoft,
 }

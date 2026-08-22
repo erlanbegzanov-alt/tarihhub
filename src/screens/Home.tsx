@@ -16,7 +16,7 @@ import { peopleMeta } from '../data/peopleMeta'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
-import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { useProfile } from '../lib/progress'
 import { useSession } from '../lib/session'
 
@@ -108,7 +108,7 @@ export function Home() {
           className="lg:col-start-1 lg:row-start-1"
         >
           <SectionHeading title={t(s.home.todayTitle)} />
-          <motion.div whileHover={{ y: -3 }} transition={springSoft}>
+          <motion.div whileHover={canHover ? { y: -3 } : undefined} transition={springSoft}>
             <Link
               to="/timeline"
               className={cn(
@@ -218,7 +218,7 @@ export function Home() {
                 : inProgress.slice(0, CONTINUE_LEARNING_COLLAPSED)
               ).map(({ lesson, percent }) => (
                 <motion.li key={lesson.id} variants={staggerItem}>
-                  <motion.div whileHover={{ y: -2 }} transition={springSoft}>
+                  <motion.div whileHover={canHover ? { y: -2 } : undefined} transition={springSoft}>
                     <Link
                       to={`/lesson/${lesson.id}`}
                       className={cn(
@@ -287,7 +287,7 @@ export function Home() {
         <motion.section variants={staggerItem} className="lg:col-span-2 lg:row-start-3">
           <SectionHeading title={t(s.home.courseTitle)} />
 
-          <motion.div whileHover={{ y: -3 }} transition={springSoft}>
+          <motion.div whileHover={canHover ? { y: -3 } : undefined} transition={springSoft}>
             <Link
               to="/course"
               className={cn(

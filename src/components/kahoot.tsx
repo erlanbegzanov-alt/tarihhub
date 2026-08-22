@@ -11,7 +11,7 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import type { KahootPlayer } from '../lib/kahoot'
-import { springSoft, staggerItem } from '../lib/motion'
+import { canHover, springSoft, staggerItem } from '../lib/motion'
 import { rankTitleText } from '../lib/rankIdentity'
 import { RankBadge } from './RankBadge'
 import { IconButton } from './ui'
@@ -70,7 +70,7 @@ export function RoleOption({
     <motion.button
       type="button"
       onClick={onClick}
-      whileHover={{ y: -2 }}
+      whileHover={canHover ? { y: -2 } : undefined}
       whileTap={{ scale: 0.99 }}
       transition={springSoft}
       className={cn(

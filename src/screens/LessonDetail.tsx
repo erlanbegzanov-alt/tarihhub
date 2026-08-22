@@ -25,7 +25,7 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { explainSection } from '../lib/ai'
 import { cn } from '../lib/cn'
-import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { recordLessonStarted, useProfile } from '../lib/progress'
 
 export function LessonDetail() {
@@ -249,7 +249,7 @@ export function LessonDetail() {
                       type="button"
                       onClick={() => void handleExplain()}
                       disabled={explainLoading}
-                      whileHover={{ y: -1 }}
+                      whileHover={canHover ? { y: -1 } : undefined}
                       whileTap={{ scale: 0.97 }}
                       transition={springSoft}
                       className={cn(
@@ -426,7 +426,11 @@ export function LessonDetail() {
               <p className="mb-3 text-[13px] leading-relaxed text-ink-faint">
                 {t(s.lesson.gateNote)}
               </p>
-              <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} transition={springSoft}>
+              <motion.div
+                whileHover={canHover ? { y: -2 } : undefined}
+                whileTap={{ scale: 0.98 }}
+                transition={springSoft}
+              >
                 <Link
                   to={`/quiz/lesson/${lesson.id}`}
                   className={cn(

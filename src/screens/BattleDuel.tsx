@@ -65,7 +65,7 @@ import { BOT_UID, botAnswerXp, createBotDuel, isBotMatchId } from '../lib/battle
 import type { BotAnswer, BotDuel } from '../lib/battleBot'
 import { cn } from '../lib/cn'
 import { isFirebaseReady } from '../lib/firebase'
-import { easeOut, springSoft } from '../lib/motion'
+import { canHover, easeOut, springSoft } from '../lib/motion'
 import {
   levelInfo,
   recordBattleResult,
@@ -918,7 +918,7 @@ export function BattleDuel({
                         <motion.button
                           type="button"
                           onClick={startBotDuel}
-                          whileHover={{ y: -2 }}
+                          whileHover={canHover ? { y: -2 } : undefined}
                           whileTap={{ scale: 0.97 }}
                           transition={springSoft}
                           className="focus-ring mt-3.5 rounded-full bg-brand px-5 py-2.5 text-[14px] font-semibold text-white shadow-soft hover:bg-brand-dark"
@@ -979,7 +979,7 @@ export function BattleDuel({
                         type="button"
                         onClick={() => choose(optionIndex)}
                         disabled={revealed}
-                        whileHover={revealed ? undefined : { y: -2 }}
+                        whileHover={canHover && !revealed ? { y: -2 } : undefined}
                         whileTap={revealed ? undefined : { scale: 0.99 }}
                         transition={springSoft}
                         className={cn(
@@ -1195,7 +1195,7 @@ export function BattleDuel({
                 <motion.button
                   type="button"
                   onClick={rematch}
-                  whileHover={{ y: -2 }}
+                  whileHover={canHover ? { y: -2 } : undefined}
                   whileTap={{ scale: 0.97 }}
                   transition={springSoft}
                   className="focus-ring rounded-full bg-brand px-6 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"

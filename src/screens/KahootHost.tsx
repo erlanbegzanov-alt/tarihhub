@@ -36,7 +36,7 @@ import {
   watchSession,
 } from '../lib/kahoot'
 import type { KahootGame, KahootPlayer, KahootSession } from '../lib/kahoot'
-import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { useSession } from '../lib/session'
 
 /**
@@ -85,7 +85,7 @@ function HostButton({
     <motion.button
       type="button"
       onClick={onClick}
-      whileHover={{ y: -2 }}
+      whileHover={canHover ? { y: -2 } : undefined}
       whileTap={{ scale: 0.99 }}
       transition={springSoft}
       className="focus-ring mt-5 w-full rounded-full bg-brand px-6 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"

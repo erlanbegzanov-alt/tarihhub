@@ -10,7 +10,7 @@ import { XP_PER_QUIZ, buildLessonQuiz, buildQuiz } from '../data/quiz'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
-import { easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import {
   LESSON_PASS_RATIO,
   completeQuiz,
@@ -331,7 +331,7 @@ export function Quiz() {
                     type="button"
                     onClick={() => choose(option.id)}
                     disabled={revealed}
-                    whileHover={revealed ? undefined : { y: -2 }}
+                    whileHover={canHover && !revealed ? { y: -2 } : undefined}
                     whileTap={revealed ? undefined : { scale: 0.99 }}
                     transition={springSoft}
                     className={cn(
@@ -410,7 +410,7 @@ export function Quiz() {
                 <motion.button
                   type="button"
                   onClick={advance}
-                  whileHover={{ y: -2 }}
+                  whileHover={canHover ? { y: -2 } : undefined}
                   whileTap={{ scale: 0.98 }}
                   transition={springSoft}
                   className="focus-ring mt-3.5 w-full rounded-full bg-brand px-5 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"

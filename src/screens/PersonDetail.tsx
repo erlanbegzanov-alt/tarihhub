@@ -21,7 +21,7 @@ import { getPerson, people } from '../data/people'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
-import { springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { recordPersonView } from '../lib/progress'
 
 export function PersonDetail() {
@@ -161,7 +161,7 @@ export function PersonDetail() {
             <motion.button
               type="button"
               onClick={() => navigate(`/ai/${person.id}`)}
-              whileHover={{ y: -2 }}
+              whileHover={canHover ? { y: -2 } : undefined}
               whileTap={{ scale: 0.97 }}
               transition={springSoft}
               className={cn(
@@ -176,7 +176,7 @@ export function PersonDetail() {
             <motion.button
               type="button"
               onClick={() => navigate(`/quiz/${person.id}`)}
-              whileHover={{ y: -2 }}
+              whileHover={canHover ? { y: -2 } : undefined}
               whileTap={{ scale: 0.97 }}
               transition={springSoft}
               className={cn(
@@ -226,7 +226,7 @@ export function PersonDetail() {
               <motion.button
                 type="button"
                 onClick={() => navigate(`/ai/${person.id}`)}
-                whileHover={{ y: -2 }}
+                whileHover={canHover ? { y: -2 } : undefined}
                 whileTap={{ scale: 0.97 }}
                 transition={springSoft}
                 className={cn(
@@ -241,7 +241,7 @@ export function PersonDetail() {
               <motion.button
                 type="button"
                 onClick={() => navigate(`/quiz/${person.id}`)}
-                whileHover={{ y: -2 }}
+                whileHover={canHover ? { y: -2 } : undefined}
                 whileTap={{ scale: 0.97 }}
                 transition={springSoft}
                 className={cn(

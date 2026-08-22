@@ -68,7 +68,11 @@ export function PersonRow({ person }: { person: Person }) {
 
   return (
     <motion.div variants={staggerItem}>
-      <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.99 }} transition={springSoft}>
+      <motion.div
+        whileHover={canHover ? { y: -2 } : undefined}
+        whileTap={{ scale: 0.99 }}
+        transition={springSoft}
+      >
         <Link
           to={`/person/${person.id}`}
           className={cn(
