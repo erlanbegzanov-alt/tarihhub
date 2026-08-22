@@ -14,8 +14,8 @@
  * casual search that finds nobody offers a bot duel instead — entirely local,
  * always labelled, and never in ranked (see `src/lib/battleBot.ts`).
  */
-import { AnimatePresence, motion } from 'framer-motion'
-import { Crown, Loader2, Trophy } from 'lucide-react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { Crown, Loader2, Trophy, UserX } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BotChip,
@@ -34,6 +34,9 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import {
   MAX_BATTLE_XP,
+  PRESENCE_GRACE_MS,
+  PRESENCE_PING_MS,
+  PRESENCE_STALE_MS,
   QUESTION_SECONDS,
   QUEUE_TTL_MS,
   ROUND_SIZE,
@@ -47,6 +50,7 @@ import {
   findMatch,
   joinQueue,
   leaveQueue,
+  pingPresence,
   pushSlot,
   ratingTierFor,
   slotKeyFor,
@@ -102,13 +106,22 @@ const WAIT_TIMEOUT_MS = 30_000
 const BOT_OFFER_MS = 8_000
 const BOT_AUTO_MS = 20_000
 
-type Phase = 'searching' | 'duel' | 'waiting' | 'result'
+/**
+ * How often the AFK check re-evaluates. Staleness is a clock reading, not an
+ * event: once the opponent stops writing, no snapshot arrives to notice it
+ * with, so something local has to keep looking.
+ */
+const AFK_CHECK_MS = 1_000
+
+type Phase = 'searching' | 'duel' | 'waiting' | 'result' | 'ended'
 
 interface Outcome {
   myXp: number
   foeXp: number
   won: boolean
   ranked: boolean
+  /** The duel was closed out early because the opponent stopped answering. */
+  afk: boolean
   /**
    * Where the rating landed, once Firestore has confirmed the write.
    *
@@ -144,6 +157,7 @@ function Fighter({
   rankTitle,
   isWeeklyTop,
   isBot = false,
+  afk = false,
   won,
 }: {
   name: string
@@ -157,10 +171,13 @@ function Fighter({
   isWeeklyTop: boolean
   /** Marks the practice bot, so its side of the head says so throughout. */
   isBot?: boolean
+  /** This side has stopped sending heartbeats — stamp them. */
+  afk?: boolean
   /** `null` until the duel is scored. */
   won: boolean | null
 }) {
   const { t } = useLang()
+  const reduce = useReducedMotion()
   return (
     <div className="flex min-w-0 flex-col items-center gap-2 text-center">
       <div className="relative">
@@ -198,6 +215,59 @@ function Fighter({
             className="absolute -top-1 -right-1 ring-2 ring-surface"
           />
         )}
+
+        {/* The rubber stamp: it should land, not appear. The mark comes in
+            oversized, over-rotated and transparent, and an under-damped spring
+            drives it down onto the face with a visible overshoot, while a ring
+            snaps outward from the point of impact and dies. Both are the app's
+            own `--color-wrong`, and both collapse to the settled state when the
+            reader has asked for reduced motion. */}
+        <AnimatePresence>
+          {afk && (
+            <motion.span
+              key="afk"
+              aria-hidden
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="pointer-events-none absolute -inset-0.5 z-10 grid place-items-center rounded-full"
+              style={{
+                background: 'color-mix(in srgb, var(--color-ink) 42%, transparent)',
+              }}
+            >
+              {!reduce && (
+                <motion.span
+                  className="absolute inset-0 rounded-full"
+                  initial={{ opacity: 0.7, scale: 0.85 }}
+                  animate={{ opacity: 0, scale: 2 }}
+                  transition={{ duration: 0.55, ease: easeOut }}
+                  style={{ boxShadow: '0 0 0 3px var(--color-wrong)' }}
+                />
+              )}
+              <motion.span
+                initial={
+                  reduce
+                    ? { opacity: 1, scale: 1, rotate: -18 }
+                    : { opacity: 0, scale: 2.9, rotate: -48 }
+                }
+                animate={{ opacity: 1, scale: 1, rotate: -18 }}
+                transition={
+                  reduce
+                    ? { duration: 0 }
+                    : { type: 'spring', stiffness: 900, damping: 15, mass: 1.15 }
+                }
+                className="rounded-[3px] px-1.5 py-px text-[12px] leading-tight font-black tracking-[0.14em] whitespace-nowrap uppercase"
+                style={{
+                  color: 'var(--color-wrong)',
+                  border: '2.5px solid var(--color-wrong)',
+                  background: 'color-mix(in srgb, var(--color-surface) 86%, transparent)',
+                }}
+              >
+                {t(s.battle.afkStamp)}
+              </motion.span>
+            </motion.span>
+          )}
+        </AnimatePresence>
       </div>
       <span className="max-w-full truncate text-[13.5px] font-bold text-ink">
         {name}
@@ -304,6 +374,14 @@ export function BattleDuel({
   const [roundBanner, setRoundBanner] = useState<number | null>(null)
   /** True once the search has run long enough to offer the bot (casual only). */
   const [botOffered, setBotOffered] = useState(false)
+  /**
+   * The opponent's heartbeat has gone quiet. Flagging is not the same as
+   * ending: this only raises the stamp and the offer, and clears itself again
+   * if they come back — a hiccup shouldn't pull anyone out of a live duel.
+   */
+  const [foeAfk, setFoeAfk] = useState(false)
+  /** The reader took that offer: score this duel where it stands. */
+  const [afkResolved, setAfkResolved] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -409,6 +487,8 @@ export function BattleDuel({
     setAnswers([])
     setMyXp(0)
     setTimedOut(false)
+    setFoeAfk(false)
+    setAfkResolved(false)
     setOutcome(null)
     setPhase('duel')
   }, [])
@@ -657,6 +737,89 @@ export function BattleDuel({
 
   useEffect(() => () => window.clearTimeout(revealRef.current), [])
 
+  /* ------------------------------ presence ------------------------------ */
+
+  /*
+   * The complaint this answers: backing out the instant a match is found is
+   * easy to do by accident, and it used to leave the other player alone with
+   * nine questions, no sign anything was wrong, and no consequence for the one
+   * who left. There is no server to notice that, so the two clients tell each
+   * other directly — see the presence block in `src/lib/battle.ts`.
+   */
+
+  /** "Still here", for as long as this player has a real duel open. */
+  useEffect(() => {
+    if (vsBot || !matchId || !slot) return
+    if (phase !== 'duel' && phase !== 'waiting') return
+    void pingPresence(matchId, slot)
+    const beat = window.setInterval(
+      () => void pingPresence(matchId, slot),
+      PRESENCE_PING_MS,
+    )
+    return () => window.clearInterval(beat)
+  }, [vsBot, matchId, slot, phase])
+
+  /**
+   * …and reading the other side of it. Deliberately on a local interval rather
+   * than on the snapshot listener: the whole signal here is a write that *stops*
+   * arriving, so nothing would ever fire to notice it.
+   *
+   * Three things keep this from crying wolf. A grace period from match creation,
+   * so a first heartbeat still in flight is never mistaken for an empty chair.
+   * A `doneAt` check, because a player who has finished their nine questions has
+   * every right to close the tab. And `lastSeenAt === 0`, which means a match
+   * document written before presence existed at all — no signal, not absence.
+   * Bot duels are excluded outright: the script has no presence to report.
+   */
+  useEffect(() => {
+    if (vsBot || !match || !foeSlot || afkResolved) return
+    if (phase !== 'duel' && phase !== 'waiting') return
+    if (foeSlot.doneAt !== null || foeSlot.lastSeenAt === 0) {
+      setFoeAfk(false)
+      return
+    }
+    const check = () => {
+      const now = Date.now()
+      if (now - match.createdAt < PRESENCE_GRACE_MS) return
+      setFoeAfk(now - foeSlot.lastSeenAt > PRESENCE_STALE_MS)
+    }
+    check()
+    const timer = window.setInterval(check, AFK_CHECK_MS)
+    return () => window.clearInterval(timer)
+  }, [vsBot, match, foeSlot, phase, afkResolved])
+
+  /**
+   * Takes the offer: freeze this duel where it stands and let the ordinary
+   * scoring effect below close it out. The final slot is pushed with `done`
+   * first, so the player who walked away comes back to a match that agrees it
+   * is over rather than one they can keep answering into.
+   */
+  const endAgainstAfk = useCallback(() => {
+    if (!match || !slot || scoredRef.current || afkResolved) return
+    window.clearTimeout(revealRef.current)
+    void pushSlot(
+      match.id,
+      slot,
+      answers.length ? answers : Array.from({ length: questions.length }, () => null),
+      myXp,
+      true,
+    )
+    setAfkResolved(true)
+  }, [match, slot, afkResolved, answers, questions.length, myXp])
+
+  /**
+   * The other end of the same story: the player who left, coming back to a duel
+   * the other side has already closed. Only ever from 'duel' — a reader sitting
+   * in 'waiting' has already finished and is owed their result screen, which
+   * `WAIT_TIMEOUT_MS` gets them either way.
+   */
+  useEffect(() => {
+    if (vsBot || !match || scoredRef.current || afkResolved) return
+    if (phase !== 'duel' || match.status !== 'done') return
+    window.clearTimeout(revealRef.current)
+    setPhase('ended')
+  }, [vsBot, match, phase, afkResolved])
+
   /* ------------------------------- scoring ------------------------------- */
 
   useEffect(() => {
@@ -668,11 +831,23 @@ export function BattleDuel({
   useEffect(() => {
     if (!match || !slot || !foeSlot || !uid || scoredRef.current) return
     const mine = slot === 'p1' ? match.p1 : match.p2
-    if (mine.doneAt === null) return
-    if (foeSlot.doneAt === null && !timedOut) return
+    // An abandoned duel is a variant ending, not a second scoring flow: it
+    // simply satisfies both gates on its own, and everything below — the profile
+    // XP, the ranked write, the history row, `closeMatch` — runs unchanged.
+    if (!afkResolved) {
+      if (mine.doneAt === null) return
+      if (foeSlot.doneAt === null && !timedOut) return
+    }
 
     scoredRef.current = true
-    const won = mine.xp >= foeSlot.xp
+    // On an abandonment the local tally is the authoritative one: the `doneAt`
+    // push that ended the duel may not have round-tripped through the snapshot
+    // listener yet, so `mine.xp` can still be a question behind.
+    const myScore = afkResolved ? Math.max(myXp, mine.xp) : mine.xp
+    // The consequence the owner asked for. A player who walks out forfeits —
+    // the win goes to whoever was still there, and the row records exactly how
+    // it was won so it can never pass for an ordinary one.
+    const won = afkResolved || myScore >= foeSlot.xp
     const ranked = match.mode === 'ranked'
 
     // The face across the board, captured as it was at match end. Stored on
@@ -689,18 +864,19 @@ export function BattleDuel({
     // Real profile XP either way — a casual duel is worth just as much to the
     // reader's level as a ranked one. Only the rating and the weekly board are
     // held back for ranked; each mode keeps its own stats and history.
-    recordBattleResult(mine.xp)
+    recordBattleResult(myScore)
     if (ranked) {
-      void applyRankedResult(uid, meta, mine.xp, won).then((rating) => {
+      void applyRankedResult(uid, meta, myScore, won).then((rating) => {
         onRankedResult?.()
         if (!rating) return
         recordRankedDuelResult({
           opponent: duelOpponent,
           won,
-          xpEarned: mine.xp,
+          xpEarned: myScore,
           foeXp: foeSlot.xp,
           ratingBefore: rating.before,
           ratingAfter: rating.after,
+          opponentWasAfk: afkResolved,
         })
         // Fills in the rating block the result screen already rendered a
         // placeholder for. Guarded on the outcome still being *this* duel's,
@@ -708,14 +884,34 @@ export function BattleDuel({
         setOutcome((prev) => (prev && prev.rating === null ? { ...prev, rating } : prev))
       })
     } else {
-      recordCasualDuelResult(duelOpponent, won, mine.xp, foeSlot.xp)
+      recordCasualDuelResult(duelOpponent, won, myScore, foeSlot.xp, afkResolved)
     }
     // A bot duel has no document to close — it never had one.
     if (!vsBot) void closeMatch(match.id)
 
-    setOutcome({ myXp: mine.xp, foeXp: foeSlot.xp, won, ranked, rating: null })
+    setOutcome({
+      myXp: myScore,
+      foeXp: foeSlot.xp,
+      won,
+      ranked,
+      afk: afkResolved,
+      rating: null,
+    })
     setPhase('result')
-  }, [match, slot, foeSlot, uid, meta, timedOut, foeName, opponent, onRankedResult, vsBot])
+  }, [
+    match,
+    slot,
+    foeSlot,
+    uid,
+    meta,
+    timedOut,
+    foeName,
+    opponent,
+    onRankedResult,
+    vsBot,
+    afkResolved,
+    myXp,
+  ])
 
   /* ------------------------------- render ------------------------------- */
 
@@ -733,12 +929,18 @@ export function BattleDuel({
     setPicked(null)
     setAnswers([])
     setTimedOut(false)
+    setFoeAfk(false)
+    setAfkResolved(false)
     setBotOffered(false)
     setPhase('searching')
   }
 
-  const inDuel = phase === 'duel' || phase === 'waiting' || phase === 'result'
+  const inDuel =
+    phase === 'duel' || phase === 'waiting' || phase === 'result' || phase === 'ended'
   const foeXp = outcome?.foeXp ?? foeSlot?.xp ?? 0
+  /** The stamp stands only while the duel is still open — once it is scored the
+   *  head belongs to the verdict, which `OutcomeAvatar` draws in the same spot. */
+  const showAfk = foeAfk && !outcome && (phase === 'duel' || phase === 'waiting')
 
   /* ---------------------- the rating, as a movement ---------------------- */
 
@@ -840,6 +1042,7 @@ export function BattleDuel({
               rankTitle={foeRankTitle}
               isWeeklyTop={opponent !== null && weeklyTopUids.has(opponent.uid)}
               isBot={vsBot}
+              afk={showAfk}
               won={outcome ? !outcome.won : null}
             />
           </div>
@@ -869,6 +1072,54 @@ export function BattleDuel({
               </span>
             </div>
           </div>
+
+          {/* The way out, offered rather than taken: a stalled opponent might
+              be back in three seconds, and yanking someone out of a duel they
+              are still enjoying would be its own bug. So the choice is the
+              reader's — but it sits directly under the bars, in the red the
+              stamp just used, not buried behind anything. */}
+          <AnimatePresence>
+            {showAfk && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.24, ease: easeOut }}
+                className="overflow-hidden"
+              >
+                <div
+                  className="mx-5 mb-5 rounded-tile p-4 text-center ring-1"
+                  style={{
+                    background: 'var(--color-wrong-tint)',
+                    ['--tw-ring-color' as string]:
+                      'color-mix(in srgb, var(--color-wrong) 35%, transparent)',
+                  }}
+                >
+                  <p
+                    className="flex items-center justify-center gap-1.5 text-[14px] font-bold"
+                    style={{ color: 'var(--color-wrong)' }}
+                  >
+                    <UserX className="h-4 w-4" strokeWidth={2.4} aria-hidden />
+                    {t(s.battle.afkTitle)}
+                  </p>
+                  <p className="mx-auto mt-1.5 max-w-sm text-[12.5px] leading-relaxed text-ink-soft">
+                    {t(s.battle.afkText)}
+                  </p>
+                  <motion.button
+                    type="button"
+                    onClick={endAgainstAfk}
+                    whileHover={canHover ? { y: -2 } : undefined}
+                    whileTap={{ scale: 0.97 }}
+                    transition={springSoft}
+                    className="focus-ring mt-3.5 rounded-full px-5 py-2.5 text-[14px] font-semibold text-white shadow-soft"
+                    style={{ background: 'var(--color-wrong)' }}
+                  >
+                    {t(s.battle.afkAction)}
+                  </motion.button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </>
       )}
 
@@ -1031,6 +1282,58 @@ export function BattleDuel({
             </motion.div>
           )}
 
+          {/* The duel the reader walked away from, closed by the other side
+              while they were gone. Nothing to score — they never finished —
+              so this is only an honest dead end with a way out of it, rather
+              than a board they can keep answering into. */}
+          {phase === 'ended' && (
+            <motion.div
+              key="ended"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22, ease: easeOut }}
+              className="py-8 text-center"
+            >
+              <span
+                className="mx-auto grid h-14 w-14 place-items-center rounded-full"
+                style={{ background: 'var(--color-wrong-tint)' }}
+              >
+                <UserX
+                  className="h-6 w-6"
+                  strokeWidth={1.9}
+                  style={{ color: 'var(--color-wrong)' }}
+                  aria-hidden
+                />
+              </span>
+              <h2 className="mt-3.5 text-[17px] font-bold text-ink">
+                {t(s.battle.afkEndedTitle)}
+              </h2>
+              <p className="mx-auto mt-1.5 max-w-sm text-[13px] leading-relaxed text-ink-soft">
+                {t(s.battle.afkEndedText)}
+              </p>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+                <motion.button
+                  type="button"
+                  onClick={rematch}
+                  whileHover={canHover ? { y: -2 } : undefined}
+                  whileTap={{ scale: 0.97 }}
+                  transition={springSoft}
+                  className="focus-ring rounded-full bg-brand px-6 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"
+                >
+                  {t(s.battle.again)}
+                </motion.button>
+                <button
+                  type="button"
+                  onClick={onExit}
+                  className="focus-ring rounded-full bg-surface px-5 py-3.5 text-[14px] font-semibold text-ink-soft ring-1 ring-line hover:text-ink"
+                >
+                  {t(s.common.back)}
+                </button>
+              </div>
+            </motion.div>
+          )}
+
           {/* ---------------------------- result ---------------------------- */}
           {phase === 'result' && outcome && (
             <motion.div
@@ -1076,6 +1379,28 @@ export function BattleDuel({
                 <p className="mx-auto mt-3 flex max-w-sm items-center justify-center gap-2 rounded-tile bg-cream px-3.5 py-2.5 text-[12.5px] leading-snug text-ink-soft ring-1 ring-line/60">
                   <BotChip />
                   {t(s.battle.botResultNote)}
+                </p>
+              )}
+
+              {/* Same principle for a duel that ended because the other side
+                  left: said outright on the screen that announces the win, not
+                  only on the history row it will leave behind. */}
+              {outcome.afk && (
+                <p
+                  className="mx-auto mt-3 flex max-w-sm items-center justify-center gap-2 rounded-tile px-3.5 py-2.5 text-[12.5px] leading-snug text-ink-soft ring-1"
+                  style={{
+                    background: 'var(--color-wrong-tint)',
+                    ['--tw-ring-color' as string]:
+                      'color-mix(in srgb, var(--color-wrong) 30%, transparent)',
+                  }}
+                >
+                  <UserX
+                    className="h-4 w-4 shrink-0"
+                    strokeWidth={2.4}
+                    style={{ color: 'var(--color-wrong)' }}
+                    aria-hidden
+                  />
+                  {t(s.battle.afkResultNote)}
                 </p>
               )}
 

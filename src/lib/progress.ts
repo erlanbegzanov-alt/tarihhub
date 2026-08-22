@@ -68,8 +68,21 @@ export interface DuelOpponent {
   opponentIsBot: boolean
 }
 
+/**
+ * True when the duel ended because the opponent stopped answering and this
+ * player chose to close it out, rather than because nine questions were played.
+ *
+ * Stored for the same reason `opponentIsBot` is: a row that reads as an
+ * ordinary win months later would be a result the reader was misled about.
+ * Kept on the two records rather than on `DuelOpponent`, because it describes
+ * how *this duel* ended, not who was across the board.
+ */
+export interface DuelAfkFlag {
+  opponentWasAfk: boolean
+}
+
 /** One finished casual duel, newest first in `recentCasualDuels`. */
-export interface CasualDuelRecord extends DuelOpponent {
+export interface CasualDuelRecord extends DuelOpponent, DuelAfkFlag {
   won: boolean
   /** This player's XP in that duel. */
   xp: number
@@ -88,7 +101,7 @@ export interface CasualDuelRecord extends DuelOpponent {
  * is what makes a row explain itself — "1240 → 1258" instead of an opaque
  * "+18" with nothing to read it against.
  */
-export interface RankedDuelRecord extends DuelOpponent {
+export interface RankedDuelRecord extends DuelOpponent, DuelAfkFlag {
   won: boolean
   xp: number
   foeXp: number
@@ -282,6 +295,9 @@ function normalizeRecentCasualDuels(value: unknown): CasualDuelRecord[] {
       won: record.won,
       xp: Math.max(0, Math.round(record.xp)),
       foeXp: countOr(record.foeXp, 0),
+      // Same reasoning as `opponentIsBot`: absent on every row written before
+      // AFK detection existed, and every one of those was played out in full.
+      opponentWasAfk: record.opponentWasAfk === true,
       at: record.at,
     })
   }
@@ -309,6 +325,7 @@ function normalizeRecentRankedDuels(value: unknown): RankedDuelRecord[] {
       won: record.won,
       xp: Math.max(0, Math.round(record.xp)),
       foeXp: countOr(record.foeXp, 0),
+      opponentWasAfk: record.opponentWasAfk === true,
       ratingBefore,
       ratingAfter: countOr(record.ratingAfter, ratingBefore),
       at: record.at,
@@ -685,6 +702,8 @@ export function recordCasualDuelResult(
   won: boolean,
   xpEarned: number,
   foeXp: number,
+  /** The duel was closed out early because the opponent stopped answering. */
+  opponentWasAfk = false,
 ): void {
   const entry: CasualDuelRecord = {
     ...normalizeDuelOpponent(opponent),
@@ -692,6 +711,7 @@ export function recordCasualDuelResult(
     won,
     xp: countOr(xpEarned, 0),
     foeXp: countOr(foeXp, 0),
+    opponentWasAfk,
     at: Date.now(),
   }
   write({
@@ -723,6 +743,8 @@ export function recordRankedDuelResult(params: {
   foeXp: number
   ratingBefore: number
   ratingAfter: number
+  /** The duel was closed out early because the opponent stopped answering. */
+  opponentWasAfk?: boolean
 }): void {
   const ratingBefore = countOr(params.ratingBefore, 0)
   const entry: RankedDuelRecord = {
@@ -731,6 +753,7 @@ export function recordRankedDuelResult(params: {
     won: params.won,
     xp: countOr(params.xpEarned, 0),
     foeXp: countOr(params.foeXp, 0),
+    opponentWasAfk: params.opponentWasAfk === true,
     ratingBefore,
     ratingAfter: countOr(params.ratingAfter, ratingBefore),
     at: Date.now(),

@@ -281,6 +281,35 @@ export const s = {
       ru: 'Это был бот, а не живой игрок. На рейтинг не влияет.',
     },
 
+    /* ------------------------ the opponent who left ------------------------ */
+
+    /**
+     * The stamp slammed over the opponent's face once their heartbeat has gone
+     * quiet (see `PRESENCE_STALE_MS` in `src/lib/battle.ts`). Left in Latin in
+     * both languages on purpose: "AFK" is what players of this age already read
+     * it as, and it is short enough to sit inside a 56px avatar.
+     */
+    afkStamp: { kz: 'AFK', ru: 'AFK' },
+    afkTitle: { kz: 'Қарсылас жауап бермей тұр', ru: 'Соперник не отвечает' },
+    afkText: {
+      kz: 'Ол бірнеше секунд бойы белгі бермеді. Қалған сұрақтарды күтпей-ақ, ұрысты дәл қазір аяқтауға болады — жеңіс сізге беріледі.',
+      ru: 'Он не подаёт признаков жизни уже несколько секунд. Можно не доигрывать остальные вопросы, а закончить бой прямо сейчас — победа засчитается вам.',
+    },
+    afkAction: { kz: 'Ұрысты аяқтау', ru: 'Закончить бой' },
+    /** On the result screen, so the win is never taken for an ordinary one. */
+    afkResultNote: {
+      kz: 'Қарсылас ұрысты тастап кетті, сондықтан жекпе-жек мерзімінен бұрын аяқталды.',
+      ru: 'Соперник покинул бой, поэтому дуэль была завершена досрочно.',
+    },
+    /** Replaces the "Победа" chip on the history row this duel leaves behind. */
+    afkHistoryLabel: { kz: 'Қарсылас жауап бермеді', ru: 'Соперник не отвечал' },
+    /** What the player who walked away sees if they come back to a closed duel. */
+    afkEndedTitle: { kz: 'Бұл ұрыс аяқталған', ru: 'Этот бой уже завершён' },
+    afkEndedText: {
+      kz: 'Сіз жауап бермей тұрғанда қарсылас ұрысты жапты. Жаңа қарсылас іздеп көріңіз.',
+      ru: 'Пока вы не отвечали, соперник закрыл бой. Попробуйте найти нового соперника.',
+    },
+
     /** Neutral label for the player themselves, above their own avatar. */
     you: { kz: 'Сен', ru: 'Ты' },
     opponent: { kz: 'Қарсылас', ru: 'Соперник' },

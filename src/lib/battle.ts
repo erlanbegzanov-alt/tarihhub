@@ -126,6 +126,39 @@ export function ratingTierFor(rating: number): RatingTierInfo {
  */
 export const QUEUE_TTL_MS = 120_000
 
+/* ------------------------------- presence ------------------------------- */
+
+/*
+ * Backing out the instant a match is found used to cost nothing: the other
+ * player ground through all nine questions against somebody who would never
+ * answer, with no sign anything was wrong. With no server there is nobody to
+ * notice that for us, so each client says "still here" into its own slot and
+ * reads the other's — three numbers, no new collection, no rules change (a
+ * dotted write to `p1.lastSeenAt` leaves `p2` byte-identical, which is exactly
+ * what the existing `battleMatches` update rule already allows).
+ */
+
+/** How often a player in a live duel refreshes their own `lastSeenAt`. */
+export const PRESENCE_PING_MS = 4_000
+/**
+ * How long an opponent's `lastSeenAt` may stand still before they count as
+ * gone. Four missed heartbeats: long enough that ordinary jitter, a backgrounded
+ * tab's throttled timers or a slow Firestore round-trip never read as absence,
+ * short enough that a real walk-out is caught inside one question.
+ *
+ * Both timestamps come from their own writer's clock, so a badly skewed device
+ * is compared against ours — the same trade the queue TTL and the claim stamp
+ * already make. The margin here absorbs anything short of a genuinely wrong
+ * clock.
+ */
+export const PRESENCE_STALE_MS = 16_000
+/**
+ * No staleness check at all until this long after the match was created, so the
+ * seeded `lastSeenAt` of a player whose first heartbeat is still in flight can
+ * never be mistaken for an empty chair.
+ */
+export const PRESENCE_GRACE_MS = 10_000
+
 /** XP earned for one answer, given the seconds still on the clock. */
 export function answerXp(correct: boolean, secondsLeft: number): number {
   if (!correct) return 0
@@ -141,6 +174,17 @@ export interface BattleSlot {
   answers: (number | null)[]
   xp: number
   doneAt: number | null
+  /**
+   * "I am still here", refreshed by this slot's owner every
+   * `PRESENCE_PING_MS` while they have the duel open (`pingPresence`).
+   *
+   * Seeded to the match's creation time for *both* slots by `emptySlot()`, so a
+   * duel is never read as abandoned in the instant before either client has had
+   * a chance to send its first real heartbeat. `0` means the field is absent
+   * altogether — a document written before presence existed — which readers
+   * must treat as "no signal", never as "gone".
+   */
+  lastSeenAt: number
 }
 
 export interface BattleMatch {
@@ -249,6 +293,7 @@ function normalizeSlot(value: unknown, questions: number): BattleSlot {
     }),
     xp: Math.max(0, Math.round(numberOr(data.xp, 0))),
     doneAt: typeof data.doneAt === 'number' ? data.doneAt : null,
+    lastSeenAt: numberOr(data.lastSeenAt, 0),
   }
 }
 
@@ -280,6 +325,8 @@ function emptySlot(): BattleSlot {
     answers: Array.from({ length: BATTLE_QUESTIONS }, () => null),
     xp: 0,
     doneAt: null,
+    // Both slots start "seen" at match creation — see `BattleSlot.lastSeenAt`.
+    lastSeenAt: Date.now(),
   }
 }
 
@@ -666,6 +713,25 @@ export async function pushSlot(
     })
   } catch (error) {
     console.warn('[tarihhub] Could not save the battle answer.', error)
+  }
+}
+
+/**
+ * "Still here" — the heartbeat behind AFK detection, written the same
+ * own-slot-only way `pushSlot` writes an answer, so the same rule covers it.
+ *
+ * Failures are swallowed on purpose and not even warned about: this runs every
+ * few seconds for the whole duel, and a dropped heartbeat is already what the
+ * staleness threshold is built to tolerate.
+ */
+export async function pingPresence(matchId: string, slot: SlotKey): Promise<void> {
+  if (!db) return
+  try {
+    await updateDoc(doc(db, 'battleMatches', matchId), {
+      [`${slot}.lastSeenAt`]: Date.now(),
+    })
+  } catch {
+    /* one missed beat — the threshold allows several */
   }
 }
 

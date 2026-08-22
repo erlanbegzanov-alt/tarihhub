@@ -185,6 +185,11 @@ export function createBotDuel(uid: string): BotDuel {
     answers: Array.from({ length: BATTLE_QUESTIONS }, () => null),
     xp: 0,
     doneAt: null,
+    // Only here to satisfy the shared `BattleSlot` shape. A bot duel is
+    // entirely local, so nothing ever refreshes or reads this — and the AFK
+    // check in `BattleDuel.tsx` skips bot matches outright, which is what keeps
+    // a script that is *always* "absent" from ever being flagged as one.
+    lastSeenAt: Date.now(),
   })
   return {
     match: {

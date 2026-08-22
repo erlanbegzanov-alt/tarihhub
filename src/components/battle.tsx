@@ -13,7 +13,7 @@
  * show), the bar is `ProgressBar`, and the motion comes from `lib/motion.ts`.
  */
 import { motion, useReducedMotion } from 'framer-motion'
-import { Award, Bot, Check, Crown, Gem, Medal, Shield, Trophy, X } from 'lucide-react'
+import { Award, Bot, Check, Crown, Gem, Medal, Shield, Trophy, UserX, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { AvatarGender } from '../data/ranks'
@@ -574,6 +574,8 @@ export function MatchRow({
     opponentAvatarGender: AvatarGender | null
     opponentAvatarTierIndex: number
     opponentIsBot: boolean
+    /** Ended early because the opponent stopped answering — see `DuelAfkFlag`. */
+    opponentWasAfk: boolean
     won: boolean
     xp: number
     foeXp: number
@@ -586,11 +588,17 @@ export function MatchRow({
   const { won, xp: myXp, foeXp, at } = duel
   const { color, tint } = outcomeStyle(won)
   const opponentName = duel.opponentName || t(s.battle.opponent)
+  // A duel the opponent walked out of is still a win, and the avatars say so —
+  // but the chip says how it was actually won, in the same red the AFK stamp
+  // used during the duel, so the row can never be read as an ordinary result.
+  const afk = duel.opponentWasAfk
 
   return (
     <li
       className="border-b border-line-soft px-4 py-3.5 last:border-b-0"
-      aria-label={`${t(s.battle.historyRowLabel)}: ${t(won ? s.battle.recentWin : s.battle.recentLose)}`}
+      aria-label={`${t(s.battle.historyRowLabel)}: ${
+        afk ? t(s.battle.afkHistoryLabel) : t(won ? s.battle.recentWin : s.battle.recentLose)
+      }`}
     >
       {/* Capped and centred rather than edge-to-edge: on a desktop-width card
           the two avatars would otherwise sit a screen apart with the score
@@ -647,10 +655,17 @@ export function MatchRow({
 
       <div className="mx-auto mt-2.5 flex max-w-lg flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
         <span
-          className="rounded-full px-2.5 py-1 text-[11px] font-bold"
-          style={{ background: tint, color }}
+          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold"
+          style={
+            afk
+              ? { background: 'var(--color-wrong-tint)', color: 'var(--color-wrong)' }
+              : { background: tint, color }
+          }
         >
-          {t(won ? s.battle.recentWin : s.battle.recentLose)}
+          {afk && <UserX className="h-3 w-3" strokeWidth={2.6} aria-hidden />}
+          {afk
+            ? t(s.battle.afkHistoryLabel)
+            : t(won ? s.battle.recentWin : s.battle.recentLose)}
         </span>
         <span className="flex items-center gap-2.5">
           {meta}
