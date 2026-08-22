@@ -18,7 +18,6 @@ import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { useProfile } from '../lib/progress'
-import { useSession } from '../lib/session'
 
 // Collapsed height of the "continue learning" list before it needs its own
 // expand toggle — past this, an unbounded number of in-progress lessons would
@@ -30,7 +29,6 @@ export function Home() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [showAllInProgress, setShowAllInProgress] = useState(false)
-  const session = useSession()
   const profile = useProfile()
 
   // Deterministic by calendar day — same card for everyone on a given day,
@@ -57,10 +55,6 @@ export function Home() {
     profile.completedLessons.includes(lesson.id),
   ).length
 
-  // Greet the signed-in account's first name.
-  const greetingName =
-    session.user?.displayName?.split(' ')[0] || t(s.profile.userName)
-
   const submitSearch = (value: string) => {
     setQuery(value)
     // Any non-empty query navigates. Requiring two characters made Enter look
@@ -80,9 +74,6 @@ export function Home() {
     >
       {/* ---------- search ---------- */}
       <motion.div variants={staggerItem} className="md:max-w-2xl">
-        <p className="mb-3 text-[13px] font-medium text-ink-faint md:hidden">
-          {t(s.home.greeting)}, {greetingName} 👋
-        </p>
         <form
           onSubmit={(event) => {
             event.preventDefault()
