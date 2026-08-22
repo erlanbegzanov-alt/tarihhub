@@ -352,7 +352,7 @@ export function PersonDetail() {
                   {t(eras[person.eraKey].label)}
                 </span>
               </h2>
-              <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                 {alsoSee.map((other) => (
                   <Link
                     key={other.id}

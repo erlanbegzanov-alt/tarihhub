@@ -204,7 +204,7 @@ export function MapScreen() {
             variants={staggerContainer}
             initial="initial"
             animate="animate"
-            className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1"
+            className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1"
           >
             {visibleSites.map((site) => {
               const Icon = SITE_ICONS[site.category]

@@ -43,7 +43,7 @@ function PersonaPicker({ onPick }: { onPick: (person: Person) => void }) {
         variants={staggerContainer}
         initial="initial"
         animate="animate"
-        className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
+        className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
       >
         {people.map((person) => (
           <motion.li key={person.id} variants={staggerItem} className="min-w-0">
