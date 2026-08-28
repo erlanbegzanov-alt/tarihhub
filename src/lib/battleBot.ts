@@ -59,9 +59,9 @@ interface BotSkill {
 }
 
 const BOT_SKILLS: BotSkill[] = [
-  { accuracy: 0.5, minMs: 3800, maxMs: 10_000 },
-  { accuracy: 0.7, minMs: 2600, maxMs: 7600 },
-  { accuracy: 0.88, minMs: 1700, maxMs: 5200 },
+  { accuracy: 0.62, minMs: 3200, maxMs: 8500 },
+  { accuracy: 0.78, minMs: 2200, maxMs: 6600 },
+  { accuracy: 0.92, minMs: 1500, maxMs: 4500 },
 ]
 
 /**

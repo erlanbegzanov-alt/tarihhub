@@ -370,7 +370,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                   transition={{ ...springSoft, delay: 0.12 }}
                   className="relative"
                 >
-                  <Wordmark className="h-12 drop-shadow-sm" />
+                  <Wordmark className="h-20 drop-shadow-sm sm:h-24" />
                 </motion.div>
               )}
             </div>
