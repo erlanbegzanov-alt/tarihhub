@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://tarihhub.com/</loc>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://tarihhub.com/explore</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://tarihhub.com/course</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://tarihhub.com/timeline</loc>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://tarihhub.com/map</loc>
+    <priority>0.6</priority>
+  </url>
+</urlset>
