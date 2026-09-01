@@ -42,6 +42,13 @@ const ERROR_TEXT: Record<string, LocalizedText> = {
   'auth/invalid-login-credentials': s.auth.errWrongPassword,
   'auth/too-many-requests': s.auth.errTooManyRequests,
   'auth/operation-not-allowed': s.auth.errNotAllowed,
+  'auth/network-request-failed': s.auth.errNetwork,
+  // All "this deploy is misconfigured, not your input" — most often an
+  // unauthorised domain right after the app moves to a new hostname.
+  'auth/unauthorized-domain': s.auth.errConfig,
+  'auth/invalid-api-key': s.auth.errConfig,
+  'auth/api-key-not-valid': s.auth.errConfig,
+  'auth/invalid-api-key.-please-pass-a-valid-api-key.': s.auth.errConfig,
 }
 
 /** Closing the Google chooser is a decision, not a failure — nothing to report. */

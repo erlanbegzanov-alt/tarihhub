@@ -858,6 +858,19 @@ export const s = {
       kz: 'Email арқылы кіру әзірге қосылмаған.',
       ru: 'Вход по email пока не включён.',
     },
+    /* No network: don't let this fall through to the generic "try again",
+       which reads like the credentials were wrong. */
+    errNetwork: {
+      kz: 'Интернетпен байланыс жоқ сияқты. Желіні тексеріп, қайталап көріңіз.',
+      ru: 'Похоже, нет соединения. Проверьте интернет и попробуйте снова.',
+    },
+    /* Also not the visitor's mistake: the domain isn't authorised in the
+       Firebase console, or a key is wrong. Say it's on our side so they
+       don't waste time retrying their password. */
+    errConfig: {
+      kz: 'Кіру уақытша істемей тұр (баптау қатесі). Сәл кейінірек қайталаңыз.',
+      ru: 'Вход временно не работает (ошибка настройки). Повторите чуть позже.',
+    },
 
     loading: { kz: 'Жүктелуде…', ru: 'Загрузка…' },
     signedInAs: { kz: 'Кірген аккаунт', ru: 'Вы вошли как' },
