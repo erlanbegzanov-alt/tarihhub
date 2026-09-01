@@ -47,11 +47,15 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Default cap is 2 MiB; the course content (60+ bilingual lessons and
-        // their quiz pools) pushes the main bundle past that. Raised well
-        // above the current size so it doesn't need revisiting as more
-        // lessons land.
-        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
+        // The two heaviest chunks — the full text of every lesson and the
+        // whole quiz-question bank — are kept OUT of the install-time
+        // precache (they alone were ~1.1 MB gzipped of a ~1.9 MB precache).
+        // They still land in the cache the first time a lesson or quiz is
+        // opened, via the same-origin `app-shell-cache` script rule below,
+        // so offline-after-first-visit is unchanged; only the up-front
+        // install download shrinks.
+        globIgnores: ['**/lessons-*.js', '**/quiz-*.js'],
         runtimeCaching: [
           {
             // Portrait images (`public/portraits/*.webp`) keep a stable filename even

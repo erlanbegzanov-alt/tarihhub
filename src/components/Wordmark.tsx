@@ -21,13 +21,17 @@ export function Wordmark({
   return (
     <span className="inline-flex">
       <img
-        src="/brand/tarihhub-logo-light.png"
+        src="/brand/tarihhub-logo-light.webp"
         alt="TarihHub"
+        width={556}
+        height={320}
         className={cn(sizeClass, 'w-auto object-contain dark:hidden', className)}
       />
       <img
-        src="/brand/tarihhub-logo-dark.png"
+        src="/brand/tarihhub-logo-dark.webp"
         alt="TarihHub"
+        width={554}
+        height={320}
         className={cn(sizeClass, 'hidden w-auto object-contain dark:block', className)}
       />
     </span>
