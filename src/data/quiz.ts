@@ -1,4 +1,5 @@
 import { shuffled } from '../lib/shuffle'
+import { entQuestions } from './entQuestions'
 import { lessonQuestions } from './lessonQuestions'
 import type { QuizQuestion } from './types'
 
@@ -11103,7 +11104,7 @@ const persona: QuizQuestion[] = [
   },
 ]
 
-export const quizQuestions: QuizQuestion[] = [...general, ...persona]
+export const quizQuestions: QuizQuestion[] = [...general, ...persona, ...entQuestions]
 
 export const QUIZ_LENGTH = 5
 /**
@@ -11126,9 +11127,11 @@ function withShuffledOptions(question: QuizQuestion): QuizQuestion {
 /**
  * Builds a 5-question quiz, freshly randomised every call — both which
  * questions are picked (when a persona has more than `QUIZ_LENGTH` in their
- * pool) and the order they're served in. The general set is a fallback for a
- * persona with fewer than `QUIZ_LENGTH` dedicated questions, and the whole
- * quiz when no persona is given (the `/quiz` practice route).
+ * pool) and the order they're served in. The general set plus the ЕНТ practice
+ * bank (`entQuestions`) are the fallback for a persona with fewer than
+ * `QUIZ_LENGTH` dedicated questions, and the whole quiz when no persona is
+ * given (the `/quiz` practice route) — so practice draws from the full bank,
+ * not just the five hand-written `general` items.
  */
 export function buildQuiz(personId?: string): QuizQuestion[] {
   const specific = personId
@@ -11137,7 +11140,7 @@ export function buildQuiz(personId?: string): QuizQuestion[] {
   const picked =
     specific.length >= QUIZ_LENGTH
       ? shuffled(specific).slice(0, QUIZ_LENGTH)
-      : shuffled([...specific, ...general]).slice(0, QUIZ_LENGTH)
+      : shuffled([...specific, ...general, ...entQuestions]).slice(0, QUIZ_LENGTH)
   return picked.map(withShuffledOptions)
 }
 
