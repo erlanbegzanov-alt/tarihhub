@@ -13,9 +13,10 @@
  * spending it on the app's behalf — is closed two ways: requiring a real
  * signed-in Firebase session (the caller sends its ID token, confirmed
  * against Google's own `accounts:lookup` endpoint — no `firebase-admin`
- * needed for that one check) and a per-user daily cap enforced through
- * `firebase-admin` when `FIREBASE_SERVICE_ACCOUNT_KEY` is configured (see the
- * rate-limiting section below).
+ * needed for that one check) and a per-user + global daily cap, enforced
+ * transactionally through `firebase-admin` when `FIREBASE_SERVICE_ACCOUNT_KEY`
+ * is set and otherwise over Firestore REST against an increment-only counter
+ * (see the rate-limiting section below).
  *
  * The system prompt (persona instructions, anti-injection/anti-abuse rules)
  * used to be built client-side in `src/lib/ai.ts` and sent here as a plain
@@ -104,20 +105,21 @@ async function verifyFirebaseToken(idToken: string): Promise<{ uid: string } | n
 /* ------------------------------------------------------------------ *
  * Per-user daily rate limiting
  *
- * Needs a Firestore write that the caller cannot forge or reset — a doc
- * writable with the caller's own ID token would let them just zero their own
- * counter back out, which defeats the point. That means this can't reuse the
- * dependency-free REST trick `verifyFirebaseToken` uses above; it needs a
- * privileged write, which only `firebase-admin` with a service account can
- * do.
+ * Three tiers, tried in order:
+ *   1. `firebase-admin` + `FIREBASE_SERVICE_ACCOUNT_KEY` — a real transaction,
+ *      exact, no lost updates. The best option when the credential is set.
+ *   2. Firestore REST with the caller's own ID token (see
+ *      `restCheckAndIncrement` below). Needs no service account. The counter
+ *      it writes lives at `aiUsage/{bucket}/days/{day}` and `firestore.rules`
+ *      makes it increment-only and un-deletable, so the caller holding the
+ *      write credential still cannot reset or lower it.
+ *   3. `ALLOW_UNMETERED_AI=1` — the explicit escape hatch, only consulted when
+ *      neither metered path can run at all (no project id, no token).
  *
- * Fails *closed* when that credential is missing or malformed — a shared key
- * with no cap at all is worth guarding harder than the feature is worth
- * losing to a misconfigured deploy. `ALLOW_UNMETERED_AI=1` is the explicit,
- * deliberate escape hatch for anyone who'd rather have the feature up with no
- * cap than down. A transient failure of the check itself (Firestore hiccup,
- * not missing config) still fails *open* — that's an availability trade
- * worth making on its own.
+ * Without the escape hatch and with both metered paths unavailable the request
+ * fails *closed* (429): a shared key with no cap is worth guarding harder than
+ * the feature is worth. A transient failure of a check that *did* run still
+ * fails *open* — an availability trade worth making on its own.
  * ------------------------------------------------------------------ */
 
 const DAILY_AI_LIMIT = 50
@@ -148,15 +150,119 @@ function getAdminApp(): Promise<import('firebase-admin/app').App | null> {
   return adminAppPromise
 }
 
+/* ------------------------------------------------------------------ *
+ * Dependency-free fallback limiter
+ *
+ * When `FIREBASE_SERVICE_ACCOUNT_KEY` isn't configured there is still no
+ * excuse for an unmetered shared key. This tier meters against Firestore over
+ * plain REST with the *caller's own* ID token — the same approach
+ * `verifyFirebaseToken` uses to avoid needing `firebase-admin`.
+ *
+ * It is safe despite the client holding the write credential because
+ * `firestore.rules` makes `aiUsage/{bucket}/days/{day}` tamper-evident: the
+ * counter is created at 1, may only ever rise by exactly 1, and can never be
+ * deleted or reset. A user who spends their 50 for the day cannot zero it.
+ *
+ * Two accepted weaknesses versus the transactional admin path, both fine for
+ * an abuse cap: two of one user's requests racing can each read the same count
+ * and write +1 (one slot uncharged — the `updateTime` precondition plus retry
+ * below makes this rare), and the `_shared` counter can be inflated by a
+ * hostile client to trip the day's ceiling early. Neither yields a free key.
+ * ------------------------------------------------------------------ */
+
+const FIRESTORE_DOCS_BASE = (() => {
+  const projectId = process.env.VITE_FIREBASE_PROJECT_ID
+  return projectId
+    ? `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`
+    : null
+})()
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+/**
+ * Reads `aiUsage/<bucket>/days/<today>` and, if still under `limit`, writes it
+ * back one higher under an optimistic-concurrency precondition (retrying on a
+ * lost race). Returns whether the request is allowed, or `null` for "can't
+ * tell from here" — no project id, no token, or the REST call itself failed —
+ * which the caller resolves against `ALLOW_UNMETERED_AI`, then fails closed.
+ */
+async function restCheckAndIncrement(
+  bucket: string,
+  idToken: string,
+  limit: number,
+): Promise<boolean | null> {
+  if (!FIRESTORE_DOCS_BASE || !idToken) return null
+  const day = today()
+  const url = `${FIRESTORE_DOCS_BASE}/aiUsage/${encodeURIComponent(bucket)}/days/${day}`
+  const auth = { authorization: `Bearer ${idToken}` }
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let count = 0
+    let updateTime: string | null = null
+    try {
+      const read = await fetch(url, { headers: auth, signal: AbortSignal.timeout(5000) })
+      if (read.ok) {
+        const doc = (await read.json()) as {
+          updateTime?: string
+          fields?: { count?: { integerValue?: string } }
+        }
+        const parsed = Number.parseInt(doc.fields?.count?.integerValue ?? '0', 10)
+        count = Number.isFinite(parsed) ? parsed : 0
+        updateTime = doc.updateTime ?? null
+      } else if (read.status !== 404) {
+        return null
+      }
+    } catch {
+      return null
+    }
+
+    if (count >= limit) return false
+
+    const params = new URLSearchParams()
+    params.append('updateMask.fieldPaths', 'count')
+    params.append('updateMask.fieldPaths', 'day')
+    if (updateTime) params.set('currentDocument.updateTime', updateTime)
+    else params.set('currentDocument.exists', 'false')
+
+    try {
+      const write = await fetch(`${url}?${params.toString()}`, {
+        method: 'PATCH',
+        headers: { ...auth, 'content-type': 'application/json' },
+        signal: AbortSignal.timeout(5000),
+        body: JSON.stringify({
+          fields: {
+            count: { integerValue: String(count + 1) },
+            day: { stringValue: day },
+          },
+        }),
+      })
+      if (write.ok) return true
+      // 409/412 — someone wrote between our read and write; read again.
+      if (write.status === 409 || write.status === 412) continue
+      return null
+    } catch {
+      return null
+    }
+  }
+  // Lost the race three times running: allow this one rather than 500 the
+  // feature — the same transient-failure trade the admin path makes.
+  return true
+}
+
 /**
  * Increments today's request count for `uid`, capped at `DAILY_AI_LIMIT`.
- * Returns `false` once the cap is hit for the day — or, when firebase-admin
- * isn't configured, `false` unless `ALLOW_UNMETERED_AI=1` says to let the
- * request through uncapped (see the section header above).
+ * Prefers the transactional `firebase-admin` path; without that credential it
+ * falls back to the dependency-free REST limiter above, and only when *that*
+ * cannot run at all does it consult `ALLOW_UNMETERED_AI`.
  */
-async function checkDailyLimit(uid: string): Promise<boolean> {
+async function checkDailyLimit(uid: string, idToken: string): Promise<boolean> {
   const app = await getAdminApp()
-  if (!app) return process.env.ALLOW_UNMETERED_AI === '1'
+  if (!app) {
+    const viaRest = await restCheckAndIncrement(uid, idToken, DAILY_AI_LIMIT)
+    return viaRest ?? process.env.ALLOW_UNMETERED_AI === '1'
+  }
   try {
     const { getFirestore } = await import('firebase-admin/firestore')
     const db = getFirestore(app)
@@ -183,9 +289,12 @@ async function checkDailyLimit(uid: string): Promise<boolean> {
  * shape as `checkDailyLimit` for a missing credential, fail-open for a
  * transient Firestore error.
  */
-async function checkGlobalLimit(): Promise<boolean> {
+async function checkGlobalLimit(idToken: string): Promise<boolean> {
   const app = await getAdminApp()
-  if (!app) return process.env.ALLOW_UNMETERED_AI === '1'
+  if (!app) {
+    const viaRest = await restCheckAndIncrement('_shared', idToken, GLOBAL_DAILY_LIMIT)
+    return viaRest ?? process.env.ALLOW_UNMETERED_AI === '1'
+  }
   try {
     const { getFirestore } = await import('firebase-admin/firestore')
     const db = getFirestore(app)
@@ -350,10 +459,10 @@ export default {
       return new Response('Bad Request', { status: 400 })
     }
 
-    if (!(await checkDailyLimit(identity.uid))) {
+    if (!(await checkDailyLimit(identity.uid, idToken))) {
       return new Response('Daily AI usage limit reached', { status: 429 })
     }
-    if (!(await checkGlobalLimit())) {
+    if (!(await checkGlobalLimit(idToken))) {
       return new Response('Daily AI usage limit reached', { status: 429 })
     }
 
