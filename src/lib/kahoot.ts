@@ -45,6 +45,7 @@ import type { AvatarGender } from '../data/ranks'
 import { uploadImage } from './cloudinary'
 import { db } from './firebase'
 import { OWNER_TIER_INDEX } from './rankStyle'
+import { safePhotoURL } from './safeUrl'
 
 /* ------------------------------ the rules ------------------------------ */
 
@@ -606,8 +607,10 @@ export async function joinSession(
   try {
     await setDoc(doc(db, 'kahootSessions', code, 'players', uid), {
       uid,
-      displayName: meta.displayName,
-      photoURL: meta.photoURL,
+      // This row renders to the whole class; cap the name (rules match this at
+      // <= 40) and allow-list the photo the same way the battle mirror does.
+      displayName: meta.displayName.slice(0, 40),
+      photoURL: safePhotoURL(meta.photoURL),
       score: 0,
       lastAnswerIndex: null,
       lastAnswerAt: null,
