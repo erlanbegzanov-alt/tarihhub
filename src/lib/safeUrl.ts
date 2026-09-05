@@ -1,33 +1,29 @@
 /**
- * Allow-list for the one user-controllable URL the app ever stores where
- * *another* user's browser will render it: `photoURL` on the public battle
- * mirror (`battlePlayers/{uid}`) and on a Кахут player row.
+ * Allow-list for the one user-controllable URL the app stores where *another*
+ * user's browser renders it: `photoURL` on the public battle mirror
+ * (`battlePlayers/{uid}`) and on a Кахут player row.
  *
- * The CSP already blocks an off-list `img-src` from actually loading, so this
- * is defence in depth, not the only guard — but it keeps the stored value
- * honest (no attacker-planted tracker URL sitting in a row every leaderboard
- * viewer fetches) and it means the value the app persists always matches the
- * value the CSP would allow to paint.
+ * A player photo is only ever the signed-in user's Google account image, so
+ * the list is exactly that one host. (Кахут *question* photos are a different,
+ * host-authored field and go through Cloudinary — not this.) The CSP `img-src`
+ * already blocks an off-list URL from loading; this keeps the stored value
+ * honest so no attacker-planted tracker URL sits in a row every leaderboard
+ * viewer fetches.
  *
- * Two hosts, matching the CSP's `img-src`:
- *   - `lh3.googleusercontent.com` — Google account photos (the only source the
- *     app ever sets `photoURL` from today).
- *   - `res.cloudinary.com` — the Кахут question-photo upload path.
- * Anything else — a bare string, `javascript:`, `data:`, or a plain http://
- * URL — collapses to `''`, which every `PlayerAvatar` caller already renders
- * as the initial-on-a-disc fallback.
+ * Anything else — a bare string, `javascript:`, `data:`, a plain http:// URL,
+ * or an https URL carrying userinfo / an explicit port / a non-Google host —
+ * collapses to `''`, which every `PlayerAvatar` caller already renders as the
+ * initials-on-a-disc fallback. The check mirrors `firestore.rules`'
+ * `validSharedPhoto`, which is the actual enforcement.
  */
-const ALLOWED_PHOTO_HOSTS = new Set([
-  'lh3.googleusercontent.com',
-  'res.cloudinary.com',
-])
+const ALLOWED_PHOTO_HOST = 'lh3.googleusercontent.com'
 
 /** The stored-`photoURL` cap, matching `firestore.rules`' `photoURL.size() <= 300`. */
 const MAX_PHOTO_URL_LENGTH = 300
 
 /**
- * Returns `url` unchanged when it is an `https://` URL on an allowed image
- * host and within the length cap, or `''` for everything else.
+ * Returns `url` unchanged when it is a plain `https://lh3.googleusercontent.com`
+ * URL (no userinfo, no explicit port) within the length cap, or `''` otherwise.
  */
 export function safePhotoURL(url: unknown): string {
   if (typeof url !== 'string' || url === '' || url.length > MAX_PHOTO_URL_LENGTH) {
@@ -40,5 +36,6 @@ export function safePhotoURL(url: unknown): string {
     return ''
   }
   if (parsed.protocol !== 'https:') return ''
-  return ALLOWED_PHOTO_HOSTS.has(parsed.hostname) ? url : ''
+  if (parsed.username || parsed.password || parsed.port) return ''
+  return parsed.hostname === ALLOWED_PHOTO_HOST ? url : ''
 }

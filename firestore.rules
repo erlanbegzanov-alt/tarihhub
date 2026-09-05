@@ -43,17 +43,34 @@ service cloud.firestore {
         && d.recentCasualDuels is list && d.recentCasualDuels.size() <= 8
         && d.recentRankedDuels is list && d.recentRankedDuels.size() <= 10
         && d.lessonProgress is map && d.lessonProgress.size() <= 2000
-        && d.lessonQuizBest is map && d.lessonQuizBest.size() <= 2000;
+        && d.lessonQuizBest is map && d.lessonQuizBest.size() <= 2000
+        && (d.avatarGender == null || d.avatarGender in ['m', 'f'])
+        && (d.displayedRankTier == null
+            || (d.displayedRankTier is int && d.displayedRankTier >= 0 && d.displayedRankTier <= 20))
+        && (d.displayedAvatarTier == null
+            || (d.displayedAvatarTier is int && d.displayedAvatarTier >= 0 && d.displayedAvatarTier <= 20));
     }
 
+    // `prev` is the *stored* doc, only ever as complete as the client that last
+    // wrote it — and `casualDuels`/`rankedWins` etc. are younger than the
+    // cloud mirror itself, so a doc last written in Aug 2026 can be missing
+    // them. Reading an absent map key is an evaluation error (which denies), so
+    // every stored-side read goes through `.get(key, 0)`: a field the doc never
+    // had reads as 0, and any new value is trivially "not a rollback".
+    // Append-only collections get the same treatment by size.
     function progressCountersMonotonic(next, prev) {
-      return next.xp >= prev.xp && next.xp <= prev.xp + 100000
-        && next.quizzesCompleted >= prev.quizzesCompleted
-        && next.totalVisits >= prev.totalVisits
-        && next.casualDuels >= prev.casualDuels
-        && next.casualWins >= prev.casualWins
-        && next.rankedDuels >= prev.rankedDuels
-        && next.rankedWins >= prev.rankedWins;
+      return next.xp >= prev.get('xp', 0) && next.xp <= prev.get('xp', 0) + 100000
+        && next.quizzesCompleted >= prev.get('quizzesCompleted', 0)
+        && next.totalVisits >= prev.get('totalVisits', 0)
+        && next.casualDuels >= prev.get('casualDuels', 0)
+        && next.casualWins >= prev.get('casualWins', 0)
+        && next.rankedDuels >= prev.get('rankedDuels', 0)
+        && next.rankedWins >= prev.get('rankedWins', 0)
+        && next.completedLessons.size() >= prev.get('completedLessons', []).size()
+        && next.unlockedBadges.size() >= prev.get('unlockedBadges', []).size()
+        && next.peopleViewed.size() >= prev.get('peopleViewed', []).size()
+        && next.sectionChecksDone.size() >= prev.get('sectionChecksDone', []).size()
+        && (next.timelineViewed || !prev.get('timelineViewed', false));
     }
 
     // Scoped to `request.auth.uid == uid` — one user can never read or touch
@@ -88,18 +105,28 @@ service cloud.firestore {
     // server's own clock (not just be *a* number) for the write-rate check
     // below to mean anything — a client that could backdate it could otherwise
     // reopen the throttle on every write.
+    // Empty, or an https URL on the one host a shared identity photo ever comes
+    // from (a Google account image). Reused by the Кахут player row below.
+    function validSharedPhoto(url) {
+      return url is string && url.size() <= 300
+        && (url == '' || url.matches('https://lh3[.]googleusercontent[.]com(/.*)?'));
+    }
+
     function validBattlePlayer(d) {
-      return d.displayName is string && d.displayName.size() <= 40
-        // Every viewer of the weekly board fetches this as an <img src>. Empty,
-        // or an https URL on one of the two hosts the CSP's `img-src` allows —
-        // never an attacker-planted tracker/redirect URL. Mirrors
-        // `safePhotoURL` in `src/lib/safeUrl.ts`.
-        && d.photoURL is string && d.photoURL.size() <= 300
-        && (
-          d.photoURL == ''
-          || d.photoURL.matches('https://lh3[.]googleusercontent[.]com(/.*)?')
-          || d.photoURL.matches('https://res[.]cloudinary[.]com(/.*)?')
-        )
+      return d.keys().hasOnly([
+          'uid', 'displayName', 'photoURL', 'level', 'rating', 'weekXp',
+          'weekStart', 'updatedAt', 'scoredAt', 'avatarGender',
+          'avatarTierIndex', 'titleTierIndex',
+        ])
+        && d.displayName is string && d.displayName.size() <= 40
+        // Every viewer of the weekly board fetches this as an <img src>. A
+        // player photo is only ever the signed-in user's Google account image,
+        // so the allow-list is exactly that one host — not the whole of
+        // `res.cloudinary.com` (a shared multi-tenant CDN where any free
+        // account could plant a tracking URL that still parses). Mirrors
+        // `safePhotoURL` in `src/lib/safeUrl.ts`; Кахут question photos are a
+        // different, host-authored field.
+        && validSharedPhoto(d.photoURL)
         && d.level is number && d.level >= 1 && d.level <= 500
         && d.avatarTierIndex is number && d.avatarTierIndex >= 0 && d.avatarTierIndex <= 7
         && d.titleTierIndex is number && d.titleTierIndex >= 0 && d.titleTierIndex <= 7
@@ -129,8 +156,10 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == uid
         && validBattlePlayer(request.resource.data)
-        && request.resource.data.weekXp is number && request.resource.data.weekXp <= 600
-        && request.resource.data.rating is number && request.resource.data.rating <= 20;
+        && request.resource.data.weekXp is number
+        && request.resource.data.weekXp >= 0 && request.resource.data.weekXp <= 600
+        && request.resource.data.rating is number
+        && request.resource.data.rating >= 0 && request.resource.data.rating <= 20;
       allow update: if request.auth != null && request.auth.uid == uid
         && validBattlePlayer(request.resource.data)
         && request.resource.data.weekXp is number
@@ -257,19 +286,33 @@ service cloud.firestore {
       // their own — never another player's score. `score` is self-reported
       // (there is no server to settle it against), but it can only ever move
       // up, and only by at most one question's worth at a time — the same
-      // per-write delta shape `battlePlayers` uses. `avatarTierIndex`/
-      // `titleTierIndex` are bounded the same way as there too: unbounded, a
-      // single crafted row used to crash the lobby's leaderboard for the
-      // whole class, host included, the instant it rendered.
+      // per-write delta shape `battlePlayers` uses. The identity fields
+      // (`displayName`, `photoURL`) render to the whole class, so they are
+      // shape-checked the same way the battle mirror's are — a client-side
+      // sanitiser in `joinSession` is not a control against a hostile client.
+      // `avatarTierIndex`/`titleTierIndex`: unbounded, a single crafted row
+      // used to crash the lobby's leaderboard for the whole class the instant
+      // it rendered.
+      function validKahootPlayer(d) {
+        return d.keys().hasOnly([
+            'uid', 'displayName', 'photoURL', 'score', 'lastAnswerIndex',
+            'lastAnswerAt', 'joinedAt', 'avatarGender', 'avatarTierIndex',
+            'titleTierIndex',
+          ])
+          && d.displayName is string && d.displayName.size() <= 40
+          && validSharedPhoto(d.photoURL)
+          && d.avatarTierIndex is number
+          && d.avatarTierIndex >= 0 && d.avatarTierIndex <= 7
+          && d.titleTierIndex is number
+          && d.titleTierIndex >= 0 && d.titleTierIndex <= 7;
+      }
       match /players/{uid} {
         allow read: if request.auth != null;
         allow create: if request.auth != null && request.auth.uid == uid
-          && request.resource.data.score is number && request.resource.data.score == 0
-          && request.resource.data.avatarTierIndex is number
-          && request.resource.data.avatarTierIndex >= 0 && request.resource.data.avatarTierIndex <= 7
-          && request.resource.data.titleTierIndex is number
-          && request.resource.data.titleTierIndex >= 0 && request.resource.data.titleTierIndex <= 7;
+          && validKahootPlayer(request.resource.data)
+          && request.resource.data.score is number && request.resource.data.score == 0;
         allow update: if request.auth != null && request.auth.uid == uid
+          && validKahootPlayer(request.resource.data)
           && request.resource.data.score is number
           && request.resource.data.score >= resource.data.score
           && request.resource.data.score <= resource.data.score + 1200
@@ -324,8 +367,10 @@ service cloud.firestore {
         && request.resource.data.day == resource.data.day;
     }
 
-    // Explicit deny-all default: blocks any other path, including ones added
-    // by mistake later, from being reachable without an matching rule above.
+    // Firestore already denies anything no `allow` matches; this states that
+    // intent in the file. (It is not a backstop against a too-broad `allow`
+    // elsewhere — `allow` clauses union, so a later mistake still has to be
+    // caught in review, not here.)
     match /{document=**} {
       allow read, write: if false;
     }

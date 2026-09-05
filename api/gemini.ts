@@ -239,8 +239,17 @@ async function restCheckAndIncrement(
         }),
       })
       if (write.ok) return true
-      // 409/412 — someone wrote between our read and write; read again.
+      // A precondition that no longer holds means someone wrote between our
+      // read and this write — read again. Firestore's HTTP mapping isn't
+      // uniform: `exists=false` on a now-existing doc is 409, but an
+      // `updateTime` mismatch is 400 FAILED_PRECONDITION (not 412), and the
+      // `updateTime` branch is the one every request after the day's first
+      // takes — so 400 has to be inspected, not blindly retried or rejected.
       if (write.status === 409 || write.status === 412) continue
+      if (write.status === 400) {
+        const detail = await write.text().catch(() => '')
+        if (detail.includes('FAILED_PRECONDITION')) continue
+      }
       return null
     } catch {
       return null

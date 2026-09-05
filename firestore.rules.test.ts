@@ -20,6 +20,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 const hasEmulator = Boolean(process.env.FIRESTORE_EMULATOR_HOST)
 const d = hasEmulator ? describe : describe.skip
 
+// Outside the skipped block on purpose: if `test:rules` ever stops exporting
+// FIRESTORE_EMULATOR_HOST the whole `d(...)` suite would skip silently and go
+// green with zero assertions — this line is what fails instead.
+it('runs against a Firestore emulator (FIRESTORE_EMULATOR_HOST set)', () => {
+  expect(process.env.FIRESTORE_EMULATOR_HOST).toBeTruthy()
+})
+
 /** A complete, in-bounds profile document — the shape `validProfileShape` wants. */
 function validProfile(over: Record<string, unknown> = {}) {
   return {
@@ -101,6 +108,24 @@ d('firestore.rules', () => {
       )
     })
 
+    it('lets an account whose stored doc predates the battle counters keep syncing', async () => {
+      // A profile last written before casualDuels/rankedWins existed. The
+      // monotonic check must read those absent keys as 0, not error (which
+      // would deny — and `allow delete: if false` leaves no way to recover).
+      const legacy = validProfile()
+      delete (legacy as Record<string, unknown>).casualDuels
+      delete (legacy as Record<string, unknown>).casualWins
+      delete (legacy as Record<string, unknown>).rankedDuels
+      delete (legacy as Record<string, unknown>).rankedWins
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'users/alice/profile/state'), legacy)
+      })
+      const db = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(
+        setDoc(doc(db, 'users/alice/profile/state'), validProfile({ xp: 140 }), { merge: true }),
+      )
+    })
+
     it('rejects a decreasing lifetime counter on update', async () => {
       await env.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(doc(ctx.firestore(), 'users/alice/profile/state'), validProfile({ xp: 500 }))
@@ -140,16 +165,31 @@ d('firestore.rules', () => {
       )
     })
 
-    it('rejects a photoURL on an off-allowlist host', async () => {
+    it('accepts only a plain lh3.googleusercontent.com photoURL', async () => {
       const db = env.authenticatedContext('alice').firestore()
-      await assertFails(
-        setDoc(doc(db, 'battlePlayers/alice'), validBattlePlayer({ photoURL: 'https://evil.example/x.png' })),
-      )
+      for (const bad of [
+        'https://evil.example/x.png',
+        'https://res.cloudinary.com/x/image/upload/v1/q.jpg',
+        'https://evil.example/?x=https://lh3.googleusercontent.com/a/y',
+        'https://lh3.googleusercontent.com.evil.example/a/x',
+        'https://lh3.googleusercontent.com@evil.example/x',
+      ]) {
+        await assertFails(
+          setDoc(doc(db, 'battlePlayers/alice'), validBattlePlayer({ photoURL: bad })),
+        )
+      }
       await assertSucceeds(
         setDoc(
           doc(db, 'battlePlayers/alice'),
           validBattlePlayer({ photoURL: 'https://lh3.googleusercontent.com/a/x' }),
         ),
+      )
+    })
+
+    it('rejects an unknown extra field on the mirror', async () => {
+      const db = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        setDoc(doc(db, 'battlePlayers/alice'), validBattlePlayer({ isChampion: true })),
       )
     })
 
@@ -214,7 +254,4 @@ d('firestore.rules', () => {
     })
   })
 
-  it('sanity: the suite actually ran against an emulator', () => {
-    expect(hasEmulator).toBe(true)
-  })
 })

@@ -7,14 +7,17 @@ describe('safePhotoURL', () => {
     expect(safePhotoURL(url)).toBe(url)
   })
 
-  it('passes an https Cloudinary URL through unchanged', () => {
-    const url = 'https://res.cloudinary.com/demo/image/upload/v1/q.jpg'
-    expect(safePhotoURL(url)).toBe(url)
+  it('drops a URL on any other host, including Cloudinary and look-alikes', () => {
+    expect(safePhotoURL('https://evil.example/track.gif?uid=1')).toBe('')
+    expect(safePhotoURL('https://res.cloudinary.com/x/image/upload/v1/q.jpg')).toBe('')
+    expect(safePhotoURL('https://lh3.googleusercontent.com.evil.example/x')).toBe('')
   })
 
-  it('drops a URL on any other host', () => {
-    expect(safePhotoURL('https://evil.example/track.gif?uid=1')).toBe('')
-    expect(safePhotoURL('https://lh3.googleusercontent.com.evil.example/x')).toBe('')
+  it('drops an https URL that smuggles another authority', () => {
+    expect(safePhotoURL('https://lh3.googleusercontent.com@evil.example/x')).toBe('')
+    expect(safePhotoURL('https://user:pass@lh3.googleusercontent.com/a/x')).toBe('')
+    expect(safePhotoURL('https://lh3.googleusercontent.com:8443/a/x')).toBe('')
+    expect(safePhotoURL('https://evil.example/?x=https://lh3.googleusercontent.com/a/y')).toBe('')
   })
 
   it('drops non-https schemes', () => {

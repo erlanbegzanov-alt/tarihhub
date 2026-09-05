@@ -15,10 +15,10 @@ to write **valid, in-bounds, monotonic** data.
 | Area | Guarantee |
 | --- | --- |
 | `users/{uid}/profile/state` | Only the owner reads/writes; never deletable. Every field type- and range-checked (`xp` ≤ 10M, arrays capped). Lifetime counters (`xp`, `quizzesCompleted`, `totalVisits`, casual/ranked duels & wins) may only **stay equal or grow**, and `xp` by ≤ 100k per write. No unknown fields. |
-| `battlePlayers/{uid}` | Public read, owner-only write. `weekXp`/`rating` self-reported but bounded per write **and** throttled to one scoring write per 60 real seconds (`request.time`), so the weekly board can't be won faster than roughly one duel per minute of grinding. `photoURL` must be empty or an `https://` URL on `lh3.googleusercontent.com` / `res.cloudinary.com` (mirrors `src/lib/safeUrl.ts` and the CSP `img-src`). |
+| `battlePlayers/{uid}` | Public read, owner-only write, no unknown fields (`hasOnly`). `weekXp`/`rating` self-reported but bounded per write, `>= 0`, **and** throttled to one scoring write per 60 real seconds (`request.time`), so the weekly board can't be won faster than roughly one duel per minute of grinding. `photoURL` must be empty or an `https://lh3.googleusercontent.com` URL — no userinfo, no port (mirrors `src/lib/safeUrl.ts`; the CSP `img-src` is the outer layer). |
 | `battleMatches` / `battleQueue` / `battleClaims` | Each player writes only their own half; a match can't be self-paired or seeded with a winner; a queue slot / claim can only be cleared by its owner. |
 | `kahootGames` | Host-only read — the answer key never leaves Firestore for a student. |
-| `kahootSessions/{code}` (+ `/players`) | Any signed-in user reads (that's how a student plays); only the host writes the room. A student row's `score` only rises, ≤ one question's worth per write. Name capped, `photoURL` allow-listed (client side, in `joinSession`). |
+| `kahootSessions/{code}` (+ `/players`) | Any signed-in user reads (that's how a student plays); only the host writes the room. A student row's `score` only rises, ≤ one question's worth per write; name capped, `photoURL` allow-listed and no unknown fields — enforced in the rules (`validKahootPlayer`), not just in `joinSession`. |
 | `aiUsage/{bucket}/days/{day}` | Increment-only, un-deletable per-user and global counters. Lets `api/gemini.ts` meter the shared AI key **without** a service-account key: the caller writes with their own token but can only ever add 1, never reset. |
 | everything else | Explicit `allow read, write: if false`. |
 
@@ -42,10 +42,15 @@ to write **valid, in-bounds, monotonic** data.
   self-reported. The rules cap the *rate* (~600 weekXp / ~20 rating per minute)
   but a script left running still climbs without playing. Fixing it properly
   needs a backend the project deliberately doesn't have.
-- **Global AI circuit-breaker griefing.** Any signed-in user can push the
-  `_shared` daily counter up, so a determined client could trip the day's
-  global ceiling early. A mild-DoS trade for metering a shared key with no
-  service account. The per-user cap is unaffected.
+- **Global AI circuit-breaker griefing.** The `_shared` daily counter is
+  increment-only and un-resettable, but *monotonic-upward* abuse remains: one
+  throwaway account scripting ~2000 `+1` writes (≈30 min, bounded by
+  Firestore's per-document write rate) drives it to `GLOBAL_DAILY_LIMIT` and
+  **both AI features return 429 for every user until the next UTC midnight**,
+  repeatable daily. The per-user cap is unaffected. This is the price of
+  metering a shared key with no service account; setting
+  `FIREBASE_SERVICE_ACCOUNT_KEY` moves the counter onto a server-only path and
+  removes the exposure entirely.
 - **Profile inflation is contained, not impossible.** The rules stop absurd
   values and roll-backs, but a user can still, slowly and within bounds, award
   themselves progress. The document is readable only by its owner and feeds no
