@@ -10,7 +10,7 @@
     "lint": "oxlint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:rules": "firebase emulators:exec --only firestore --project tarihhub-test \"vitest run firestore.rules.test.ts\"",
+    "test:rules": "firebase emulators:exec --only firestore --project tarihhub-test \"vitest run --config vitest.rules.config.ts\"",
     "smoke": "node scripts/smoke.mjs",
     "preview": "vite preview"
   },
