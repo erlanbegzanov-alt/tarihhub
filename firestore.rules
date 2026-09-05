@@ -97,8 +97,8 @@ service cloud.firestore {
         && d.photoURL is string && d.photoURL.size() <= 300
         && (
           d.photoURL == ''
-          || d.photoURL.matches('^https://lh3[.]googleusercontent[.]com/.*')
-          || d.photoURL.matches('^https://res[.]cloudinary[.]com/.*')
+          || d.photoURL.matches('https://lh3[.]googleusercontent[.]com(/.*)?')
+          || d.photoURL.matches('https://res[.]cloudinary[.]com(/.*)?')
         )
         && d.level is number && d.level >= 1 && d.level <= 500
         && d.avatarTierIndex is number && d.avatarTierIndex >= 0 && d.avatarTierIndex <= 7
