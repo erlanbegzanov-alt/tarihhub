@@ -101,10 +101,14 @@ service cloud.firestore {
     // `ranks.length` (7, see src/lib/rankStyle.ts's `OWNER_TIER_INDEX`) — an
     // out-of-range value used to be able to reach this collection and crash
     // `RankBadge`/`rankTitleText` for every viewer of the leaderboard, since
-    // those only clamped the *lower* bound. `updatedAt` has to track the
+    // those only clamped the *lower* bound. `updatedAt` has to stay near the
     // server's own clock (not just be *a* number) for the write-rate check
-    // below to mean anything — a client that could backdate it could otherwise
-    // reopen the throttle on every write.
+    // below to mean anything — a client that could freely backdate it could
+    // otherwise reopen the throttle on every write. The tolerance is ±5
+    // minutes, not ±5 seconds: real devices routinely run tens of seconds off
+    // NTP, and a ±5s window was silently denying every `syncBattlePlayer`
+    // write (and so every duel) for those users. ±5min still pins the value
+    // close enough that the 60s scoring throttle keeps its intent.
     // Empty, or an https URL on the one host a shared identity photo ever comes
     // from (a Google account image). Reused by the Кахут player row below.
     function validSharedPhoto(url) {
@@ -131,8 +135,8 @@ service cloud.firestore {
         && d.avatarTierIndex is number && d.avatarTierIndex >= 0 && d.avatarTierIndex <= 7
         && d.titleTierIndex is number && d.titleTierIndex >= 0 && d.titleTierIndex <= 7
         && d.updatedAt is number
-        && d.updatedAt <= request.time.toMillis() + 5000
-        && d.updatedAt >= request.time.toMillis() - 5000;
+        && d.updatedAt <= request.time.toMillis() + 300000
+        && d.updatedAt >= request.time.toMillis() - 300000;
     }
 
     // Public mirror of just what an opponent row or a leaderboard row needs —

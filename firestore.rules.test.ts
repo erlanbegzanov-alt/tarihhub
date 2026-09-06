@@ -193,6 +193,25 @@ d('firestore.rules', () => {
       )
     })
 
+    it('tolerates a device clock a few minutes off but not wildly off', async () => {
+      const db = env.authenticatedContext('alice').firestore()
+      // A phone 90s off NTP used to have every duel write denied by a ±5s
+      // window; ±5min now lets it through.
+      await assertSucceeds(
+        setDoc(
+          doc(db, 'battlePlayers/alice'),
+          validBattlePlayer({ updatedAt: Date.now() - 90_000 }),
+        ),
+      )
+      // The window is still bounded — a 10-minute backdate is refused.
+      await assertFails(
+        setDoc(
+          doc(db, 'battlePlayers/bob'),
+          validBattlePlayer({ updatedAt: Date.now() - 600_000 }),
+        ),
+      )
+    })
+
     it('throttles scoring writes to one per 60 seconds and caps the delta', async () => {
       const now = Date.now()
       await env.withSecurityRulesDisabled(async (ctx) => {
