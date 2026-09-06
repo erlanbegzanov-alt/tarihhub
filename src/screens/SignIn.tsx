@@ -31,12 +31,18 @@ const TABS: { value: Tab; label: LocalizedText }[] = [
  * message, so that is what this switches on. `auth/invalid-credential` is the
  * newer SDK's replacement for `auth/wrong-password` — both still turn up
  * depending on the project's settings, so both land on the same line.
+ *
+ * `auth/user-not-found` is deliberately mapped to the *same* generic line as a
+ * wrong password: telling the visitor which of the two it was is an account-
+ * enumeration oracle (probe an address, learn from the wording whether it has
+ * an account). Firebase's own "Email enumeration protection" setting collapses
+ * these at the API too — this keeps the screen honest even if that is off.
  */
 const ERROR_TEXT: Record<string, LocalizedText> = {
   'auth/email-already-in-use': s.auth.errEmailInUse,
   'auth/weak-password': s.auth.errWeakPassword,
   'auth/invalid-email': s.auth.errInvalidEmail,
-  'auth/user-not-found': s.auth.errUserNotFound,
+  'auth/user-not-found': s.auth.errWrongPassword,
   'auth/wrong-password': s.auth.errWrongPassword,
   'auth/invalid-credential': s.auth.errWrongPassword,
   'auth/invalid-login-credentials': s.auth.errWrongPassword,

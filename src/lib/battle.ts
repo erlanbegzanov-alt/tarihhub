@@ -42,6 +42,7 @@ import type { AvatarGender } from '../data/ranks'
 import type { LocalizedText } from '../data/types'
 import { db } from './firebase'
 import { OWNER_TIER_INDEX } from './rankStyle'
+import { safePhotoURL } from './safeUrl'
 
 /* ----------------------------- the rules of a duel ----------------------------- */
 
@@ -404,18 +405,22 @@ export async function syncBattlePlayer(
   // this, a real (if unusually long) Google account name could get this
   // write rejected outright instead of just trimmed.
   const displayName = meta.displayName.slice(0, 40)
+  // Every viewer of the weekly board fetches this row's `photoURL` as an
+  // <img src>; only the two hosts the CSP's `img-src` allows survive, anything
+  // else becomes '' (see `safeUrl.ts`).
+  const photoURL = safePhotoURL(meta.photoURL)
   if (current) {
     try {
       await updateDoc(doc(db, 'battlePlayers', uid), {
         displayName,
-        photoURL: meta.photoURL,
+        photoURL,
         level: meta.level,
         updatedAt: Date.now(),
         avatarGender: meta.avatarGender,
         avatarTierIndex: meta.avatarTierIndex,
         titleTierIndex: meta.titleTierIndex,
       })
-      return { ...current, displayName, photoURL: meta.photoURL, level: meta.level }
+      return { ...current, displayName, photoURL, level: meta.level }
     } catch (error) {
       console.warn('[tarihhub] Could not publish the battle player.', error)
       return current
@@ -426,7 +431,7 @@ export async function syncBattlePlayer(
   const next: BattlePlayer = {
     uid,
     displayName,
-    photoURL: meta.photoURL,
+    photoURL,
     level: meta.level,
     rating: 0,
     weekXp: 0,
@@ -485,7 +490,8 @@ export async function applyRankedResult(
     uid,
     // Matches the `displayName.size() <= 40` cap in firestore.rules.
     displayName: meta.displayName.slice(0, 40),
-    photoURL: meta.photoURL,
+    // Allow-listed the same way as in `syncBattlePlayer` above.
+    photoURL: safePhotoURL(meta.photoURL),
     level: meta.level,
     rating: Math.max(0, (current?.rating ?? 0) + (won ? RATING_WIN : -RATING_LOSS)),
     weekXp: (current?.weekXp ?? 0) + Math.max(0, Math.round(xpEarned)),
