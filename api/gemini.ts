@@ -435,7 +435,11 @@ interface GeminiContent {
 }
 
 interface GeminiResponse {
-  candidates?: { content?: { parts?: { text?: string }[] } }[]
+  candidates?: {
+    content?: { parts?: { text?: string }[] }
+    finishReason?: string
+  }[]
+  promptFeedback?: { blockReason?: string }
 }
 
 export default {
@@ -521,23 +525,33 @@ export default {
             maxOutputTokens,
             temperature,
           },
-          // This is an educational app about Kazakh history, so ordinary
-          // lesson content (wars, conquest, khans dying in battle) sits
-          // naturally in "medium" harassment/dangerous-content territory —
-          // BLOCK_LOW_AND_ABOVE blocked a plain "tell me about your life"
-          // question here (measured directly), so MEDIUM is the strictest
-          // threshold that still lets real history through while still
-          // catching profanity, hate speech and explicit content.
+          // This is an educational app about Kazakh history: a persona chat
+          // with a khan is *about* wars, conquest, sieges, executions and
+          // rebellions, and a lesson-rephrase passage carries the same. Real
+          // questions ("were you the last khan — were you executed?", "tell me
+          // about your life") were measured landing in MEDIUM harassment /
+          // dangerous-content and coming back with an empty candidate, which
+          // the client can only render as "demo mode". HARASSMENT and
+          // DANGEROUS_CONTENT are therefore relaxed to BLOCK_ONLY_HIGH so the
+          // history itself gets through; HATE_SPEECH and SEXUALLY_EXPLICIT
+          // stay at BLOCK_MEDIUM_AND_ABOVE, and the fixed system prompt still
+          // forbids the persona from profanity, slurs or explicit content.
           safetySettings: [
-            'HARM_CATEGORY_HARASSMENT',
-            'HARM_CATEGORY_HATE_SPEECH',
-            'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-            'HARM_CATEGORY_DANGEROUS_CONTENT',
-          ].map((category) => ({ category, threshold: 'BLOCK_MEDIUM_AND_ABOVE' })),
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+          ],
         }),
       })
 
       if (!geminiResponse.ok) {
+        // Surface *why* upstream refused — status plus a short body slice —
+        // instead of a bare 502 that shows up in logs as an unexplained blip.
+        const detail = await geminiResponse.text().catch(() => '')
+        console.warn(
+          `[api/gemini] upstream ${geminiResponse.status} (${body.mode}): ${detail.slice(0, 300)}`,
+        )
         return new Response('Upstream error', { status: 502 })
       }
 
@@ -548,11 +562,25 @@ export default {
         .join('\n')
         .trim()
 
+      if (!text) {
+        // A 200 with no usable text is almost always a safety block or a
+        // truncated-at-zero candidate. Return it as the failure it is (the
+        // client falls back either way) and log the reason so a recurring
+        // block is visible rather than silent.
+        const reason =
+          data.candidates?.[0]?.finishReason ??
+          data.promptFeedback?.blockReason ??
+          'no candidates'
+        console.warn(`[api/gemini] empty completion (${body.mode}), reason: ${reason}`)
+        return new Response('Empty completion', { status: 502 })
+      }
+
       return new Response(JSON.stringify({ text }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       })
-    } catch {
+    } catch (error) {
+      console.warn(`[api/gemini] upstream call failed (${body.mode}):`, error)
       return new Response('Upstream error', { status: 502 })
     }
   },
