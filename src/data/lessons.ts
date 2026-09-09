@@ -1,5 +1,5 @@
 import { units } from './units'
-import type { Badge, Lesson } from './types'
+import type { Badge, Lang, Lesson, LocalizedText } from './types'
 
 /** Shorthand `meta` values reused across several lessons in the same unit. */
 const META = { kz: '3-бөлім · Дала ренессансы', ru: 'Раздел 3 · Ренессанс степи' }
@@ -2292,6 +2292,7 @@ export const allLessons: Lesson[] = [
     meta: { kz: '8-бөлім · Тәуелсіздік', ru: 'Раздел 8 · Независимость' },
     eraKey: 'independence',
     duration: { kz: '5 тарау · ~9 мин', ru: '5 частей · ~9 мин' },
+    relatedPersonId: 'nursultan-nazarbayev',
     sections: [
       {
         heading: {
@@ -7511,6 +7512,7 @@ export const allLessons: Lesson[] = [
     meta: META_UNIT_6,
     eraKey: 'alash',
     duration: { kz: '6 тарау · ~12 мин', ru: '6 частей · ~12 мин' },
+    relatedPersonId: 'alikhan-bokeikhan',
     sections: [
       {
         heading: {
@@ -8768,6 +8770,7 @@ export const allLessons: Lesson[] = [
     meta: META_UNIT_7,
     eraKey: 'soviet',
     duration: { kz: '6 тарау · ~11 мин', ru: '6 частей · ~11 мин' },
+    relatedPersonId: 'satbayev',
     sections: [
       {
         heading: {
@@ -11190,6 +11193,7 @@ export const allLessons: Lesson[] = [
     meta: { kz: '1-бөлім · Сақ дәуірі', ru: 'Раздел 1 · Сакская эпоха' },
     eraKey: 'saka',
     duration: { kz: '6 тарау · ~12 мин', ru: '6 частей · ~12 мин' },
+    relatedPersonId: 'tomiris',
     sections: [
       {
         heading: {
@@ -13038,6 +13042,7 @@ export const allLessons: Lesson[] = [
     meta: { kz: '3-бөлім · Дала ренессансы', ru: 'Раздел 3 · Ренессанс степи' },
     eraKey: 'golden',
     duration: { kz: '6 тарау · ~11 мин', ru: '6 частей · ~11 мин' },
+    relatedPersonId: 'yasawi',
     sections: [
       {
         heading: {
@@ -14830,6 +14835,7 @@ export const allLessons: Lesson[] = [
     meta: META_INDEPENDENCE,
     eraKey: 'independence',
     duration: { kz: '5 тарау · ~9 мин', ru: '5 частей · ~9 мин' },
+    relatedPersonId: 'nursultan-nazarbayev',
     sections: [
       {
         heading: {
@@ -15201,6 +15207,7 @@ export const allLessons: Lesson[] = [
     meta: META_INDEPENDENCE,
     eraKey: 'independence',
     duration: { kz: '6 тарау · ~11 мин', ru: '6 частей · ~11 мин' },
+    relatedPersonId: 'nursultan-nazarbayev',
     sections: [
       {
         heading: {
@@ -15644,6 +15651,7 @@ export const allLessons: Lesson[] = [
     meta: META_INDEPENDENCE,
     eraKey: 'independence',
     duration: { kz: '6 тарау · ~11 мин', ru: '6 частей · ~11 мин' },
+    relatedPersonId: 'nursultan-nazarbayev',
     sections: [
       {
         heading: {
@@ -16087,6 +16095,7 @@ export const allLessons: Lesson[] = [
     meta: META_INDEPENDENCE,
     eraKey: 'independence',
     duration: { kz: '5 тарау · ~9 мин', ru: '5 частей · ~9 мин' },
+    relatedPersonId: 'nursultan-nazarbayev',
     sections: [
       {
         heading: {
@@ -16902,6 +16911,7 @@ export const allLessons: Lesson[] = [
     meta: META_INDEPENDENCE,
     eraKey: 'independence',
     duration: { kz: '6 тарау · ~12 мин', ru: '6 частей · ~12 мин' },
+    relatedPersonId: 'nursultan-nazarbayev',
     sections: [
       {
         heading: {
@@ -18326,6 +18336,7 @@ export const allLessons: Lesson[] = [
     meta: META_UNIT_1,
     eraKey: 'saka',
     duration: { kz: '6 тарау · ~11 мин', ru: '6 частей · ~11 мин' },
+    relatedPersonId: 'tomiris',
     sections: [
       {
         heading: {
@@ -19875,6 +19886,7 @@ export const allLessons: Lesson[] = [
     meta: META_UNIT_2,
     eraKey: 'turkic',
     duration: { kz: '6 тарау · ~11 мин', ru: '6 частей · ~11 мин' },
+    relatedPersonId: 'bumin-kagan',
     sections: [
       {
         heading: {
@@ -20390,6 +20402,7 @@ export const allLessons: Lesson[] = [
     meta: META_UNIT_3,
     eraKey: 'goldenHorde',
     duration: { kz: '6 тарау · ~12 мин', ru: '6 частей · ~12 мин' },
+    relatedPersonId: 'zhoshy-khan',
     sections: [
       {
         heading: {
@@ -22617,6 +22630,7 @@ export const allLessons: Lesson[] = [
     meta: META_UNIT_4,
     eraKey: 'khanate',
     duration: { kz: '5 тарау · ~9 мин', ru: '5 частей · ~9 мин' },
+    relatedPersonId: 'tauke-khan',
     sections: [
       {
         heading: { kz: 'Үш жүздің құрамы', ru: 'Состав трёх жузов' },
@@ -27154,6 +27168,49 @@ export const allLessons: Lesson[] = [
 /** Lesson lookup for the detail screen. */
 export function getLesson(id?: string): Lesson | undefined {
   return allLessons.find((lesson) => lesson.id === id)
+}
+
+/**
+ * Words a minute — deliberately conservative. This is a seventeen-year-old
+ * reading unfamiliar names, dates and terms, not skimming a news article.
+ */
+const WORDS_PER_MINUTE = 180
+
+const countWords = (text: string): number => text.trim().split(/\s+/).filter(Boolean).length
+
+/** Russian needs three forms for a count; Kazakh needs none. */
+function ruPlural(count: number, one: string, few: string, many: string): string {
+  if (count % 100 >= 11 && count % 100 <= 14) return many
+  if (count % 10 === 1) return one
+  if (count % 10 >= 2 && count % 10 <= 4) return few
+  return many
+}
+
+function minutesOf(lesson: Lesson, lang: Lang): number {
+  const words = lesson.sections.reduce(
+    (total, section) => total + countWords(section.heading[lang]) + countWords(section.body[lang]),
+    0,
+  )
+  return Math.max(1, Math.round(words / WORDS_PER_MINUTE))
+}
+
+/**
+ * The "N parts · ~M min" line above a lesson, derived from the lesson's own
+ * text rather than read from the stored `Lesson.duration`.
+ *
+ * Those stored strings drifted badly as lessons were edited: 58 of the 62
+ * claimed roughly three times the real reading time, several promising twelve
+ * minutes for a four-minute read. It is the first promise the app makes to a
+ * reader and the easiest one for them to check against their own clock, so it
+ * is a bad one to get wrong — and there is no reason to store what the text
+ * already says.
+ */
+export function lessonDuration(lesson: Lesson): LocalizedText {
+  const parts = lesson.sections.length
+  return {
+    kz: `${parts} тарау · ~${minutesOf(lesson, 'kz')} мин`,
+    ru: `${parts} ${ruPlural(parts, 'глава', 'главы', 'глав')} · ~${minutesOf(lesson, 'ru')} мин`,
+  }
 }
 
 /** Position of a lesson's unit in the course, or last for an unknown unit id. */
