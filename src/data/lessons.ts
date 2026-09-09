@@ -6181,6 +6181,7 @@ export const allLessons: Lesson[] = [
     meta: META_UNIT_6,
     eraKey: 'alash',
     duration: { kz: '6 тарау · ~12 мин', ru: '6 частей · ~12 мин' },
+    relatedPersonId: 'amangeldy-imanov',
     sections: [
       {
         heading: {
@@ -7956,6 +7957,7 @@ export const allLessons: Lesson[] = [
     meta: META_UNIT_7,
     eraKey: 'soviet',
     duration: { kz: '6 тарау · ~12 мин', ru: '6 частей · ~12 мин' },
+    relatedPersonId: 'turar-ryskulov',
     sections: [
       {
         heading: {
@@ -14392,6 +14394,7 @@ export const allLessons: Lesson[] = [
     meta: META_SOVIET,
     eraKey: 'soviet',
     duration: { kz: '6 тарау · ~11 мин', ru: '6 частей · ~11 мин' },
+    relatedPersonId: 'kairat-ryskulbekov',
     sections: [
       {
         heading: {
@@ -23869,6 +23872,7 @@ export const allLessons: Lesson[] = [
     meta: META_UNIT_5,
     eraKey: 'modern',
     duration: { kz: '6 тарау · ~11 мин', ru: '6 частей · ~11 мин' },
+    relatedPersonId: 'abulkhair-khan',
     sections: [
       {
         heading: {
