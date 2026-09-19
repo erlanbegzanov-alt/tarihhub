@@ -45,7 +45,7 @@
 project → имя вроде `tarihhub-test`. План Spark, карта не нужна. Дальше внутри
 проекта:
 
-- **Firestore Database** → Create database → регион `eur3` (тот же, что у
+- **Firestore Database** → Create database → регион `nam5` (тот же, что у
   боевого, чтобы задержки были похожи);
 - **Authentication** → Sign-in method → включить **Google**;
 - **Project settings** → Your apps → Web app (`</>`) → зарегистрировать →
