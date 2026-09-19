@@ -11,7 +11,7 @@
  * different content around the same duel engine (see BattleDuel.tsx), so each
  * keeps its own screen rather than a mode toggle switching content in place.
  */
-import { ChevronRight, Swords, Trophy, Users, Zap } from 'lucide-react'
+import { ChevronRight, Swords, Trophy, UserPlus, Users, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
@@ -23,6 +23,7 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { fetchBattlePlayer, ratingTierFor } from '../lib/battle'
 import { cn } from '../lib/cn'
+import { FEATURE_TEAM_BATTLE } from '../lib/environment'
 import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { useProfile } from '../lib/progress'
 import { useSession } from '../lib/session'
@@ -244,6 +245,17 @@ export function Battle() {
           subtitle={t(s.battle.modeKahootSub)}
           onClick={() => navigate('/battle/kahoot')}
         />
+        {/* Unfinished — test site only until team battle ships. Violet
+            because green, the tier colour and blue are already taken above. */}
+        {FEATURE_TEAM_BATTLE && (
+          <ModeCard
+            icon={UserPlus}
+            accent="var(--color-era-turkic)"
+            title={t(s.friends.title)}
+            subtitle={t(s.friends.hubSub)}
+            onClick={() => navigate('/battle/friends')}
+          />
+        )}
       </motion.div>
     </motion.div>
   )

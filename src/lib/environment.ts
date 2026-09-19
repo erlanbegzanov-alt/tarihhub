@@ -13,11 +13,9 @@
  * the bundler drops the losing branch outright. Test-only code is therefore
  * not merely hidden in the production bundle, it is absent from it — the same
  * reasoning the hidden developer panel in `Profile.tsx` already relies on
- * with `import.meta.env.DEV`. That elimination only happens when
- * `VITE_APP_ENV` is actually set on the production deploy; if it is missing
- * the comparison still evaluates `false` at runtime, so the failure mode is
- * "dead code ships and nothing switches on", never "test tooling appears in
- * front of a student".
+ * with `import.meta.env.DEV`. `vite.config.ts` pins every flag here to its
+ * value or to '' when unset, so the folding happens on every build — an unset
+ * flag is a literal `''`, never a runtime lookup the bundler has to keep.
  */
 
 /** The two deploy contours. Any other value is treated as production. */

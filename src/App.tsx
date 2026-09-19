@@ -7,6 +7,7 @@ import { TestModeBadge } from './components/TestModeBadge'
 import { LanguageProvider } from './i18n/LanguageProvider'
 import { s } from './i18n/strings'
 import { useLang } from './i18n/useLang'
+import { FEATURE_TEAM_BATTLE } from './lib/environment'
 import { easeOut, pageVariants } from './lib/motion'
 import { completeOnboarding, sessionGate, useSession } from './lib/session'
 import { Home } from './screens/Home'
@@ -23,6 +24,11 @@ const BattleCasual = lazy(() => import('./screens/BattleCasual').then((m) => ({ 
 const BattleRanked = lazy(() => import('./screens/BattleRanked').then((m) => ({ default: m.BattleRanked })))
 const BattleDuelScreen = lazy(() => import('./screens/BattleDuelScreen').then((m) => ({ default: m.BattleDuelScreen })))
 const Explore = lazy(() => import('./screens/Explore').then((m) => ({ default: m.Explore })))
+// Behind the flag at the declaration, not just the route, so a production
+// build holds no reference to the screen at all.
+const Friends = FEATURE_TEAM_BATTLE
+  ? lazy(() => import('./screens/Friends').then((m) => ({ default: m.Friends })))
+  : null
 const Kahoot = lazy(() => import('./screens/Kahoot').then((m) => ({ default: m.Kahoot })))
 const KahootCreate = lazy(() => import('./screens/KahootCreate').then((m) => ({ default: m.KahootCreate })))
 const KahootHost = lazy(() => import('./screens/KahootHost').then((m) => ({ default: m.KahootHost })))
@@ -70,6 +76,11 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   // is being played (see `BattleDuelScreen.tsx`).
   { path: '/battle/casual/duel', element: <BattleDuelScreen mode="casual" /> },
   { path: '/battle/ranked/duel', element: <BattleDuelScreen mode="ranked" /> },
+  // Unfinished: only routed where the team-battle flag is on (the test site).
+  // On a production build `/battle/friends` falls through to Home; the chunk
+  // file is still written out but nothing references it, and vite.config.ts
+  // keeps it out of the service worker's precache.
+  ...(Friends ? [{ path: '/battle/friends', element: <Friends /> }] : []),
   { path: '/battle/kahoot', element: <Kahoot /> },
   { path: '/battle/kahoot/teacher', element: <KahootTeacher /> },
   { path: '/battle/kahoot/student', element: <KahootStudent /> },

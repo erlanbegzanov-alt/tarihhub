@@ -14,7 +14,19 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore'
+import type { Firestore } from 'firebase/firestore'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 const hasEmulator = Boolean(process.env.FIRESTORE_EMULATOR_HOST)
@@ -270,6 +282,177 @@ d('firestore.rules', () => {
       await assertSucceeds(setDoc(doc(db, path('_shared')), { count: 1, day: '2026-03-01' }))
       await assertSucceeds(updateDoc(doc(db, path('_shared')), { count: 2 }))
       await assertFails(updateDoc(doc(db, path('_shared')), { count: 999 }))
+    })
+  })
+
+  /* --------------------------- friends --------------------------- */
+
+  /** The batch `ensureMyFriendCode` writes: the code and its owner pointer together. */
+  function mintCode(db: Firestore, uid: string, code: string) {
+    const batch = writeBatch(db)
+    batch.set(doc(db, 'friendCodes', code), { uid, createdAt: Date.now() })
+    batch.set(doc(db, 'friendCodeOwners', uid), { code })
+    return batch.commit()
+  }
+
+  const BOB_CODE = 'BQK7M2XZ'
+  const ALICE_CODE = 'A3HJ9PWR'
+
+  /** Seeds bob's (and optionally alice's) code with the rules off. */
+  async function seedCodes(withAlice = false) {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore()
+      await setDoc(doc(db, 'friendCodes', BOB_CODE), { uid: 'bob', createdAt: 1 })
+      await setDoc(doc(db, 'friendCodeOwners/bob'), { code: BOB_CODE })
+      if (withAlice) {
+        await setDoc(doc(db, 'friendCodes', ALICE_CODE), { uid: 'alice', createdAt: 1 })
+        await setDoc(doc(db, 'friendCodeOwners/alice'), { code: ALICE_CODE })
+      }
+    })
+  }
+
+  function request(over: Record<string, unknown> = {}) {
+    return {
+      uids: ['alice', 'bob'],
+      requestedBy: 'alice',
+      status: 'pending',
+      createdAt: Date.now(),
+      viaCode: BOB_CODE,
+      ...over,
+    }
+  }
+
+  describe('friendCodes / friendCodeOwners', () => {
+    it('an account mints its own code and pointer in one batch', async () => {
+      const db = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(mintCode(db, 'alice', ALICE_CODE))
+    })
+
+    it('a code without its owner pointer (or the other way round) is refused', async () => {
+      const db = env.authenticatedContext('alice').firestore()
+      await assertFails(setDoc(doc(db, 'friendCodes', ALICE_CODE), { uid: 'alice', createdAt: 1 }))
+      await assertFails(setDoc(doc(db, 'friendCodeOwners/alice'), { code: ALICE_CODE }))
+    })
+
+    it('an account cannot mint a second code', async () => {
+      const db = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(mintCode(db, 'alice', ALICE_CODE))
+      await assertFails(mintCode(db, 'alice', 'Z9Z9Z9Z9'))
+    })
+
+    it('nobody can take over a code that already belongs to someone', async () => {
+      await seedCodes()
+      const db = env.authenticatedContext('mallory').firestore()
+      await assertFails(mintCode(db, 'mallory', BOB_CODE))
+    })
+
+    it('rejects codes with look-alike characters or the wrong length', async () => {
+      const db = env.authenticatedContext('alice').firestore()
+      for (const bad of ['ABCDEFG0', 'ABCDEFGI', 'ABCDEFG', 'abcdefgh']) {
+        await assertFails(mintCode(db, 'alice', bad))
+      }
+    })
+
+    it('a code can be looked up by value, but the codes cannot be listed', async () => {
+      await seedCodes()
+      const db = env.authenticatedContext('mallory').firestore()
+      await assertSucceeds(getDoc(doc(db, 'friendCodes', BOB_CODE)))
+      await assertFails(getDocs(collection(db, 'friendCodes')))
+      // Nor can someone else's pointer be read to learn their code.
+      await assertFails(getDoc(doc(db, 'friendCodeOwners/bob')))
+    })
+  })
+
+  describe('friendships/{pairId}', () => {
+    it('alice can send bob a request with bob’s real code', async () => {
+      await seedCodes()
+      const db = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(setDoc(doc(db, 'friendships/alice_bob'), request()))
+    })
+
+    it('a request without the other person’s code is refused', async () => {
+      await seedCodes(true)
+      const db = env.authenticatedContext('alice').firestore()
+      // Her own code, a made-up code, and no code at all.
+      await assertFails(setDoc(doc(db, 'friendships/alice_bob'), request({ viaCode: ALICE_CODE })))
+      await assertFails(setDoc(doc(db, 'friendships/alice_bob'), request({ viaCode: 'ZZZZZZZZ' })))
+      const noCode = request()
+      delete (noCode as Record<string, unknown>).viaCode
+      await assertFails(setDoc(doc(db, 'friendships/alice_bob'), noCode))
+    })
+
+    it('rejects a spoofed sender, a pre-accepted request and a badly formed pair', async () => {
+      await seedCodes()
+      const db = env.authenticatedContext('alice').firestore()
+      await assertFails(setDoc(doc(db, 'friendships/alice_bob'), request({ requestedBy: 'bob' })))
+      await assertFails(setDoc(doc(db, 'friendships/alice_bob'), request({ status: 'accepted' })))
+      await assertFails(
+        setDoc(doc(db, 'friendships/bob_alice'), request({ uids: ['bob', 'alice'] })),
+      )
+      await assertFails(setDoc(doc(db, 'friendships/alice_carol'), request()))
+    })
+
+    it('mallory cannot plant a friendship between two other people', async () => {
+      await seedCodes()
+      const db = env.authenticatedContext('mallory').firestore()
+      await assertFails(
+        setDoc(doc(db, 'friendships/alice_bob'), request({ requestedBy: 'mallory' })),
+      )
+    })
+
+    it('only the person asked can accept, and only as pending → accepted', async () => {
+      await seedCodes()
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'friendships/alice_bob'), request())
+      })
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        updateDoc(doc(alice, 'friendships/alice_bob'), { status: 'accepted', acceptedAt: Date.now() }),
+      )
+      const bob = env.authenticatedContext('bob').firestore()
+      // Accepting may not rewrite who is in the pair.
+      await assertFails(
+        updateDoc(doc(bob, 'friendships/alice_bob'), {
+          status: 'accepted',
+          acceptedAt: Date.now(),
+          requestedBy: 'bob',
+        }),
+      )
+      await assertSucceeds(
+        updateDoc(doc(bob, 'friendships/alice_bob'), { status: 'accepted', acceptedAt: Date.now() }),
+      )
+    })
+
+    it('only the two people in a pair can see it, as a document or in a query', async () => {
+      await seedCodes()
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'friendships/alice_bob'), request())
+      })
+      const bob = env.authenticatedContext('bob').firestore()
+      await assertSucceeds(getDoc(doc(bob, 'friendships/alice_bob')))
+      await assertSucceeds(
+        getDocs(query(collection(bob, 'friendships'), where('uids', 'array-contains', 'bob'))),
+      )
+      const mallory = env.authenticatedContext('mallory').firestore()
+      await assertFails(getDoc(doc(mallory, 'friendships/alice_bob')))
+      await assertFails(
+        getDocs(query(collection(mallory, 'friendships'), where('uids', 'array-contains', 'bob'))),
+      )
+      // A pair that doesn't exist is refused just the same — no existence leak.
+      await assertFails(getDoc(doc(mallory, 'friendships/bob_carol')))
+      // But the caller may check one of their own pairs before sending.
+      await assertSucceeds(getDoc(doc(mallory, 'friendships/bob_mallory')))
+    })
+
+    it('either side can remove the pair; nobody else can', async () => {
+      await seedCodes()
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'friendships/alice_bob'), request())
+      })
+      const mallory = env.authenticatedContext('mallory').firestore()
+      await assertFails(deleteDoc(doc(mallory, 'friendships/alice_bob')))
+      const bob = env.authenticatedContext('bob').firestore()
+      await assertSucceeds(deleteDoc(doc(bob, 'friendships/alice_bob')))
     })
   })
 
