@@ -1,7 +1,12 @@
 import { shuffled } from '../lib/shuffle'
 import { entQuestions } from './entQuestions'
 import { lessonQuestions } from './lessonQuestions'
-import type { QuizQuestion } from './types'
+import type {
+  LessonSection,
+  LocalizedText,
+  QuizQuestion,
+  SectionCheckQuestion,
+} from './types'
 
 const CATEGORY = {
   kz: 'Қазақстан тарихы',
@@ -11144,14 +11149,72 @@ export function buildQuiz(personId?: string): QuizQuestion[] {
   return picked.map(withShuffledOptions)
 }
 
+/** Subject label worn by a section check promoted into a lesson's final quiz. */
+const CHECK_CATEGORY: LocalizedText = {
+  kz: 'Сабақ материалы бойынша',
+  ru: 'По материалу урока',
+}
+
+/**
+ * Promotes one section's inline check to a full quiz question.
+ *
+ * The id is namespaced because a check's own id only has to be unique inside
+ * its section, while quiz ids have to be unique across the whole bank.
+ */
+function fromSectionCheck(
+  check: SectionCheckQuestion,
+  lessonId: string,
+  sectionIndex: number,
+): QuizQuestion {
+  return {
+    id: `check-${lessonId}-${sectionIndex}-${check.id}`,
+    lessonIds: [lessonId],
+    category: CHECK_CATEGORY,
+    question: check.question,
+    options: check.options,
+    correctId: check.correctId,
+    explanation: check.explanation,
+  }
+}
+
 /**
  * Builds the quiz that gates one lesson. Unlike `buildQuiz` this never tops up
  * from the general pool: passing has to mean the reader knows *this* lesson, so
- * a lesson with two tagged questions gets a two-question quiz, and a lesson
- * with none gets an empty array — which the UI must show as "not ready yet"
- * rather than as a quiz the reader can fail.
+ * a lesson with no questions at all still gets an empty array — which the UI
+ * must show as "not ready yet" rather than as a quiz the reader can fail.
+ *
+ * Two of the lesson's own pools feed it, in priority order. The dedicated
+ * questions in `lessonQuestions` were written to test the lesson as a whole and
+ * go in first; the inline section checks fill whatever is left.
+ *
+ * Those checks are why `sections` is worth passing. Without them only nine of
+ * the sixty-two lessons reached the thirty questions this quiz is sized for and
+ * the rest served seven or eight, which had two bad consequences. It made the
+ * thin lessons *harder*, because the pass mark is a ratio: ceil(0.8 × 7) = 6
+ * allows a single mistake where ceil(0.8 × 30) = 24 allows six. And it made
+ * every retry identical, because a pool of seven has nothing else to draw.
  */
-export function buildLessonQuiz(lessonId: string): QuizQuestion[] {
-  const tagged = lessonQuestions.filter((q) => q.lessonIds?.includes(lessonId))
-  return shuffled(tagged).slice(0, LESSON_QUIZ_LENGTH).map(withShuffledOptions)
+export function buildLessonQuiz(
+  lessonId: string,
+  sections: LessonSection[] = [],
+): QuizQuestion[] {
+  const tagged = shuffled(
+    lessonQuestions.filter((question) => question.lessonIds?.includes(lessonId)),
+  )
+  const inline = shuffled(
+    sections.flatMap((section, index) =>
+      (section.check ?? []).map((check) => fromSectionCheck(check, lessonId, index)),
+    ),
+  )
+  // Reserve most of the quiz for dedicated questions, then fill the rest from
+  // everything that is left. Taking *all* the dedicated ones first would leave
+  // the nine lessons that already have thirty of them drawing the identical
+  // test on every retry — the best-written lessons ending up the only
+  // memorisable ones.
+  const core = tagged.slice(0, Math.ceil(LESSON_QUIZ_LENGTH * 0.6))
+  const rest = shuffled([...tagged.slice(core.length), ...inline])
+  const picked = [...core, ...rest].slice(0, LESSON_QUIZ_LENGTH)
+  // Re-shuffle the winners so the dedicated questions aren't always the opening
+  // run and the checks always the tail.
+  return shuffled(picked).map(withShuffledOptions)
 }

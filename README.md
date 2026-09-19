@@ -66,6 +66,12 @@ and configuration. Firebase console → Authentication → Sign-in method → Go
 өшірулі, прогресс тек `localStorage`-та. Кірген соң прогресс
 `users/{uid}/profile/state` Firestore құжатымен синхрондалады.
 
+## Тест / Тестовый контур
+
+Ветка `test` собирается в отдельный сайт со **своей базой Firestore**, чтобы
+незаконченные фичи и тестовые батлы не задевали живых пользователей. Настройка
+и порядок выката в прод — `TEST-CONTOUR.md`.
+
 ## Құрылымы / Структура
 
 ```

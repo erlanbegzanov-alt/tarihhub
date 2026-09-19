@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
+import { TestModeBadge } from './components/TestModeBadge'
 import { LanguageProvider } from './i18n/LanguageProvider'
 import { s } from './i18n/strings'
 import { useLang } from './i18n/useLang'
@@ -185,6 +186,10 @@ export default function App() {
   return (
     <LanguageProvider>
       <Gate />
+      {/* Outside the gate so it also shows on onboarding and sign-in — the
+          sign-in screen is exactly where it matters which database you are
+          about to enter. */}
+      <TestModeBadge />
     </LanguageProvider>
   )
 }

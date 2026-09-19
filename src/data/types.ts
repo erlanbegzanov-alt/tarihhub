@@ -167,7 +167,13 @@ export interface Lesson {
   /** Where the lesson sits in the course, e.g. "4-бөлім · Қазақ хандығы". */
   meta: LocalizedText
   eraKey: EraKey
-  /** e.g. "5 тарау · ~9 мин" — honest reading estimate for `sections`. */
+  /**
+   * @deprecated Stale, and no longer read by the app. These strings drifted to
+   * roughly three times the real reading time as lessons were edited. The line
+   * shown to the reader now comes from `lessonDuration()` in `lessons.ts`,
+   * which derives it from the lesson's own text. Kept only so the existing
+   * lesson data still typechecks.
+   */
   duration: LocalizedText
   /**
    * The lesson itself. Written from `history-reference/*.md`, keeping that

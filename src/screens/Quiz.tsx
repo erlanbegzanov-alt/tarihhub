@@ -33,7 +33,7 @@ export function Quiz() {
   // purpose: a retry re-draws and re-shuffles, so passing a lesson can't come
   // down to memorising which option sat in which slot last time.
   const questions = useMemo(
-    () => (lessonId ? buildLessonQuiz(lessonId) : buildQuiz(personId)),
+    () => (lessonId ? buildLessonQuiz(lessonId, lesson?.sections) : buildQuiz(personId)),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `round` is the retry counter: bumping it is exactly what should re-draw the questions.
     [lessonId, personId, round],
   )

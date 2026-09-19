@@ -17,7 +17,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { SectionCheck } from '../components/SectionCheck'
 import { EraBadge, IconButton, ProgressBar } from '../components/ui'
 import { eraColor, eras } from '../data/eras'
-import { getLesson, lessonsInCourseOrder } from '../data/lessons'
+import { getLesson, lessonDuration, lessonsInCourseOrder } from '../data/lessons'
 import { getPerson } from '../data/people'
 import { buildLessonQuiz } from '../data/quiz'
 import { getUnit } from '../data/units'
@@ -27,6 +27,33 @@ import { explainSection } from '../lib/ai'
 import { cn } from '../lib/cn'
 import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { recordLessonStarted, useProfile } from '../lib/progress'
+
+/**
+ * Where the reader left off inside each lesson.
+ *
+ * Deliberately not part of `progress.ts`: this is a convenience, not an
+ * achievement. It has no business syncing to another device, passing Firestore
+ * validation, or surviving a sign-out.
+ */
+const SECTION_KEY = 'tarihhub.lesson.section'
+
+function readSection(lessonId: string | undefined): number {
+  if (!lessonId) return 0
+  try {
+    const stored = Number(localStorage.getItem(`${SECTION_KEY}.${lessonId}`))
+    return Number.isInteger(stored) && stored > 0 ? stored : 0
+  } catch {
+    return 0
+  }
+}
+
+function writeSection(lessonId: string, index: number): void {
+  try {
+    localStorage.setItem(`${SECTION_KEY}.${lessonId}`, String(index))
+  } catch {
+    // Storage blocked or full. Losing the reader's place is not worth an error.
+  }
+}
 
 export function LessonDetail() {
   const { id } = useParams()
@@ -38,7 +65,7 @@ export function LessonDetail() {
   // Which part is on screen right now — parts live on separate "pages" inside
   // the lesson (like Khan Academy's per-lesson sidebar), not stacked in one
   // long scroll.
-  const [activeIndex, setActiveIndex] = useState(0)
+  const [activeIndex, setActiveIndex] = useState(() => readSection(id))
 
   // The "explain simpler" AI hint — see src/lib/ai.ts's explainSection. Kept
   // per-section: switching parts clears whatever was shown for the last one.
@@ -53,8 +80,16 @@ export function LessonDetail() {
     if (lesson) recordLessonStarted(lesson.id)
   }, [lesson])
 
-  // A fresh lesson always opens on its first part.
-  useEffect(() => setActiveIndex(0), [id])
+  // Re-open where the reader left off in *this* lesson, clamped in case the
+  // lesson has lost parts since they were last here.
+  useEffect(() => {
+    const last = Math.max(0, (lesson?.sections.length ?? 1) - 1)
+    setActiveIndex(Math.min(readSection(id), last))
+  }, [id, lesson])
+
+  useEffect(() => {
+    if (id) writeSection(id, activeIndex)
+  }, [id, activeIndex])
 
   /**
    * Bumped every time the section (or the lesson itself) changes below —
@@ -77,7 +112,7 @@ export function LessonDetail() {
 
   // Only the count matters here: whether this lesson can be gated at all.
   const questionCount = useMemo(
-    () => (lesson ? buildLessonQuiz(lesson.id).length : 0),
+    () => (lesson ? buildLessonQuiz(lesson.id, lesson.sections).length : 0),
     [lesson],
   )
 
@@ -159,7 +194,7 @@ export function LessonDetail() {
             {t(lesson.title)}
           </h1>
           <p className="mt-1.5 text-[13.5px] text-ink-faint">
-            {t(lesson.meta)} · {t(lesson.duration)}
+            {t(lesson.meta)} · {t(lessonDuration(lesson))}
           </p>
 
           <div className="mt-4">
