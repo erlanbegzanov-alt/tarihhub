@@ -15,7 +15,6 @@ import { s } from '../i18n/strings'
 import { activeNavPath, navItems } from './navItems'
 import { InstallPrompt } from './InstallPrompt'
 import { RankBadge } from './RankBadge'
-import { TestModeBadge } from './TestModeBadge'
 import { Wordmark } from './Wordmark'
 
 /**
@@ -369,7 +368,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       <MobileTopBar onOpenMenu={() => setMenuOpen(true)} />
       <MobileDrawer open={menuOpen} onClose={() => setMenuOpen(false)} active={active} />
       <InstallPrompt />
-      <TestModeBadge />
       <main className="md:pl-[240px] lg:pl-[264px]">
         <div className="mx-auto w-full max-w-[1180px] px-4 pt-5 pb-8 sm:px-6 md:px-8 md:pt-8 md:pb-12">
           {children}
