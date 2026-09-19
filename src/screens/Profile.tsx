@@ -25,6 +25,7 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { fetchWeeklyTopUids } from '../lib/battle'
 import { cn } from '../lib/cn'
+import { DEV_TOOLS_ENABLED } from '../lib/environment'
 import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import {
   DEFAULT_STATE,
@@ -52,14 +53,18 @@ const THEME_OPTIONS: { value: ThemePreference; label: typeof s.profile.themeLigh
  * Hidden developer panel (see "🛠 Dev режим" below): arbitrary XP, rank-tier
  * jumps, and a raw profile JSON editor, all wired straight to `replaceProfile`
  * and synced to Firestore. Real power, so it's built out of the production
- * bundle entirely (`import.meta.env.DEV` is inlined `false` by Vite at build
+ * bundle entirely (`DEV_TOOLS_ENABLED` folds to a literal `false` at build
  * time and the whole branch is dead-code-eliminated) rather than merely
  * hidden behind a query param a curious visitor could just type.
+ *
+ * It does stay in on `npm run dev` and on the test deploy: the test site is a
+ * production build, and without the panel there is no way to reach a
+ * rank-gated screen there short of grinding the XP by hand.
  */
 const DEV_MODE_KEY = 'tarihhub_dev'
 
 function readDevModeFlag(): boolean {
-  if (!import.meta.env.DEV || typeof window === 'undefined') return false
+  if (!DEV_TOOLS_ENABLED || typeof window === 'undefined') return false
   try {
     return window.localStorage.getItem(DEV_MODE_KEY) === '1'
   } catch {
@@ -115,7 +120,7 @@ export function Profile() {
   // `?dev=1` flips the flag on (persisted in localStorage) and is then
   // stripped from the address bar so it doesn't linger in history/URL bar.
   useEffect(() => {
-    if (!import.meta.env.DEV) return
+    if (!DEV_TOOLS_ENABLED) return
     const params = new URLSearchParams(window.location.search)
     if (params.get('dev') !== '1') return
     try {
@@ -400,7 +405,10 @@ export function Profile() {
           </motion.section>
 
           {/* ---------- dev mode ---------- */}
-          {devMode && (
+          {/* `DEV_TOOLS_ENABLED` is a build-time constant, so on a production
+              build this whole subtree is deleted rather than merely left
+              unreachable behind the `devMode` state. */}
+          {DEV_TOOLS_ENABLED && devMode && (
             <motion.section
               variants={staggerItem}
               className="rounded-card border-2 border-dashed border-line bg-surface p-5 shadow-soft sm:p-6"
