@@ -420,6 +420,102 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid in resource.data.uids;
     }
 
+    /* --------------------------- team battle ---------------------------- */
+    /*
+     * Gathering a team of 2–5 before a team battle (see src/lib/party.ts).
+     * The 1v1 duel above is untouched — this is only for the bigger formats.
+     *
+     * A party's document id IS its join code, the same trick `kahootSessions`
+     * uses: knowing the code is what lets someone in, so the code is what the
+     * leader shares with friends. Every member writes the same document, so
+     * the rules below have to say precisely which part of it each person owns:
+     * the leader runs the party, and a member may only ever add or remove
+     * *themselves*.
+     */
+    function validPartyCode(code) {
+      return code.matches('[A-HJ-NP-Z2-9]{6}');
+    }
+
+    function validPartyShape(d) {
+      return d.keys().hasOnly(['leader', 'members', 'mode', 'size', 'status', 'createdAt'])
+        && d.leader is string
+        && d.members is list && d.members.size() >= 1 && d.members.size() <= 5
+        && d.leader in d.members
+        && d.mode in ['casual', 'ranked']
+        && d.size is int && d.size >= 2 && d.size <= 5
+        && d.status in ['idle', 'queued']
+        && d.createdAt is number;
+    }
+
+    /** Everything except `members` and `status` is the leader's to set, so a
+     *  join or a leave must leave all of it exactly as it was. */
+    function partyFramePreserved(next, prev) {
+      return next.leader == prev.leader
+        && next.mode == prev.mode
+        && next.size == prev.size
+        && next.createdAt == prev.createdAt;
+    }
+
+    match /parties/{code} {
+      // Readable by any signed-in user: an invited friend has to be able to
+      // look the code up before they are a member. The document holds uids and
+      // a size, nothing personal — names come from `battlePlayers`.
+      allow get: if request.auth != null;
+      allow create: if request.auth != null
+        && validPartyCode(code)
+        && validPartyShape(request.resource.data)
+        && request.resource.data.leader == request.auth.uid
+        && request.resource.data.members == [request.auth.uid]
+        && request.resource.data.status == 'idle';
+      allow update: if request.auth != null
+        && validPartyShape(request.resource.data)
+        && (
+          // The leader runs the party: mode, size, status, and removing
+          // someone. Never adding — nobody can be dragged into a party.
+          (request.auth.uid == resource.data.leader
+            && request.resource.data.leader == resource.data.leader
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.members.hasOnly(resource.data.members)
+            && request.auth.uid in request.resource.data.members)
+          // Joining: append yourself, change nothing else. Only into a party
+          // that is still gathering, so nobody can slip into a live search.
+          || (!(request.auth.uid in resource.data.members)
+            && resource.data.status == 'idle'
+            && request.resource.data.status == 'idle'
+            && request.resource.data.members == resource.data.members.concat([request.auth.uid])
+            && partyFramePreserved(request.resource.data, resource.data))
+          // Leaving: remove yourself, change nothing else.
+          || (request.auth.uid in resource.data.members
+            && request.auth.uid != resource.data.leader
+            && request.resource.data.members == resource.data.members.removeAll([request.auth.uid])
+            && partyFramePreserved(request.resource.data, resource.data))
+        );
+      // Only the leader disbands it; a leaving member removes themselves above.
+      allow delete: if request.auth != null && request.auth.uid == resource.data.leader;
+    }
+
+    // One queue slot per party, doc id = the party's code. Listable by any
+    // signed-in user: that is how the format picker shows how many people are
+    // waiting in each size, and how matchmaking finds an opponent party.
+    // Written only by that party's leader, and only to match the party as it
+    // actually stands — so a slot cannot claim a size the party doesn't have.
+    match /partyQueue/{code} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.resource.data.keys().hasOnly(['leader', 'size', 'mode', 'members', 'createdAt'])
+        && request.resource.data.leader == request.auth.uid
+        && request.resource.data.size is int
+        && request.resource.data.size >= 2 && request.resource.data.size <= 5
+        && request.resource.data.mode in ['casual', 'ranked']
+        && request.resource.data.members is list
+        && request.resource.data.members.size() == request.resource.data.size
+        && request.resource.data.createdAt is number
+        && get(/databases/$(database)/documents/parties/$(code)).data.leader == request.auth.uid
+        && get(/databases/$(database)/documents/parties/$(code)).data.members == request.resource.data.members
+        && get(/databases/$(database)/documents/parties/$(code)).data.size == request.resource.data.size;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.leader;
+    }
+
     /* ------------------------------ ai usage ----------------------------- */
     /*
      * The daily cap on the shared Gemini key (see `api/gemini.ts`). The proxy

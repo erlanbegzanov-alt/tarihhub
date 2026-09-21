@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
   // service worker precaches every file it finds, so without this each
   // production install would download the unfinished screens anyway.
   const teamBattleOn = env.VITE_APP_ENV === 'test' || env.VITE_FEATURE_TEAM_BATTLE === '1'
-  const unfinishedChunks = teamBattleOn ? [] : ['**/Friends-*.js']
+  const unfinishedChunks = teamBattleOn ? [] : ['**/Friends-*.js', '**/TeamBattle-*.js']
   return {
     define: {
       'import.meta.env.VITE_APP_ENV': JSON.stringify(env.VITE_APP_ENV ?? ''),

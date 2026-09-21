@@ -456,4 +456,156 @@ d('firestore.rules', () => {
     })
   })
 
+  /* ------------------------- team battle ------------------------- */
+
+  const PARTY = 'K7PMX2'
+
+  function party(over: Record<string, unknown> = {}) {
+    return {
+      leader: 'alice',
+      members: ['alice'],
+      mode: 'casual',
+      size: 2,
+      status: 'idle',
+      createdAt: Date.now(),
+      ...over,
+    }
+  }
+
+  /** Seeds a party with the rules off, so each test starts from a known state. */
+  async function seedParty(over: Record<string, unknown> = {}) {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'parties', PARTY), party(over))
+    })
+  }
+
+  describe('parties/{code}', () => {
+    it('a leader opens a party containing only themselves', async () => {
+      const db = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(setDoc(doc(db, 'parties', PARTY), party()))
+    })
+
+    it('rejects a party that starts with someone else in it, or a bad code/size', async () => {
+      const db = env.authenticatedContext('alice').firestore()
+      await assertFails(setDoc(doc(db, 'parties', PARTY), party({ members: ['alice', 'bob'] })))
+      await assertFails(setDoc(doc(db, 'parties', PARTY), party({ leader: 'bob' })))
+      await assertFails(setDoc(doc(db, 'parties', PARTY), party({ size: 9 })))
+      await assertFails(setDoc(doc(db, 'parties', 'k7pmx2'), party()))
+      await assertFails(setDoc(doc(db, 'parties', PARTY), party({ status: 'queued' })))
+    })
+
+    it('a friend with the code joins by appending only themselves', async () => {
+      await seedParty()
+      const bob = env.authenticatedContext('bob').firestore()
+      await assertSucceeds(
+        updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'bob'] }),
+      )
+    })
+
+    it('nobody can drag a third person in, or rewrite the party while joining', async () => {
+      await seedParty()
+      const bob = env.authenticatedContext('bob').firestore()
+      await assertFails(
+        updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'bob', 'carol'] }),
+      )
+      await assertFails(updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'carol'] }))
+      await assertFails(
+        updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'bob'], leader: 'bob' }),
+      )
+      await assertFails(
+        updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'bob'], size: 5 }),
+      )
+    })
+
+    it('a party already searching cannot be joined', async () => {
+      await seedParty({ members: ['alice', 'bob'], size: 3, status: 'queued' })
+      const carol = env.authenticatedContext('carol').firestore()
+      await assertFails(
+        updateDoc(doc(carol, 'parties', PARTY), { members: ['alice', 'bob', 'carol'] }),
+      )
+    })
+
+    it('a member removes only themselves; the leader may remove anyone', async () => {
+      await seedParty({ members: ['alice', 'bob', 'carol'], size: 3 })
+      const bob = env.authenticatedContext('bob').firestore()
+      // Bob cannot drop Carol …
+      await assertFails(updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'bob'] }))
+      // … but can leave himself.
+      await assertSucceeds(updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'carol'] }))
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(updateDoc(doc(alice, 'parties', PARTY), { members: ['alice'] }))
+      // Not even the leader can write themselves out of their own party.
+      await assertFails(updateDoc(doc(alice, 'parties', PARTY), { members: ['carol'] }))
+    })
+
+    it('a party never grows past five', async () => {
+      await seedParty({ members: ['alice', 'b', 'c', 'd', 'e'], size: 5 })
+      const f = env.authenticatedContext('f').firestore()
+      await assertFails(
+        updateDoc(doc(f, 'parties', PARTY), { members: ['alice', 'b', 'c', 'd', 'e', 'f'] }),
+      )
+    })
+
+    it('only the leader disbands it', async () => {
+      await seedParty({ members: ['alice', 'bob'] })
+      const bob = env.authenticatedContext('bob').firestore()
+      await assertFails(deleteDoc(doc(bob, 'parties', PARTY)))
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(deleteDoc(doc(alice, 'parties', PARTY)))
+    })
+  })
+
+  describe('partyQueue/{code}', () => {
+    const slot = (over: Record<string, unknown> = {}) => ({
+      leader: 'alice',
+      size: 2,
+      mode: 'casual',
+      members: ['alice', 'bob'],
+      createdAt: Date.now(),
+      ...over,
+    })
+
+    it('the leader queues a party that really has that many members', async () => {
+      await seedParty({ members: ['alice', 'bob'], status: 'queued' })
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(setDoc(doc(alice, 'partyQueue', PARTY), slot()))
+    })
+
+    it('a slot cannot claim a size or a roster the party does not have', async () => {
+      await seedParty({ members: ['alice', 'bob'], status: 'queued' })
+      const alice = env.authenticatedContext('alice').firestore()
+      // Claiming 5v5 with two people, so the match would start uneven.
+      await assertFails(
+        setDoc(doc(alice, 'partyQueue', PARTY), slot({ size: 5, members: ['alice', 'bob', 'c', 'd', 'e'] })),
+      )
+      // Size and roster disagreeing with each other.
+      await assertFails(setDoc(doc(alice, 'partyQueue', PARTY), slot({ size: 3 })))
+      // A roster the party itself doesn't have.
+      await assertFails(
+        setDoc(doc(alice, 'partyQueue', PARTY), slot({ members: ['alice', 'carol'] })),
+      )
+    })
+
+    it('only that party’s leader may queue it or clear the slot', async () => {
+      await seedParty({ members: ['alice', 'bob'], status: 'queued' })
+      const bob = env.authenticatedContext('bob').firestore()
+      await assertFails(setDoc(doc(bob, 'partyQueue', PARTY), slot({ leader: 'bob' })))
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'partyQueue', PARTY), slot())
+      })
+      await assertFails(deleteDoc(doc(bob, 'partyQueue', PARTY)))
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(deleteDoc(doc(alice, 'partyQueue', PARTY)))
+    })
+
+    it('anyone signed in can count who is waiting, which is what the picker shows', async () => {
+      await seedParty({ members: ['alice', 'bob'], status: 'queued' })
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'partyQueue', PARTY), slot())
+      })
+      const carol = env.authenticatedContext('carol').firestore()
+      await assertSucceeds(getDocs(collection(carol, 'partyQueue')))
+    })
+  })
+
 })

@@ -248,13 +248,22 @@ export function Battle() {
         {/* Unfinished — test site only until team battle ships. Violet
             because green, the tier colour and blue are already taken above. */}
         {FEATURE_TEAM_BATTLE && (
-          <ModeCard
-            icon={UserPlus}
-            accent="var(--color-era-turkic)"
-            title={t(s.friends.title)}
-            subtitle={t(s.friends.hubSub)}
-            onClick={() => navigate('/battle/friends')}
-          />
+          <>
+            <ModeCard
+              icon={Users}
+              accent="var(--color-era-saka)"
+              title={t(s.team.title)}
+              subtitle={t(s.team.hubSub)}
+              onClick={() => navigate('/battle/team')}
+            />
+            <ModeCard
+              icon={UserPlus}
+              accent="var(--color-era-turkic)"
+              title={t(s.friends.title)}
+              subtitle={t(s.friends.hubSub)}
+              onClick={() => navigate('/battle/friends')}
+            />
+          </>
         )}
       </motion.div>
     </motion.div>

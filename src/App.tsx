@@ -29,6 +29,9 @@ const Explore = lazy(() => import('./screens/Explore').then((m) => ({ default: m
 const Friends = FEATURE_TEAM_BATTLE
   ? lazy(() => import('./screens/Friends').then((m) => ({ default: m.Friends })))
   : null
+const TeamBattle = FEATURE_TEAM_BATTLE
+  ? lazy(() => import('./screens/TeamBattle').then((m) => ({ default: m.TeamBattle })))
+  : null
 const Kahoot = lazy(() => import('./screens/Kahoot').then((m) => ({ default: m.Kahoot })))
 const KahootCreate = lazy(() => import('./screens/KahootCreate').then((m) => ({ default: m.KahootCreate })))
 const KahootHost = lazy(() => import('./screens/KahootHost').then((m) => ({ default: m.KahootHost })))
@@ -81,6 +84,7 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   // file is still written out but nothing references it, and vite.config.ts
   // keeps it out of the service worker's precache.
   ...(Friends ? [{ path: '/battle/friends', element: <Friends /> }] : []),
+  ...(TeamBattle ? [{ path: '/battle/team', element: <TeamBattle /> }] : []),
   { path: '/battle/kahoot', element: <Kahoot /> },
   { path: '/battle/kahoot/teacher', element: <KahootTeacher /> },
   { path: '/battle/kahoot/student', element: <KahootStudent /> },
