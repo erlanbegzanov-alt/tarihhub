@@ -51,6 +51,23 @@ export const FEATURE_TEAM_BATTLE =
   IS_TEST_CONTOUR || import.meta.env.VITE_FEATURE_TEAM_BATTLE === '1'
 
 /**
+ * The ҰБТ mock (`/battle/exam`): a full 20-task variant in the real exam's
+ * shape — 10 standalone tasks and two context blocks of five.
+ *
+ * Its own flag rather than a ride on `FEATURE_TEAM_BATTLE`, because the two
+ * features are unrelated and will not be ready on the same day. Shipping one
+ * must not drag the other out with it.
+ *
+ * Deliberately not on in production yet. The screen works and its data is
+ * tested, but the bank behind it is still short of the specification's
+ * difficulty mix (76 of 98 questions are level A, exactly one is level C), so
+ * a score here would sit above the same student's real ҰБТ. It goes live with
+ * `VITE_FEATURE_EXAM_MOCK=1` once that gap is closed.
+ */
+export const FEATURE_EXAM_MOCK =
+  IS_TEST_CONTOUR || import.meta.env.VITE_FEATURE_EXAM_MOCK === '1'
+
+/**
  * The Firestore project this bundle talks to. Read straight from the env
  * rather than out of `firebase.ts` so that the badge which displays it stays
  * free of the Firebase SDK and costs nothing to import.

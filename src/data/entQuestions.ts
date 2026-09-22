@@ -41,6 +41,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-anc-1',
+    topicId: 2,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Массагет патшайымы Томирис парсы патшасы Кирді (Куруш II) қай жылы жеңді?',
@@ -60,6 +63,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-anc-2',
+    topicId: 48,
+    level: 'A',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: '«Алтын адам» табылған Есік қорғаны қай өңірде орналасқан?',
@@ -79,6 +85,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-anc-3',
+    topicId: 2,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: 'Парсы деректерінде «шошақ бөрікті» (тиграхауда) сақтар деп қай тайпа аталады?',
@@ -98,6 +107,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-anc-4',
+    topicId: 1,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: 'Жылқыны алғаш қолға үйреткен деп есептелетін энеолит дәуірінің мәдениеті:',
@@ -117,6 +129,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-anc-5',
+    topicId: 1,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: 'Орталық Қазақстандағы қола дәуірінің соңын білдіретін мәдениет:',
@@ -136,6 +151,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-anc-6',
+    topicId: 2,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: 'Еуропадағы «Ұлы қоныс аударуды» бастап, б.з. IV–V ғасырларда Рим империясына қауіп төндірген халық:',
@@ -155,6 +173,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-anc-7',
+    topicId: 2,
+    level: 'A',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: 'Үйсін мемлекетінің астанасы — «Қызыл аңғар қаласы» (Чигучен) қай көлдің жағасында болған?',
@@ -174,6 +195,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-anc-8',
+    topicId: 2,
+    level: 'A',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: 'Сырдарияның орта ағысы мен Арал өңірін мекендеген, қытай деректерінде «Кангюй» аталатын мемлекет:',
@@ -193,6 +217,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-anc-9',
+    topicId: 48,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: 'Ерте темір дәуіріндегі көшпелілер өнерінде үстемдік еткен бейнелеу стилі:',
@@ -212,6 +239,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-anc-10',
+    topicId: 2,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Парсы әскерін жалған жолмен шөл далаға бастап апарып, елін құтқарған сақ батыры:',
@@ -235,6 +265,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-turk-1',
+    topicId: 3,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Түрік қағанаты қай жылдары өмір сүрді?',
@@ -254,6 +287,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-turk-2',
+    topicId: 3,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Батыс Түрік қағанаты нақты қай жылдары болды?',
@@ -273,6 +309,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-turk-3',
+    topicId: 4,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: '751 жылғы Талас (Атлах) шайқасында араб-қарлұқ әскері кімді жеңді?',
@@ -292,6 +331,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-turk-4',
+    topicId: 5,
+    level: 'A',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: 'Сырдарияның төменгі ағысында, астанасы Янгикент болған IX–XI ғасырлардағы мемлекет:',
@@ -311,6 +353,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-turk-5',
+    topicId: 6,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Қараханид мемлекетінде ислам мемлекеттік дін болып қай билеуші тұсында жарияланды?',
@@ -330,6 +375,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-turk-6',
+    topicId: 49,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: 'Күлтегін мен Білге қағанға арналған Орхон жазба ескерткіштері қай әліпбимен жазылған?',
@@ -349,6 +397,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-turk-7',
+    topicId: 6,
+    level: 'B',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: '1128–1213 жылдары Жетісу мен Оңтүстік Қазақстанда үстемдік еткен, қытай деректерінде «Батыс Ляо» аталатын мемлекет:',
@@ -372,6 +423,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-cult-1',
+    topicId: 49,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Отырарда туған, Аристотельден кейін «Екінші ұстаз» атанған ойшыл:',
@@ -391,6 +445,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cult-2',
+    topicId: 49,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '«Диуани лұғат-ат-түрк» («Түркі тілдерінің сөздігі») атты еңбектің авторы:',
@@ -410,6 +467,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cult-3',
+    topicId: 49,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '«Диуани хикмет» жинағының авторы, Түркістандағы кесенесі Әмір Темір тұсында салынған сопы ақын:',
@@ -429,6 +489,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cult-4',
+    topicId: 49,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '«Құтадғу біліг» («Құтты білік») дастанын жазған ақын:',
@@ -452,6 +515,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-med-1',
+    topicId: 8,
+    level: 'B',
+    pattern: 'P14',
     category: CATEGORY,
     question: {
       kz: 'Шыңғыс хан әскерінің Отырарды алты айдан астам қоршауы қай оқиғаға жауап болды?',
@@ -471,6 +537,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-med-2',
+    topicId: 8,
+    level: 'A',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: 'Ақ Орданың астанасы болған қала:',
@@ -490,6 +559,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-med-3',
+    topicId: 8,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'XIV ғасырдың ортасында Жетісу мен Шығыс Түркістанда құрылған, тарихшылар «Моғолстан» атайтын мемлекеттің алғашқы ханы:',
@@ -509,6 +581,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-med-4',
+    topicId: 9,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Дереккөздерде «Өзбек хандығы» деп те аталатын, 1428–1468 жж. Дешті Қыпшақтың шығысында болған мемлекеттің билеушісі:',
@@ -528,6 +603,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-med-5',
+    topicId: 9,
+    level: 'B',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: 'Әмір Темір Алтын Орда ханы Тоқтамысты екі рет — қай өзендердің бойында ірі шайқаста жеңді?',
@@ -547,6 +625,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-med-6',
+    topicId: 7,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: '«Дешті Қыпшақ» деген атау нені білдіреді?',
@@ -570,6 +651,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-khan-1',
+    topicId: 11,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Қазақ хандығы құрылған жыл:',
@@ -589,6 +673,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-khan-2',
+    topicId: 12,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Қазақ хандығы алғаш рет күшейіп, санын 1 миллионға жеткізген, «Қасқа жолы» аталатын әдет-ғұрып ережелерін шығарған хан:',
@@ -608,6 +695,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-khan-3',
+    topicId: 16,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '1643 жылғы Орбұлақ шайқасында жоңғарларға тойтарыс берген қазақ ханы:',
@@ -627,6 +717,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-khan-4',
+    topicId: 17,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '«Жеті жарғы» атты әдет-ғұрып заңдар жинағы қай ханның тұсында жасалды?',
@@ -646,6 +739,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-khan-5',
+    topicId: 17,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '«Жеті жарғыны» жасауға қатысқан Ұлы жүздің биі:',
@@ -669,6 +765,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-xviii-1',
+    topicId: 19,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Қазақ халқының жоңғар шапқыншылығынан ойсырай жеңілген «Ақтабан шұбырынды, Алқакөл сұлама» жылы:',
@@ -688,6 +787,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xviii-2',
+    topicId: 19,
+    level: 'B',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Қазақ жасағы жоңғарларды ірі жеңіске ұшыратқан 1729/1730 жылғы шайқас:',
@@ -707,6 +809,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xviii-3',
+    topicId: 20,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Кіші жүз ханы Әбілқайыр Ресей бодандығын қай жылы қабылдады?',
@@ -726,6 +831,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xviii-4',
+    topicId: 21,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Үш жүздің ханы атанып, әрі Ресей, әрі Цин империясымен тепе-теңдік саясатын ұстанған хан:',
@@ -749,6 +857,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-xix-1',
+    topicId: 24,
+    level: 'B',
+    pattern: 'P5',
     category: CATEGORY,
     question: {
       kz: '1822 жылғы «Сібір қырғыздары туралы жарғының» авторы және ол қай жүзде хан билігін жойды?',
@@ -768,6 +879,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xix-2',
+    topicId: 24,
+    level: 'B',
+    pattern: 'P5',
     category: CATEGORY,
     question: {
       kz: '1824 жылғы Кіші жүздегі реформаның авторы:',
@@ -787,6 +901,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xix-3',
+    topicId: 27,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Абылай ханның немересі, 1841 жылы хан сайланып, 1837–1847 жж. ұлт-азаттық көтеріліске басшылық еткен тұлға:',
@@ -806,6 +923,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xix-4',
+    topicId: 26,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '1836–1838 жылдардағы Бөкей (Ішкі) Ордасындағы көтерілісті кім бастады?',
@@ -825,6 +945,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xix-5',
+    topicId: 51,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Қырғыздың «Манас» эпосын жазып алған, Қашқарияға саяхат жасаған қазақ ғалымы:',
@@ -844,6 +967,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xix-6',
+    topicId: 51,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Қазақ балаларына арнап дүнияуи мектептер ашқан, «Қазақ хрестоматиясын» құрастырған ағартушы:',
@@ -863,6 +989,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xix-7',
+    topicId: 51,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '«Қара сөздер» (45 ғақлия) шығармасының авторы:',
@@ -882,6 +1011,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xix-8',
+    topicId: 29,
+    level: 'B',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: '1867–1868 жылдардағы реформалар қазақ жерін негізінен қандай әкімшілік бірлікке бөлді?',
@@ -901,6 +1033,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xix-9',
+    topicId: 23,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Кіші жүзде 1783–1797 жылдары хандық билік пен Ресей әкімшілігіне қарсы көтеріліс бастаған би:',
@@ -924,6 +1059,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-early20-1',
+    topicId: 34,
+    level: 'B',
+    pattern: 'P14',
     category: CATEGORY,
     question: {
       kz: '1916 жылғы ұлт-азаттық көтерілістің тікелей себебі:',
@@ -943,6 +1081,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-early20-2',
+    topicId: 34,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Торғай өңіріндегі 1916 жылғы көтерілістің басты қолбасшысы:',
@@ -962,6 +1103,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-early20-3',
+    topicId: 35,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Алашорда үкіметінің төрағасы болып сайланған тұлға:',
@@ -981,6 +1125,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-early20-4',
+    topicId: 35,
+    level: 'B',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: '«Қазақ» газеті мен «Айқап» журналы қашан шыға бастады?',
@@ -1000,6 +1147,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-early20-5',
+    topicId: 38,
+    level: 'A',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: 'Қазақ АКСР-і алғаш құрылғанда (1920 ж.) оның астанасы қай қала болды?',
@@ -1019,6 +1169,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-early20-6',
+    topicId: 38,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Қазақстан КСРО құрамындағы одақтас республикаға (Қазақ КСР) қай жылы айналды?',
@@ -1038,6 +1191,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-early20-7',
+    topicId: 40,
+    level: 'B',
+    pattern: 'P15',
     category: CATEGORY,
     question: {
       kz: 'Күштеп ұжымдастыру салдарынан 1931–1933 жж. болған ашаршылықта Қазақстан халқы шамамен қаншаға азайды?',
@@ -1057,6 +1213,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-early20-8',
+    topicId: 41,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: 'Ақмола маңында әйелдерге арналған ГУЛАГ лагерінің қысқарған атауы:',
@@ -1076,6 +1235,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-early20-9',
+    topicId: 42,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Ұлы Отан соғысында Мәскеу түбінде ерлігімен танылған, Панфилов дивизиясында соғысқан қазақ қолбасшысы:',
@@ -1099,6 +1261,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-late20-1',
+    topicId: 43,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Семей ядролық сынақ полигонындағы алғашқы сынақ қай жылы өткізілді?',
@@ -1118,6 +1283,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-late20-2',
+    topicId: 44,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: '1954 жылы басталған, Қазақстанның солтүстігінде миллиондаған гектар жерді жыртқан науқан:',
@@ -1137,6 +1305,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-late20-3',
+    topicId: 46,
+    level: 'B',
+    pattern: 'P14',
     category: CATEGORY,
     question: {
       kz: 'Желтоқсан көтерілісі (1986 ж., Алматы) нені себеп етіп басталды?',
@@ -1156,6 +1327,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-late20-4',
+    topicId: 46,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Қазақ КСР Жоғарғы Кеңесі мемлекеттік егемендік туралы Декларацияны қай жылы қабылдады?',
@@ -1175,6 +1349,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-ind-1',
+    topicId: 47,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Қазақстан мемлекеттік тәуелсіздігі туралы Конституциялық заңды қай күні қабылдады?',
@@ -1194,6 +1371,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-ind-2',
+    topicId: 47,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Қазіргі қолданыстағы Қазақстан Конституциясы қай жылы бүкілхалықтық референдумда қабылданды?',
@@ -1213,6 +1393,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-ind-3',
+    topicId: 47,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Қазақстанның астанасы Алматыдан Ақмолаға қай жылы ресми түрде көшірілді?',
@@ -1232,6 +1415,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-ind-4',
+    topicId: 47,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Ұлттық валюта — теңге қай жылы айналымға енгізілді?',
@@ -1251,6 +1437,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-ind-5',
+    topicId: 47,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Қазақстан ЕҚЫҰ-ға (ОБСЕ) төрағалық еткен жыл:',
@@ -1270,6 +1459,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-ind-6',
+    topicId: 47,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Қазақстан халқы Ассамблеясы қай жылы құрылды?',
@@ -1293,6 +1485,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-cult-5',
+    topicId: 52,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '«Абай жолы» роман-эпопеясының авторы:',
@@ -1312,6 +1507,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cult-6',
+    topicId: 52,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Қазақ КСР Ғылым академиясының тұңғыш президенті, геолог-академик:',
@@ -1331,6 +1529,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cult-7',
+    topicId: 49,
+    level: 'A',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: 'XIII–XV ғасырларда Дешті Қыпшақ пен Орталық Азияны байланыстырған негізгі сауда жолы:',
@@ -1355,6 +1556,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-cluster-1',
+    topicId: 3,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: '552–603 жж. — қай қағанат?',
@@ -1374,6 +1578,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cluster-2',
+    topicId: 4,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: '704–756 жж. — Жетісудегі қай қағанат?',
@@ -1393,6 +1600,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cluster-3',
+    topicId: 19,
+    level: 'B',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Жоңғарларға қарсы Бұланты шайқасы («Қалмақ қырылған») қашан болды?',
@@ -1412,6 +1622,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cluster-4',
+    topicId: 24,
+    level: 'B',
+    pattern: 'P5',
     category: CATEGORY,
     question: {
       kz: '«Сібір қырғыздары туралы жарғы» (1822) қай жүзде хан билігін жойды?',
@@ -1431,6 +1644,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cluster-5',
+    topicId: 24,
+    level: 'B',
+    pattern: 'P5',
     category: CATEGORY,
     question: {
       kz: 'Кіші жүздегі 1824 жылғы «Орынбор қырғыздары туралы жарғының» авторы кім?',
@@ -1450,6 +1666,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cluster-6',
+    topicId: 40,
+    level: 'C',
+    pattern: 'P14',
     category: CATEGORY,
     question: {
       kz: '1921 жылғы ашаршылық пен 1931–1933 жж. ашаршылықтың басты айырмашылығы:',
@@ -1473,6 +1692,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-city-1',
+    topicId: 49,
+    level: 'A',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: 'Орта ғасырларда кітапханасының байлығымен танымал болған, әл-Фарабидің туған қаласы:',
@@ -1492,6 +1714,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-city-2',
+    topicId: 49,
+    level: 'A',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: 'Орта ғасырларда «Көпестер қаласы» атанған, Талас өзені бойындағы қала:',
@@ -1511,6 +1736,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-city-3',
+    topicId: 49,
+    level: 'A',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: 'Қожа Ахмет Ясауи кесенесі салынған, Қазақ хандығының саяси-рухани орталығына айналған қала:',
@@ -1534,6 +1762,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-xviii-5',
+    topicId: 19,
+    level: 'B',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: '1710 жылы жоңғарларға қарсы жалпықазақ жасағын құру мәселесі қай құрылтайда шешілді?',
@@ -1553,6 +1784,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xviii-6',
+    topicId: 19,
+    level: 'B',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '1726 жылғы Ордабасы құрылтайында біріккен қазақ жасағының бас қолбасшысы болып кім сайланды?',
@@ -1572,6 +1806,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xix-10',
+    topicId: 26,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '1836–1838 жж. Бөкей Ордасындағы көтерілістің ақыны әрі Исатайдың серігі:',
@@ -1591,6 +1828,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xix-11',
+    topicId: 29,
+    level: 'B',
+    pattern: 'P14',
     category: CATEGORY,
     question: {
       kz: 'XIX ғасырдың соңында Ресейден қазақ даласына шаруаларды жаппай қоныстандыруды жеделдеткен фактор:',
@@ -1610,6 +1850,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-xix-12',
+    topicId: 31,
+    level: 'A',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: 'XIX ғасырда қазақ даласындағы ірі жәрмеңкелердің бірі:',
@@ -1633,6 +1876,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-early20-10',
+    topicId: 37,
+    level: 'B',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Түркістан (Қоқан) автономиясын басқарған, кейін эмиграцияда болған Алаш қайраткері:',
@@ -1652,6 +1898,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-early20-11',
+    topicId: 40,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: 'Голощёкин жүргізген, ауыл шаруашылығын күшпен кеңестендіру мен байларды тәркілеу саясаты қалай аталды?',
@@ -1671,6 +1920,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-early20-12',
+    topicId: 41,
+    level: 'B',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '1937–1938 жылдардағы жаппай саяси қуғын-сүргін кезінде атылған Алаш зиялылары:',
@@ -1690,6 +1942,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-early20-13',
+    topicId: 42,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Ұлы Отан соғысы жылдарында пулемётші ретінде ерлік көрсетіп, Кеңес Одағының Батыры атанған қазақ қызы:',
@@ -1713,6 +1968,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-late20-5',
+    topicId: 43,
+    level: 'B',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: '1940-шы жылдардың соңында қазақ тарихшысын «Кенесары көтерілісін дәріптеді» деп айыптаған науқан:',
@@ -1732,6 +1990,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-late20-6',
+    topicId: 44,
+    level: 'A',
+    pattern: 'P4',
     category: CATEGORY,
     question: {
       kz: 'Дүние жүзіндегі алғашқы ғарыш айлағы — Байқоңыр қай өңірде салынды?',
@@ -1751,6 +2012,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-late20-7',
+    topicId: 45,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '1960–1986 жж. (үзілістермен) Қазақстан Компартиясын басқарған, «тоқырау» кезеңімен байланысты тұлға:',
@@ -1770,6 +2034,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-late20-8',
+    topicId: 46,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: 'Семей полигонына қарсы 1989 жылы Олжас Сүлейменов бастаған қоғамдық қозғалыс:',
@@ -1793,6 +2060,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-ind-7',
+    topicId: 47,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: 'Қазақстан 1992 жылы БҰҰ мінберінен ұсынған, Азиядағы қауіпсіздік пен өзара іс-қимыл жөніндегі бастама:',
@@ -1812,6 +2082,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-ind-8',
+    topicId: 47,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: 'Ресей, Беларусь және Қазақстан Кеден одағын құрып, ол 2015 жылы қандай ұйымға ұласты?',
@@ -1831,6 +2104,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-ind-9',
+    topicId: 47,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Астанада бүкіләлемдік мамандандырылған көрме — ЭКСПО қай жылы өтті?',
@@ -1850,6 +2126,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-ind-10',
+    topicId: 47,
+    level: 'B',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Қазақстан алғашқы Конституциясын (тәуелсіздік кезеңінде) қай жылы қабылдады?',
@@ -1873,6 +2152,9 @@ export const entQuestions: QuizQuestion[] = [
    * ------------------------------------------------------------------ */
   {
     id: 'ent-cult-8',
+    topicId: 51,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: '«Сарыарқа», «Адай» күйлерінің авторы, қазақтың ұлы күйшісі:',
@@ -1892,6 +2174,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cult-9',
+    topicId: 52,
+    level: 'A',
+    pattern: 'P2',
     category: CATEGORY,
     question: {
       kz: 'Қазақ жазуын араб графикасы негізінде реформалаған, «ұлт ұстазы» атанған тілтанушы:',
@@ -1911,6 +2196,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cult-10',
+    topicId: 52,
+    level: 'A',
+    pattern: 'P1',
     category: CATEGORY,
     question: {
       kz: 'Қазақ КСР-інде латын графикасынан кирилл графикасына көшу қай жылы болды?',
@@ -1930,6 +2218,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cult-11',
+    topicId: 48,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: 'Ерте темір дәуірінің Берел, Шілікті, Бесшатыр ескерткіштері нені білдіреді?',
@@ -1949,6 +2240,9 @@ export const entQuestions: QuizQuestion[] = [
   },
   {
     id: 'ent-cult-12',
+    topicId: 48,
+    level: 'A',
+    pattern: 'P3',
     category: CATEGORY,
     question: {
       kz: 'Ерте темір дәуірінде Орталық Қазақстанды мекендеген, «мұртты» қорғандарымен танымал мәдениет:',

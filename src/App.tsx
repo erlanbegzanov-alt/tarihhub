@@ -7,7 +7,7 @@ import { TestModeBadge } from './components/TestModeBadge'
 import { LanguageProvider } from './i18n/LanguageProvider'
 import { s } from './i18n/strings'
 import { useLang } from './i18n/useLang'
-import { FEATURE_TEAM_BATTLE } from './lib/environment'
+import { FEATURE_EXAM_MOCK, FEATURE_TEAM_BATTLE } from './lib/environment'
 import { easeOut, pageVariants } from './lib/motion'
 import { completeOnboarding, sessionGate, useSession } from './lib/session'
 import { Home } from './screens/Home'
@@ -31,6 +31,9 @@ const Friends = FEATURE_TEAM_BATTLE
   : null
 const TeamBattle = FEATURE_TEAM_BATTLE
   ? lazy(() => import('./screens/TeamBattle').then((m) => ({ default: m.TeamBattle })))
+  : null
+const ExamMock = FEATURE_EXAM_MOCK
+  ? lazy(() => import('./screens/ExamMock').then((m) => ({ default: m.ExamMock })))
   : null
 const Kahoot = lazy(() => import('./screens/Kahoot').then((m) => ({ default: m.Kahoot })))
 const KahootCreate = lazy(() => import('./screens/KahootCreate').then((m) => ({ default: m.KahootCreate })))
@@ -85,6 +88,7 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   // keeps it out of the service worker's precache.
   ...(Friends ? [{ path: '/battle/friends', element: <Friends /> }] : []),
   ...(TeamBattle ? [{ path: '/battle/team', element: <TeamBattle /> }] : []),
+  ...(ExamMock ? [{ path: '/battle/exam', element: <ExamMock /> }] : []),
   { path: '/battle/kahoot', element: <Kahoot /> },
   { path: '/battle/kahoot/teacher', element: <KahootTeacher /> },
   { path: '/battle/kahoot/student', element: <KahootStudent /> },

@@ -21,12 +21,18 @@ export default defineConfig(({ mode }) => {
   // dropped every reference to it. Nothing can load such an orphan, but the
   // service worker precaches every file it finds, so without this each
   // production install would download the unfinished screens anyway.
-  const teamBattleOn = env.VITE_APP_ENV === 'test' || env.VITE_FEATURE_TEAM_BATTLE === '1'
-  const unfinishedChunks = teamBattleOn ? [] : ['**/Friends-*.js', '**/TeamBattle-*.js']
+  const isTest = env.VITE_APP_ENV === 'test'
+  const teamBattleOn = isTest || env.VITE_FEATURE_TEAM_BATTLE === '1'
+  const examMockOn = isTest || env.VITE_FEATURE_EXAM_MOCK === '1'
+  const unfinishedChunks = [
+    ...(teamBattleOn ? [] : ['**/Friends-*.js', '**/TeamBattle-*.js']),
+    ...(examMockOn ? [] : ['**/ExamMock-*.js']),
+  ]
   return {
     define: {
       'import.meta.env.VITE_APP_ENV': JSON.stringify(env.VITE_APP_ENV ?? ''),
       'import.meta.env.VITE_FEATURE_TEAM_BATTLE': JSON.stringify(env.VITE_FEATURE_TEAM_BATTLE ?? ''),
+      'import.meta.env.VITE_FEATURE_EXAM_MOCK': JSON.stringify(env.VITE_FEATURE_EXAM_MOCK ?? ''),
     },
     plugins: [
       react(),

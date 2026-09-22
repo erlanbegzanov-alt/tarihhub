@@ -112,6 +112,98 @@ export interface QuizOption {
   label: LocalizedText
 }
 
+/**
+ * Codifier topic, 1–55 — the numbering of the official НЦТ specification for
+ * 2026 (`history-reference/ent-exam-patterns.md` §6.2). 1–52 are subject
+ * topics grouped into six sections; 53–55 are the three context-task topics
+ * (document / person / map) and only ever appear on a `ContextBlock`.
+ */
+export type TopicId = number
+
+/**
+ * Difficulty band from the specification (§4.4). One exam variant is fixed at
+ * A 50 % / B 30 % / C 20 % — roughly 10 / 6 / 4 of the 20 questions.
+ *
+ * A — reproducing a plain fact. B — comparing, generalising, systematising.
+ * C — causation, significance, telling a fact apart from its consequence.
+ * The C band is the ceiling a student who only memorised dates cannot pass.
+ */
+export type ExamLevel = 'A' | 'B' | 'C'
+
+/**
+ * Question mechanic, from the catalogue in §7.3 — every code there was read off
+ * the official sample variant or the official context-task example, so a
+ * question tagged with one trains against something НЦТ demonstrably does.
+ *
+ * P1 date⇄event · P2 person⇄achievement · P3 term⇄definition · P4 place⇄role
+ * P5 author of a reform · P6 dating an object to its era · P7 "which statements
+ * are true" (answer is a combination) · P8 packed matching · P9 map: object by
+ * number · P10 map: period or process · P11 map: second name of a state
+ * P12 identify the event from a document · P13 date the identified event
+ * P14 cause or consequence from the context · P15 long-term consequence
+ * P16 quantifier trap ("only", "wholly", "exclusively")
+ */
+export type PatternKey =
+  | 'P1'
+  | 'P2'
+  | 'P3'
+  | 'P4'
+  | 'P5'
+  | 'P6'
+  | 'P7'
+  | 'P8'
+  | 'P9'
+  | 'P10'
+  | 'P11'
+  | 'P12'
+  | 'P13'
+  | 'P14'
+  | 'P15'
+  | 'P16'
+
+/** Stimulus type of a context block — codifier topics 53 / 54 / 55 (§4.3). */
+export type StimulusKind = 'document' | 'person' | 'map'
+
+/**
+ * A numbered object on a schematic map: exactly what the exam asks about when
+ * it says "determine the state under №2" (sample variant, tasks 13–15).
+ *
+ * Deliberately a label point, not a boundary. The exam's own map question does
+ * not require accurate historical borders — a schema with numbers answers it,
+ * which is why this costs far less than reviving the full `/map` screen.
+ */
+export interface MapMarker {
+  n: number
+  label: LocalizedText
+  /** Real longitude in degrees east — projected via `projectLonLat` in geo.ts. */
+  lon: number
+  /** Real latitude in degrees north — projected via `projectLonLat` in geo.ts. */
+  lat: number
+}
+
+/**
+ * One context block: a single stimulus plus EXACTLY five questions (§4.1).
+ * Two of these are half the exam's marks.
+ *
+ * The questions are related on purpose. Misreading the stimulus in the first
+ * one drags several of the rest down with it, and that cascade is the thing
+ * being trained (§12.1) — it cannot be reproduced by standalone questions,
+ * which is what all 3117 existing questions in this app are.
+ */
+export interface ContextBlock {
+  id: string
+  kind: StimulusKind
+  /** Codifier topic of the stimulus itself: 53 document / 54 person / 55 map. */
+  topicId: TopicId
+  title: LocalizedText
+  /** The document or biography text. Usually absent for `kind: 'map'`. */
+  passage?: LocalizedText
+  /** For `kind: 'map'` — which era to draw and which objects carry numbers. */
+  map?: { eraKey: EraKey; markers: MapMarker[] }
+  /** Exactly 5. Checked when a variant is assembled. */
+  questions: QuizQuestion[]
+}
+
 export interface QuizQuestion {
   id: string
   /** When set, the question is only served for these personas. */
@@ -127,6 +219,16 @@ export interface QuizQuestion {
   options: QuizOption[]
   correctId: string
   explanation: LocalizedText
+  /**
+   * Codifier topic. Required for anything in the ҰБТ bank — it is what lets
+   * the result screen say "you are weak on topic 24" instead of only "14/20".
+   * Absent on the lesson and persona banks, which are scoped differently.
+   */
+  topicId?: TopicId
+  /** Difficulty band — needed to assemble a variant in the 50/30/20 proportion. */
+  level?: ExamLevel
+  /** Question mechanic — lets mistakes be broken down by type, not only by topic. */
+  pattern?: PatternKey
 }
 
 /**
