@@ -460,8 +460,28 @@ d('firestore.rules', () => {
 
   const PARTY = 'K7PMX2'
 
+  /**
+   * Sides for a room, dealt alternately.
+   *
+   * The rules insist `teams` accounts for exactly the members, so almost every
+   * write below has to carry both. Dealing alternately is also stable when a
+   * player is appended — everyone already placed keeps their side, which is
+   * exactly what the join rule checks.
+   */
+  function sides(members: string[]) {
+    const a: string[] = []
+    const b: string[] = []
+    members.forEach((uid, i) => (i % 2 === 0 ? a : b).push(uid))
+    return { a, b }
+  }
+
+  /** The members plus the sides that match them — the shape an update needs. */
+  function withTeams(members: string[]) {
+    return { members, teams: sides(members) }
+  }
+
   function party(over: Record<string, unknown> = {}) {
-    return {
+    const base = {
       leader: 'alice',
       members: ['alice'],
       mode: 'casual',
@@ -470,6 +490,7 @@ d('firestore.rules', () => {
       createdAt: Date.now(),
       ...over,
     }
+    return { ...base, teams: over.teams ?? sides(base.members as string[]) }
   }
 
   /** Seeds a party with the rules off, so each test starts from a known state. */
@@ -497,23 +518,23 @@ d('firestore.rules', () => {
     it('a friend with the code joins by appending only themselves', async () => {
       await seedParty()
       const bob = env.authenticatedContext('bob').firestore()
-      await assertSucceeds(
-        updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'bob'] }),
-      )
+      await assertSucceeds(updateDoc(doc(bob, 'parties', PARTY), withTeams(['alice', 'bob'])))
     })
 
     it('nobody can drag a third person in, or rewrite the party while joining', async () => {
       await seedParty()
       const bob = env.authenticatedContext('bob').firestore()
+      // Each of these carries sides that match its members, so what the rules
+      // reject is the act itself and not a malformed document.
       await assertFails(
-        updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'bob', 'carol'] }),
+        updateDoc(doc(bob, 'parties', PARTY), withTeams(['alice', 'bob', 'carol'])),
       )
-      await assertFails(updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'carol'] }))
+      await assertFails(updateDoc(doc(bob, 'parties', PARTY), withTeams(['alice', 'carol'])))
       await assertFails(
-        updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'bob'], leader: 'bob' }),
+        updateDoc(doc(bob, 'parties', PARTY), { ...withTeams(['alice', 'bob']), leader: 'bob' }),
       )
       await assertFails(
-        updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'bob'], size: 5 }),
+        updateDoc(doc(bob, 'parties', PARTY), { ...withTeams(['alice', 'bob']), size: 5 }),
       )
     })
 
@@ -521,7 +542,46 @@ d('firestore.rules', () => {
       await seedParty({ members: ['alice', 'bob'], size: 3, status: 'queued' })
       const carol = env.authenticatedContext('carol').firestore()
       await assertFails(
-        updateDoc(doc(carol, 'parties', PARTY), { members: ['alice', 'bob', 'carol'] }),
+        updateDoc(doc(carol, 'parties', PARTY), withTeams(['alice', 'bob', 'carol'])),
+      )
+    })
+
+    it('a player moves only themselves between the sides', async () => {
+      await seedParty({ members: ['alice', 'bob', 'carol'], size: 3 })
+      // Seeded sides are A: alice, carol — B: bob.
+      const bob = env.authenticatedContext('bob').firestore()
+      // Bob crosses over to A on his own: everyone else stays put.
+      await assertSucceeds(
+        updateDoc(doc(bob, 'parties', PARTY), {
+          members: ['alice', 'bob', 'carol'],
+          teams: { a: ['alice', 'carol', 'bob'], b: [] },
+        }),
+      )
+      // But he cannot drag Carol across with him.
+      await assertFails(
+        updateDoc(doc(bob, 'parties', PARTY), {
+          members: ['alice', 'bob', 'carol'],
+          teams: { a: ['alice'], b: ['bob', 'carol'] },
+        }),
+      )
+    })
+
+    it('rejects sides that do not account for exactly the room', async () => {
+      await seedParty({ members: ['alice', 'bob'], size: 3 })
+      const bob = env.authenticatedContext('bob').firestore()
+      // A player on no side at all.
+      await assertFails(
+        updateDoc(doc(bob, 'parties', PARTY), {
+          members: ['alice', 'bob'],
+          teams: { a: ['alice'], b: [] },
+        }),
+      )
+      // A player on a side who is not in the room.
+      await assertFails(
+        updateDoc(doc(bob, 'parties', PARTY), {
+          members: ['alice', 'bob'],
+          teams: { a: ['alice'], b: ['ghost'] },
+        }),
       )
     })
 
@@ -529,20 +589,38 @@ d('firestore.rules', () => {
       await seedParty({ members: ['alice', 'bob', 'carol'], size: 3 })
       const bob = env.authenticatedContext('bob').firestore()
       // Bob cannot drop Carol …
-      await assertFails(updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'bob'] }))
+      await assertFails(updateDoc(doc(bob, 'parties', PARTY), withTeams(['alice', 'bob'])))
       // … but can leave himself.
-      await assertSucceeds(updateDoc(doc(bob, 'parties', PARTY), { members: ['alice', 'carol'] }))
+      await assertSucceeds(updateDoc(doc(bob, 'parties', PARTY), withTeams(['alice', 'carol'])))
       const alice = env.authenticatedContext('alice').firestore()
-      await assertSucceeds(updateDoc(doc(alice, 'parties', PARTY), { members: ['alice'] }))
+      await assertSucceeds(updateDoc(doc(alice, 'parties', PARTY), withTeams(['alice'])))
       // Not even the leader can write themselves out of their own party.
-      await assertFails(updateDoc(doc(alice, 'parties', PARTY), { members: ['carol'] }))
+      await assertFails(updateDoc(doc(alice, 'parties', PARTY), withTeams(['carol'])))
     })
 
-    it('a party never grows past five', async () => {
+    it('a room holds both sides — five a side, ten in all', async () => {
+      // A sixth player is now fine: the room is 5v5, not a single team of 5.
       await seedParty({ members: ['alice', 'b', 'c', 'd', 'e'], size: 5 })
       const f = env.authenticatedContext('f').firestore()
+      await assertSucceeds(
+        updateDoc(doc(f, 'parties', PARTY), withTeams(['alice', 'b', 'c', 'd', 'e', 'f'])),
+      )
+    })
+
+    it('a room never grows past ten, and no side past its size', async () => {
+      const ten = ['alice', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+      await seedParty({ members: ten, size: 5 })
+      const k = env.authenticatedContext('k').firestore()
+      await assertFails(updateDoc(doc(k, 'parties', PARTY), withTeams([...ten, 'k'])))
+
+      // Six on one side of a 5v5 is refused even when the room itself fits.
+      await seedParty({ members: ['alice', 'b', 'c', 'd', 'e', 'f'], size: 5 })
+      const g = env.authenticatedContext('g').firestore()
       await assertFails(
-        updateDoc(doc(f, 'parties', PARTY), { members: ['alice', 'b', 'c', 'd', 'e', 'f'] }),
+        updateDoc(doc(g, 'parties', PARTY), {
+          members: ['alice', 'b', 'c', 'd', 'e', 'f', 'g'],
+          teams: { a: ['alice', 'b', 'c', 'd', 'e', 'f'], b: ['g'] },
+        }),
       )
     })
 
@@ -555,56 +633,199 @@ d('firestore.rules', () => {
     })
   })
 
-  describe('partyQueue/{code}', () => {
-    const slot = (over: Record<string, unknown> = {}) => ({
-      leader: 'alice',
-      size: 2,
-      mode: 'casual',
-      members: ['alice', 'bob'],
-      createdAt: Date.now(),
-      ...over,
-    })
-
-    it('the leader queues a party that really has that many members', async () => {
-      await seedParty({ members: ['alice', 'bob'], status: 'queued' })
+  describe('partyQueue/{code} — removed', () => {
+    // The search queue is gone (see firestore.rules and src/lib/party.ts).
+    // This is the security half of that removal: dropping the rules has to
+    // leave the collection shut, so a stale tab still running the old search
+    // cannot keep writing to a surface nothing reads any more.
+    it('is closed to reads and writes now that no rules cover it', async () => {
+      await seedParty({ members: ['alice', 'bob'] })
       const alice = env.authenticatedContext('alice').firestore()
-      await assertSucceeds(setDoc(doc(alice, 'partyQueue', PARTY), slot()))
+      await assertFails(
+        setDoc(doc(alice, 'partyQueue', PARTY), {
+          leader: 'alice',
+          size: 2,
+          mode: 'casual',
+          members: ['alice', 'bob'],
+          createdAt: Date.now(),
+        }),
+      )
+      await assertFails(getDocs(collection(alice, 'partyQueue')))
     })
+  })
 
-    it('a slot cannot claim a size or a roster the party does not have', async () => {
-      await seedParty({ members: ['alice', 'bob'], status: 'queued' })
+  describe('teamMatches/{code}', () => {
+    const ROOM = ['alice', 'bob', 'carol', 'dan']
+    const SIDES = sides(ROOM)
+
+    /** A match that matches the room `seedRoom()` seeds. */
+    function teamMatch(over: Record<string, unknown> = {}) {
+      const teams = (over.teams ?? SIDES) as { a: string[]; b: string[] }
+      return {
+        leader: 'alice',
+        size: 2,
+        questionIds: ['q1', 'q2', 'q3'],
+        startedAt: Date.now(),
+        ...over,
+        teams,
+        members: [...teams.a, ...teams.b],
+      }
+    }
+
+    /** The room the match is started from — same code, same sides. */
+    async function seedRoom(over: Record<string, unknown> = {}) {
+      await seedParty({ members: ROOM, size: 2, ...over })
+    }
+
+    async function seedMatch(over: Record<string, unknown> = {}) {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'teamMatches', PARTY), teamMatch(over))
+      })
+    }
+
+    it('the room’s leader starts a match with that room’s own sides', async () => {
+      await seedRoom()
       const alice = env.authenticatedContext('alice').firestore()
-      // Claiming 5v5 with two people, so the match would start uneven.
-      await assertFails(
-        setDoc(doc(alice, 'partyQueue', PARTY), slot({ size: 5, members: ['alice', 'bob', 'c', 'd', 'e'] })),
-      )
-      // Size and roster disagreeing with each other.
-      await assertFails(setDoc(doc(alice, 'partyQueue', PARTY), slot({ size: 3 })))
-      // A roster the party itself doesn't have.
-      await assertFails(
-        setDoc(doc(alice, 'partyQueue', PARTY), slot({ members: ['alice', 'carol'] })),
-      )
+      await assertSucceeds(setDoc(doc(alice, 'teamMatches', PARTY), teamMatch()))
     })
 
-    it('only that party’s leader may queue it or clear the slot', async () => {
-      await seedParty({ members: ['alice', 'bob'], status: 'queued' })
+    it('nobody but the leader starts it', async () => {
+      await seedRoom()
       const bob = env.authenticatedContext('bob').firestore()
-      await assertFails(setDoc(doc(bob, 'partyQueue', PARTY), slot({ leader: 'bob' })))
-      await env.withSecurityRulesDisabled(async (ctx) => {
-        await setDoc(doc(ctx.firestore(), 'partyQueue', PARTY), slot())
-      })
-      await assertFails(deleteDoc(doc(bob, 'partyQueue', PARTY)))
-      const alice = env.authenticatedContext('alice').firestore()
-      await assertSucceeds(deleteDoc(doc(alice, 'partyQueue', PARTY)))
+      // Even claiming the leadership in the document does not help: the room
+      // itself is consulted.
+      await assertFails(setDoc(doc(bob, 'teamMatches', PARTY), teamMatch({ leader: 'bob' })))
     })
 
-    it('anyone signed in can count who is waiting, which is what the picker shows', async () => {
-      await seedParty({ members: ['alice', 'bob'], status: 'queued' })
-      await env.withSecurityRulesDisabled(async (ctx) => {
-        await setDoc(doc(ctx.firestore(), 'partyQueue', PARTY), slot())
+    it('rejects a match naming a roster the room does not have', async () => {
+      await seedRoom()
+      const alice = env.authenticatedContext('alice').firestore()
+      // Staging a game in other people's names — they would be scored against
+      // without ever having been in the room.
+      await assertFails(
+        setDoc(
+          doc(alice, 'teamMatches', PARTY),
+          teamMatch({ teams: { a: ['alice', 'eve'], b: ['bob', 'dan'] } }),
+        ),
+      )
+    })
+
+    it('rejects uneven or empty sides', async () => {
+      await seedRoom()
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        setDoc(
+          doc(alice, 'teamMatches', PARTY),
+          teamMatch({ teams: { a: ['alice', 'carol'], b: ['bob'] } }),
+        ),
+      )
+      await assertFails(
+        setDoc(doc(alice, 'teamMatches', PARTY), teamMatch({ teams: { a: ['alice'], b: [] } })),
+      )
+    })
+
+    it('a started match is frozen, and only its leader clears it', async () => {
+      await seedRoom()
+      await seedMatch()
+      const alice = env.authenticatedContext('alice').firestore()
+      const bob = env.authenticatedContext('bob').firestore()
+      // Swapping the questions mid-match would change what everyone else is
+      // already being scored on.
+      await assertFails(updateDoc(doc(alice, 'teamMatches', PARTY), { questionIds: ['q9'] }))
+      await assertFails(deleteDoc(doc(bob, 'teamMatches', PARTY)))
+      await assertSucceeds(deleteDoc(doc(alice, 'teamMatches', PARTY)))
+    })
+
+    it('only the people playing can read it', async () => {
+      await seedRoom()
+      await seedMatch()
+      const dan = env.authenticatedContext('dan').firestore()
+      await assertSucceeds(getDoc(doc(dan, 'teamMatches', PARTY)))
+      const eve = env.authenticatedContext('eve').firestore()
+      await assertFails(getDoc(doc(eve, 'teamMatches', PARTY)))
+    })
+
+    describe('players/{player}', () => {
+      const run = (over: Record<string, unknown> = {}) => ({
+        side: 'a',
+        score: 0,
+        answered: 0,
+        done: false,
+        ...over,
       })
-      const carol = env.authenticatedContext('carol').firestore()
-      await assertSucceeds(getDocs(collection(carol, 'partyQueue')))
+
+      it('a player opens their own run, on the side the match puts them on', async () => {
+        await seedRoom()
+        await seedMatch()
+        const alice = env.authenticatedContext('alice').firestore()
+        await assertSucceeds(
+          setDoc(doc(alice, 'teamMatches', PARTY, 'players', 'alice'), run({ side: 'a' })),
+        )
+      })
+
+      it('nobody writes someone else’s run, or scores into the other team', async () => {
+        await seedRoom()
+        await seedMatch()
+        const bob = env.authenticatedContext('bob').firestore()
+        // bob is on side B; filing his points under A would move them to the
+        // team he is playing against.
+        await assertFails(
+          setDoc(doc(bob, 'teamMatches', PARTY, 'players', 'bob'), run({ side: 'a', score: 90 })),
+        )
+        await assertFails(
+          setDoc(doc(bob, 'teamMatches', PARTY, 'players', 'alice'), run({ score: 90 })),
+        )
+        await assertSucceeds(
+          setDoc(doc(bob, 'teamMatches', PARTY, 'players', 'bob'), run({ side: 'b', score: 90 })),
+        )
+      })
+
+      it('a score never goes down, and a finished run never un-finishes', async () => {
+        await seedRoom()
+        await seedMatch()
+        await env.withSecurityRulesDisabled(async (ctx) => {
+          await setDoc(
+            doc(ctx.firestore(), 'teamMatches', PARTY, 'players', 'alice'),
+            run({ score: 90, answered: 2, done: true }),
+          )
+        })
+        const alice = env.authenticatedContext('alice').firestore()
+        await assertFails(
+          setDoc(doc(alice, 'teamMatches', PARTY, 'players', 'alice'), run({ score: 10, answered: 2, done: true })),
+        )
+        await assertFails(
+          setDoc(doc(alice, 'teamMatches', PARTY, 'players', 'alice'), run({ score: 90, answered: 1, done: true })),
+        )
+        // Un-setting `done` would reopen a run the other side has already been
+        // shown as finished.
+        await assertFails(
+          setDoc(doc(alice, 'teamMatches', PARTY, 'players', 'alice'), run({ score: 90, answered: 2, done: false })),
+        )
+        await assertSucceeds(
+          setDoc(doc(alice, 'teamMatches', PARTY, 'players', 'alice'), run({ score: 120, answered: 3, done: true })),
+        )
+      })
+
+      it('cannot answer more questions than the match has', async () => {
+        await seedRoom()
+        await seedMatch()
+        const alice = env.authenticatedContext('alice').firestore()
+        await assertFails(
+          setDoc(doc(alice, 'teamMatches', PARTY, 'players', 'alice'), run({ answered: 4 })),
+        )
+      })
+
+      it('a run cannot be deleted, and a stranger cannot read one', async () => {
+        await seedRoom()
+        await seedMatch()
+        await env.withSecurityRulesDisabled(async (ctx) => {
+          await setDoc(doc(ctx.firestore(), 'teamMatches', PARTY, 'players', 'alice'), run())
+        })
+        const alice = env.authenticatedContext('alice').firestore()
+        await assertFails(deleteDoc(doc(alice, 'teamMatches', PARTY, 'players', 'alice')))
+        const eve = env.authenticatedContext('eve').firestore()
+        await assertFails(getDoc(doc(eve, 'teamMatches', PARTY, 'players', 'alice')))
+      })
     })
   })
 

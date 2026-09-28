@@ -436,15 +436,24 @@ service cloud.firestore {
       return code.matches('[A-HJ-NP-Z2-9]{6}');
     }
 
+    // A room holds BOTH sides now, so it is twice a team: up to ten people.
+    // `teams` must account for exactly the members present — a side listing
+    // someone who is not in the room could start a match with a ghost, and a
+    // member on neither side could never be picked to play.
     function validPartyShape(d) {
-      return d.keys().hasOnly(['leader', 'members', 'mode', 'size', 'status', 'createdAt'])
+      return d.keys().hasOnly(['leader', 'members', 'mode', 'size', 'status', 'createdAt', 'teams'])
         && d.leader is string
-        && d.members is list && d.members.size() >= 1 && d.members.size() <= 5
+        && d.members is list && d.members.size() >= 1 && d.members.size() <= 10
         && d.leader in d.members
         && d.mode in ['casual', 'ranked']
         && d.size is int && d.size >= 2 && d.size <= 5
         && d.status in ['idle', 'queued']
-        && d.createdAt is number;
+        && d.createdAt is number
+        && d.teams is map && d.teams.keys().hasOnly(['a', 'b'])
+        && d.teams.a is list && d.teams.b is list
+        && d.teams.a.size() <= d.size && d.teams.b.size() <= d.size
+        && d.teams.a.size() + d.teams.b.size() == d.members.size()
+        && d.members.hasAll(d.teams.a) && d.members.hasAll(d.teams.b);
     }
 
     /** Everything except `members` and `status` is the leader's to set, so a
@@ -466,6 +475,8 @@ service cloud.firestore {
         && validPartyShape(request.resource.data)
         && request.resource.data.leader == request.auth.uid
         && request.resource.data.members == [request.auth.uid]
+        && request.resource.data.teams.a == [request.auth.uid]
+        && request.resource.data.teams.b == []
         && request.resource.data.status == 'idle';
       allow update: if request.auth != null
         && validPartyShape(request.resource.data)
@@ -483,6 +494,23 @@ service cloud.firestore {
             && resource.data.status == 'idle'
             && request.resource.data.status == 'idle'
             && request.resource.data.members == resource.data.members.concat([request.auth.uid])
+            // Joining picks a side for yourself and moves nobody: everyone
+            // already on a side is still on it.
+            && request.resource.data.teams.a.hasAll(resource.data.teams.a)
+            && request.resource.data.teams.b.hasAll(resource.data.teams.b)
+            && partyFramePreserved(request.resource.data, resource.data))
+          // Changing sides: the room is the same people, and every player
+          // except you is exactly where they were. Removing yourself from both
+          // lists on each side and comparing is what makes "only you moved"
+          // checkable here at all.
+          || (request.auth.uid in resource.data.members
+            && resource.data.status == 'idle'
+            && request.resource.data.status == 'idle'
+            && request.resource.data.members == resource.data.members
+            && request.resource.data.teams.a.removeAll([request.auth.uid])
+                 == resource.data.teams.a.removeAll([request.auth.uid])
+            && request.resource.data.teams.b.removeAll([request.auth.uid])
+                 == resource.data.teams.b.removeAll([request.auth.uid])
             && partyFramePreserved(request.resource.data, resource.data))
           // Leaving: remove yourself, change nothing else.
           || (request.auth.uid in resource.data.members
@@ -494,26 +522,90 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == resource.data.leader;
     }
 
-    // One queue slot per party, doc id = the party's code. Listable by any
-    // signed-in user: that is how the format picker shows how many people are
-    // waiting in each size, and how matchmaking finds an opponent party.
-    // Written only by that party's leader, and only to match the party as it
-    // actually stands — so a slot cannot claim a size the party doesn't have.
-    match /partyQueue/{code} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null
-        && request.resource.data.keys().hasOnly(['leader', 'size', 'mode', 'members', 'createdAt'])
+    // `partyQueue` used to live here: one slot per team looking for an
+    // opponent. Nothing ever read two slots and paired them, so a team could
+    // only ever wait in it. A room that holds both sides needs no queue, and a
+    // collection no client writes should carry no rules either — leaving them
+    // would keep an open write surface for a feature that no longer exists.
+
+    /*
+     * The team battle (see `src/lib/teamMatch.ts`). The document id is the
+     * room's join code, so every member of that room finds the match without
+     * being sent anything.
+     *
+     * The match carries its own roster rather than reading the room's: the room
+     * is deleted the instant its leader leaves, and a match whose rules had to
+     * `get()` a room would become unreadable to everyone halfway through.
+     */
+    match /teamMatches/{code} {
+      function validTeamMatch(d) {
+        return d.keys().hasOnly(['leader', 'size', 'teams', 'members', 'questionIds', 'startedAt'])
+          && d.leader is string
+          && d.size is int && d.size >= 2 && d.size <= 5
+          && d.teams is map && d.teams.keys().hasOnly(['a', 'b'])
+          && d.teams.a is list && d.teams.b is list
+          // Equal, non-empty sides: the whole point of the room's start button.
+          && d.teams.a.size() >= 1
+          && d.teams.a.size() == d.teams.b.size()
+          && d.teams.a.size() <= d.size
+          && d.members is list
+          && d.members.size() == d.teams.a.size() + d.teams.b.size()
+          && d.members.hasAll(d.teams.a) && d.members.hasAll(d.teams.b)
+          && d.questionIds is list
+          && d.questionIds.size() >= 1 && d.questionIds.size() <= 30
+          && d.startedAt is number;
+      }
+
+      allow read: if request.auth != null && request.auth.uid in resource.data.members;
+      // Only that room's leader starts it, and only with the sides the room
+      // actually has: a match free to name any roster would let anyone stage a
+      // game in other people's names and bank points against them.
+      allow create: if request.auth != null
+        && validTeamMatch(request.resource.data)
         && request.resource.data.leader == request.auth.uid
-        && request.resource.data.size is int
-        && request.resource.data.size >= 2 && request.resource.data.size <= 5
-        && request.resource.data.mode in ['casual', 'ranked']
-        && request.resource.data.members is list
-        && request.resource.data.members.size() == request.resource.data.size
-        && request.resource.data.createdAt is number
         && get(/databases/$(database)/documents/parties/$(code)).data.leader == request.auth.uid
-        && get(/databases/$(database)/documents/parties/$(code)).data.members == request.resource.data.members
-        && get(/databases/$(database)/documents/parties/$(code)).data.size == request.resource.data.size;
+        && get(/databases/$(database)/documents/parties/$(code)).data.teams == request.resource.data.teams;
+      // A started match is frozen: its sides and its questions are what every
+      // player's screen is already scoring against.
+      allow update: if false;
       allow delete: if request.auth != null && request.auth.uid == resource.data.leader;
+
+      /*
+       * One document per player, written only by that player. Scores only ever
+       * climb and `done` never un-sets, so a second tab, a retried write or a
+       * hand-made request cannot rewind a run or replay a question for points.
+       */
+      match /players/{player} {
+        function theMatch() {
+          return get(/databases/$(database)/documents/teamMatches/$(code)).data;
+        }
+        function validRun(d) {
+          return d.keys().hasOnly(['side', 'score', 'answered', 'done'])
+            && d.score is number && d.score >= 0
+            && d.answered is int && d.answered >= 0
+            && d.answered <= theMatch().questionIds.size()
+            && d.done is bool;
+        }
+
+        allow read: if request.auth != null && request.auth.uid in theMatch().members;
+        // The side is pinned to the side the match says this player is on, so
+        // nobody can score into the other team's total.
+        allow create: if request.auth != null
+          && request.auth.uid == player
+          && validRun(request.resource.data)
+          && ((request.resource.data.side == 'a' && theMatch().teams.a.hasAny([player]))
+            || (request.resource.data.side == 'b' && theMatch().teams.b.hasAny([player])));
+        allow update: if request.auth != null
+          && request.auth.uid == player
+          && validRun(request.resource.data)
+          && request.resource.data.side == resource.data.side
+          && request.resource.data.score >= resource.data.score
+          && request.resource.data.answered >= resource.data.answered
+          && (resource.data.done == false || request.resource.data.done == true);
+        // A run is evidence; clearing it would erase points the other side has
+        // already been shown. The leader deletes the whole match instead.
+        allow delete: if false;
+      }
     }
 
     /* ------------------------------ ai usage ----------------------------- */

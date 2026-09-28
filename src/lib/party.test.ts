@@ -1,28 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
-  QUEUE_SLOT_TTL_MS,
-  countWaiting,
-  downsizeOptions,
-  emptyQueueCounts,
   generatePartyCode,
   normalizePartyCode,
+  roomCapacity,
+  smallerSide,
+  teamsReady,
   toParty,
 } from './party'
-import type { QueueSlot } from './party'
 
 const NOW = 1_800_000_000_000
-
-function slot(over: Partial<QueueSlot> = {}): QueueSlot {
-  return {
-    code: 'K7PMX2',
-    leader: 'alice',
-    size: 3,
-    mode: 'casual',
-    members: ['alice', 'bob', 'carol'],
-    createdAt: NOW,
-    ...over,
-  }
-}
 
 describe('party codes', () => {
   it('generates 6 characters without look-alikes', () => {
@@ -54,9 +40,79 @@ describe('reading a party', () => {
       members: ['alice', 'bob'],
       mode: 'ranked',
       size: 2,
+      // No `teams` in the document: this is a room made before a room held two
+      // sides. Everyone lands on A rather than being split down the middle,
+      // because nobody chose that split.
+      teams: { a: ['alice', 'bob'], b: [] },
       status: 'queued',
       createdAt: NOW,
     })
+  })
+
+  it('keeps the sides a document already states', () => {
+    const party = toParty('K7PMX2', {
+      leader: 'alice',
+      members: ['alice', 'bob', 'carol', 'dan'],
+      mode: 'casual',
+      size: 2,
+      teams: { a: ['alice', 'carol'], b: ['bob', 'dan'] },
+      status: 'idle',
+      createdAt: NOW,
+    })
+    expect(party?.teams).toEqual({ a: ['alice', 'carol'], b: ['bob', 'dan'] })
+  })
+
+  it('seats a member the sides forgot, and drops a side member who left', () => {
+    const party = toParty('K7PMX2', {
+      leader: 'alice',
+      members: ['alice', 'bob', 'carol'],
+      mode: 'casual',
+      size: 2,
+      // `carol` is in the room but on neither side; `ghost` is on a side but
+      // not in the room. A half-written document must strand neither.
+      teams: { a: ['alice'], b: ['bob', 'ghost'] },
+      status: 'idle',
+      createdAt: NOW,
+    })
+    expect(party?.teams.b).not.toContain('ghost')
+    expect([...(party?.teams.a ?? []), ...(party?.teams.b ?? [])].sort()).toEqual([
+      'alice',
+      'bob',
+      'carol',
+    ])
+  })
+})
+
+describe('sides of a room', () => {
+  const room = (a: string[], b: string[], size = 3) =>
+    toParty('K7PMX2', {
+      leader: 'alice',
+      members: [...a, ...b],
+      mode: 'casual',
+      size,
+      teams: { a, b },
+      status: 'idle',
+      createdAt: NOW,
+    })!
+
+  it('holds both teams, so a room is twice a team', () => {
+    expect(roomCapacity(2)).toBe(4)
+    expect(roomCapacity(5)).toBe(10)
+  })
+
+  it('sends the next player to the thinner side, and prefers A when level', () => {
+    expect(smallerSide({ a: [], b: [] })).toBe('a')
+    expect(smallerSide({ a: ['alice'], b: [] })).toBe('b')
+    expect(smallerSide({ a: ['alice'], b: ['bob'] })).toBe('a')
+    expect(smallerSide({ a: ['alice'], b: ['bob', 'carol'] })).toBe('a')
+  })
+
+  it('is ready only when both sides are manned and equal', () => {
+    expect(teamsReady(room(['alice'], ['bob']))).toBe(true)
+    expect(teamsReady(room(['alice', 'carol'], ['bob', 'dan']))).toBe(true)
+    // Erlan's rule: no 3 against 5, and never one side on its own.
+    expect(teamsReady(room(['alice', 'carol'], ['bob']))).toBe(false)
+    expect(teamsReady(room(['alice', 'bob'], []))).toBe(false)
   })
 
   it('drops a malformed one instead of rendering nonsense', () => {
@@ -80,40 +136,3 @@ describe('reading a party', () => {
   })
 })
 
-describe('who is waiting', () => {
-  it('counts players per size, not parties', () => {
-    const counts = countWaiting([slot(), slot({ code: 'AAAAAA', size: 2, members: ['d', 'e'] })], 'casual', NOW)
-    expect(counts[3]).toBe(3)
-    expect(counts[2]).toBe(2)
-    expect(counts[5]).toBe(0)
-  })
-
-  it('ignores the other mode', () => {
-    expect(countWaiting([slot({ mode: 'ranked' })], 'casual', NOW)).toEqual(emptyQueueCounts())
-  })
-
-  it('ignores a slot left behind by a closed tab', () => {
-    const stale = slot({ createdAt: NOW - QUEUE_SLOT_TTL_MS - 1 })
-    expect(countWaiting([stale], 'casual', NOW)[3]).toBe(0)
-    const fresh = slot({ createdAt: NOW - QUEUE_SLOT_TTL_MS + 1000 })
-    expect(countWaiting([fresh], 'casual', NOW)[3]).toBe(3)
-  })
-})
-
-describe('what to offer when nobody is in 5х5', () => {
-  it('offers only smaller formats the party can field and someone waits in', () => {
-    const counts = { ...emptyQueueCounts(), 2: 4, 3: 0, 4: 6 }
-    expect(downsizeOptions(5, 5, counts)).toEqual([2, 4])
-    // A party of three cannot field 4х4, however many are waiting there.
-    expect(downsizeOptions(5, 3, counts)).toEqual([2])
-  })
-
-  it('offers nothing when every smaller queue is empty', () => {
-    expect(downsizeOptions(5, 5, emptyQueueCounts())).toEqual([])
-  })
-
-  it('never offers the size already being waited on, or a bigger one', () => {
-    const counts = { ...emptyQueueCounts(), 2: 2, 3: 2, 4: 2, 5: 2 }
-    expect(downsizeOptions(3, 5, counts)).toEqual([2])
-  })
-})

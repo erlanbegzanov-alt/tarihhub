@@ -5,16 +5,16 @@
  * rating and its own screen. This module is only about the bigger formats,
  * where players have to be assembled *before* matchmaking can start.
  *
- * Two collections (see `firestore.rules`):
+ * One collection (see `firestore.rules`): `parties/{code}` — the room itself.
+ * The document id is the six-letter join code the leader shares, so knowing the
+ * code is what gets someone in, exactly like a Кахут room. The leader owns
+ * `mode`, `size` and `status`; everyone else may only move or remove
+ * themselves.
  *
- * - `parties/{code}`    — the party itself. The document id is the six-letter
- *   join code the leader shares, so knowing the code is what gets someone in,
- *   exactly like a Кахут room. The leader owns `mode`, `size` and `status`;
- *   everyone else may only add or remove themselves.
- * - `partyQueue/{code}` — "this party is looking for an opponent". Readable by
- *   everyone signed in, which is what lets the format picker show how many
- *   players are waiting in each size instead of dropping someone into an
- *   empty queue with no warning.
+ * There used to be a second collection, `partyQueue`, holding "this team is
+ * looking for an opponent". It is gone: nothing ever read two slots and paired
+ * them, so the queue could only ever be waited in, never matched out of. A room
+ * holding both sides needs no queue at all.
  *
  * Every join and leave runs in a transaction: five phones editing one members
  * list is exactly the case where read-then-write loses people.
@@ -22,17 +22,7 @@
  * As everywhere else here, nothing throws when Firebase is absent — calls
  * become no-ops and the screen shows its unavailable state.
  */
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  onSnapshot,
-  runTransaction,
-  setDoc,
-  updateDoc,
-  writeBatch,
-} from 'firebase/firestore'
+import { doc, onSnapshot, runTransaction, setDoc, updateDoc } from 'firebase/firestore'
 import type { BattleMode } from './battle'
 import { db } from './firebase'
 import { FRIEND_CODE_ALPHABET } from './friends'
@@ -45,30 +35,85 @@ export type TeamSize = (typeof TEAM_SIZES)[number]
 export const PARTY_CODE_LENGTH = 6
 const PARTY_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/
 
-/** How long a queue slot is treated as live — a phone that closed mid-search
- *  leaves its slot behind, and a stale slot must not be counted as a waiting
- *  player or matched against. */
-export const QUEUE_SLOT_TTL_MS = 90_000
-
+/**
+ * `queued` is no longer written by anything — it belonged to the old search.
+ * It stays in the union because rooms created before the queue was removed may
+ * still carry it, and `joinParty` refusing to let anyone into such a room is
+ * the right answer for a document this code can no longer drive.
+ */
 export type PartyStatus = 'idle' | 'queued'
+
+/**
+ * The two sides of one room.
+ *
+ * A room used to be a single team that then queued for an opponent, and the
+ * opponent never came: nothing in the app ever read two queue slots and paired
+ * them, so a full team could wait for ever. Even with that written, at this
+ * app's size two full teams are almost never waiting in the same minute. The
+ * room now holds both sides at once — gather whoever is around, split them,
+ * play. No queue, and it works with four people online.
+ */
+export interface Teams {
+  a: string[]
+  b: string[]
+}
 
 export interface Party {
   code: string
   leader: string
+  /** Everyone in the room, both sides. `teams` says who is on which. */
   members: string[]
   mode: BattleMode
+  /** Per side, so the room holds `size * 2`. */
   size: TeamSize
+  teams: Teams
   status: PartyStatus
   createdAt: number
 }
 
-export interface QueueSlot {
-  code: string
-  leader: string
-  size: TeamSize
-  mode: BattleMode
-  members: string[]
-  createdAt: number
+/** Where a uid sits, or `null` when they are in the room but unassigned. */
+export type TeamKey = 'a' | 'b'
+
+/** Room capacity: both sides. */
+export function roomCapacity(size: TeamSize): number {
+  return size * 2
+}
+
+/** Reads a roster off a raw document, keeping only strings. */
+function roster(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+/**
+ * Splits `members` into two sides when the document has no `teams` yet.
+ *
+ * Rooms created before this existed are single teams, and the honest reading
+ * of one is "everybody on side A" — not a silent half-and-half split that
+ * would put friends against each other without anyone choosing it.
+ */
+function teamsFrom(value: unknown, members: string[]): Teams {
+  const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : null
+  const a = roster(raw?.a).filter((uid) => members.includes(uid))
+  const b = roster(raw?.b).filter((uid) => members.includes(uid))
+  if (!raw || (a.length === 0 && b.length === 0)) return { a: [...members], b: [] }
+  const placed = new Set([...a, ...b])
+  // Anyone in the room but on neither side joins the smaller one, so a
+  // half-written document can never leave a player with nowhere to stand.
+  const rest = members.filter((uid) => !placed.has(uid))
+  const out: Teams = { a, b }
+  for (const uid of rest) (out.a.length <= out.b.length ? out.a : out.b).push(uid)
+  return out
+}
+
+/** The side with room, preferring A when they are even. */
+export function smallerSide(teams: Teams): TeamKey {
+  return teams.a.length <= teams.b.length ? 'a' : 'b'
+}
+
+/** Both sides manned and equal — Erlan's rule: no 3 against 5. */
+export function teamsReady(party: Party): boolean {
+  const { a, b } = party.teams
+  return a.length >= 1 && a.length === b.length
 }
 
 /* ---------------------------------- codes --------------------------------- */
@@ -101,12 +146,14 @@ export function toParty(code: string, data: unknown): Party | null {
   const members = value.members
   if (!size || !Array.isArray(members) || members.some((m) => typeof m !== 'string')) return null
   if (typeof value.leader !== 'string') return null
+  const roomMembers = members as string[]
   return {
     code,
     leader: value.leader,
-    members: members as string[],
+    members: roomMembers,
     mode: value.mode === 'ranked' ? 'ranked' : 'casual',
     size,
+    teams: teamsFrom(value.teams, roomMembers),
     status: value.status === 'queued' ? 'queued' : 'idle',
     createdAt: typeof value.createdAt === 'number' ? value.createdAt : 0,
   }
@@ -137,60 +184,6 @@ export function watchParty(
   )
 }
 
-/** How many players are waiting right now, per size, for one mode. */
-export type QueueCounts = Record<TeamSize, number>
-
-export function emptyQueueCounts(): QueueCounts {
-  return { 2: 0, 3: 0, 4: 0, 5: 0 }
-}
-
-/** Counts live slots only — ones older than `QUEUE_SLOT_TTL_MS` are leftovers
- *  from closed tabs, and counting them would promise an opponent who isn't
- *  there. */
-export function countWaiting(slots: QueueSlot[], mode: BattleMode, now = Date.now()): QueueCounts {
-  const counts = emptyQueueCounts()
-  for (const slot of slots) {
-    if (slot.mode !== mode) continue
-    if (now - slot.createdAt > QUEUE_SLOT_TTL_MS) continue
-    counts[slot.size] += slot.members.length
-  }
-  return counts
-}
-
-function toSlot(code: string, data: unknown): QueueSlot | null {
-  if (!data || typeof data !== 'object') return null
-  const value = data as Record<string, unknown>
-  const size = asTeamSize(value.size)
-  const members = value.members
-  if (!size || !Array.isArray(members)) return null
-  return {
-    code,
-    leader: typeof value.leader === 'string' ? value.leader : '',
-    size,
-    mode: value.mode === 'ranked' ? 'ranked' : 'casual',
-    members: members as string[],
-    createdAt: typeof value.createdAt === 'number' ? value.createdAt : 0,
-  }
-}
-
-/** Streams the whole queue. It is a handful of documents — a few parties at a
- *  time — so there is no query, no index, and one listener answers both "how
- *  many are waiting in 3х3" and, later, "who can we play against". */
-export function watchQueue(onChange: (slots: QueueSlot[]) => void): () => void {
-  if (!db) return () => {}
-  return onSnapshot(
-    collection(db, 'partyQueue'),
-    (snapshot) => {
-      onChange(
-        snapshot.docs
-          .map((entry) => toSlot(entry.id, entry.data()))
-          .filter((slot): slot is QueueSlot => slot !== null),
-      )
-    },
-    (error) => console.warn('[tarihhub] Party queue listener failed.', error),
-  )
-}
-
 /* --------------------------------- writing -------------------------------- */
 
 /** Opens a party with the caller alone in it. Returns its code, or `null`. */
@@ -210,6 +203,7 @@ export async function createParty(
         members: [uid],
         mode,
         size,
+        teams: { a: [uid], b: [] },
         status: 'idle',
         createdAt: Date.now(),
       })
@@ -246,13 +240,36 @@ export async function joinParty(rawCode: string, uid: string): Promise<JoinParty
       if (!party) return 'notFound' as JoinPartyResult
       if (party.members.includes(uid)) return 'already' as JoinPartyResult
       if (party.status === 'queued') return 'searching' as JoinPartyResult
-      if (party.members.length >= party.size) return 'full' as JoinPartyResult
-      transaction.update(ref, { members: [...party.members, uid] })
+      if (party.members.length >= roomCapacity(party.size)) return 'full' as JoinPartyResult
+      // Straight onto the thinner side, so a room fills evenly without anyone
+      // having to shuffle people about before they can start.
+      const side = smallerSide(party.teams)
+      transaction.update(ref, {
+        members: [...party.members, uid],
+        teams: { ...party.teams, [side]: [...party.teams[side], uid] },
+      })
       return 'joined' as JoinPartyResult
     })
   } catch (error) {
     console.warn('[tarihhub] Could not join the party.', error)
     return 'error'
+  }
+}
+
+/**
+ * The patch that takes one uid out of the room.
+ *
+ * `members` and `teams` have to move together in a single update: leaving a
+ * uid behind on a side it is no longer a member of would let a team start with
+ * a player who is not in the room.
+ */
+function dropFromRoom(party: Party, uid: string): { members: string[]; teams: Teams } {
+  return {
+    members: party.members.filter((member) => member !== uid),
+    teams: {
+      a: party.teams.a.filter((member) => member !== uid),
+      b: party.teams.b.filter((member) => member !== uid),
+    },
   }
 }
 
@@ -268,13 +285,12 @@ export async function leaveParty(code: string, uid: string): Promise<boolean> {
       const party = toParty(code, snapshot.data())
       if (!party) return
       if (party.leader === uid) {
-        // The leader leaving means there is no party any more: without this
-        // the others would sit in a room nobody can queue.
-        transaction.delete(doc(database, 'partyQueue', code))
+        // The leader leaving means there is no room any more: without this the
+        // others would sit in a room nobody can start.
         transaction.delete(ref)
         return
       }
-      transaction.update(ref, { members: party.members.filter((member) => member !== uid) })
+      transaction.update(ref, dropFromRoom(party, uid))
     })
     return true
   } catch (error) {
@@ -293,11 +309,45 @@ export async function removeMember(code: string, memberUid: string): Promise<boo
       const snapshot = await transaction.get(ref)
       const party = snapshot.exists() ? toParty(code, snapshot.data()) : null
       if (!party || memberUid === party.leader) return
-      transaction.update(ref, { members: party.members.filter((member) => member !== memberUid) })
+      transaction.update(ref, dropFromRoom(party, memberUid))
     })
     return true
   } catch (error) {
     console.warn('[tarihhub] Could not remove the member.', error)
+    return false
+  }
+}
+
+/**
+ * Moves one player to the other side.
+ *
+ * Anyone may move themselves and the leader may move anyone, which is how the
+ * two reference lobbies Erlan pointed at behave. The side being joined has to
+ * have room, or a 2v2 room could end up 4v0 and never satisfy `teamsReady`.
+ */
+export async function switchTeam(code: string, uid: string, to: TeamKey): Promise<boolean> {
+  if (!db) return false
+  const database = db
+  try {
+    return await runTransaction(database, async (transaction) => {
+      const ref = doc(database, 'parties', code)
+      const snapshot = await transaction.get(ref)
+      const party = snapshot.exists() ? toParty(code, snapshot.data()) : null
+      if (!party || party.status !== 'idle') return false
+      if (!party.members.includes(uid)) return false
+      if (party.teams[to].includes(uid)) return true
+      if (party.teams[to].length >= party.size) return false
+      const from: TeamKey = to === 'a' ? 'b' : 'a'
+      transaction.update(ref, {
+        teams: {
+          [from]: party.teams[from].filter((member) => member !== uid),
+          [to]: [...party.teams[to], uid],
+        },
+      })
+      return true
+    })
+  } catch (error) {
+    console.warn('[tarihhub] Could not switch sides.', error)
     return false
   }
 }
@@ -317,75 +367,3 @@ export async function setPartyFormat(
   }
 }
 
-/**
- * Starts looking for an opponent: the party is marked `queued` and its slot
- * appears in the queue, both in one batch so the two can never disagree.
- * Only a full party may search — `size` is what the opponent will be matched
- * against, and an under-filled slot would produce an uneven battle.
- */
-export async function startSearch(code: string, uid: string): Promise<boolean> {
-  if (!db) return false
-  try {
-    const snapshot = await getDoc(doc(db, 'parties', code))
-    const party = snapshot.exists() ? toParty(code, snapshot.data()) : null
-    if (!party || party.leader !== uid || party.members.length !== party.size) return false
-    const batch = writeBatch(db)
-    batch.update(doc(db, 'parties', code), { status: 'queued' })
-    batch.set(doc(db, 'partyQueue', code), {
-      leader: uid,
-      size: party.size,
-      mode: party.mode,
-      members: party.members,
-      createdAt: Date.now(),
-    })
-    await batch.commit()
-    return true
-  } catch (error) {
-    console.warn('[tarihhub] Could not start the search.', error)
-    return false
-  }
-}
-
-/** Stops looking. Safe to call when not searching. */
-export async function stopSearch(code: string): Promise<boolean> {
-  if (!db) return false
-  try {
-    await deleteDoc(doc(db, 'partyQueue', code))
-    await updateDoc(doc(db, 'parties', code), { status: 'idle' })
-    return true
-  } catch (error) {
-    console.warn('[tarihhub] Could not stop the search.', error)
-    return false
-  }
-}
-
-/** Keeps a live slot from ageing past `QUEUE_SLOT_TTL_MS` while the leader's
- *  screen is still open — the same idea as the duel's presence ping. */
-export async function refreshQueueSlot(code: string, uid: string, party: Party): Promise<void> {
-  if (!db) return
-  try {
-    await setDoc(doc(db, 'partyQueue', code), {
-      leader: uid,
-      size: party.size,
-      mode: party.mode,
-      members: party.members,
-      createdAt: Date.now(),
-    })
-  } catch (error) {
-    console.warn('[tarihhub] Could not refresh the queue slot.', error)
-  }
-}
-
-/**
- * The sizes worth offering instead of the one being waited on: smaller
- * formats the party can actually field, and that somebody is waiting in.
- * This is the answer to "5х5 may never fill" — rather than hiding an empty
- * queue, the screen offers a format with real people in it.
- */
-export function downsizeOptions(
-  current: TeamSize,
-  members: number,
-  counts: QueueCounts,
-): TeamSize[] {
-  return TEAM_SIZES.filter((size) => size < current && size <= members && counts[size] > 0)
-}
