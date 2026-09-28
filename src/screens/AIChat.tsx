@@ -3,9 +3,10 @@ import { ArrowLeft, Send, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { PortraitPanel } from '../components/PortraitPanel'
-import { EraBadge, IconButton } from '../components/ui'
+import { EraBadge, FilterChip, IconButton, SearchField } from '../components/ui'
+import { personCategories } from '../data/eras'
 import { getPerson, people } from '../data/people'
-import type { Person } from '../data/types'
+import type { Person, PersonCategory } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { askPersona } from '../lib/ai'
@@ -20,8 +21,51 @@ interface Message extends ChatTurn {
 
 /* ------------------------- persona picker ------------------------- */
 
+/**
+ * The list of people, searchable — and the whole of what used to be «Поиск».
+ *
+ * Erlan asked what the difference between AI and Поиск was. There wasn't one:
+ * both screens listed the same `people`, and only the tap differed — one opened
+ * the card, the other opened the chat. Two tabs over one list is the kind of
+ * thing that makes a section feel scattered, so the field and the category
+ * chips moved here and the tab went away.
+ *
+ * A row opens the conversation, because that is this section's verb. The card
+ * is still one tap away: the empty transcript's portrait links to it, and
+ * `?q=` from the Home search lands straight in this field.
+ */
 function PersonaPicker({ onPick }: { onPick: (person: Person) => void }) {
-  const { t } = useLang()
+  const { t, lang } = useLang()
+  // `?q=` rather than local state: the Home search box navigates here with the
+  // query already in the URL, and a shared link to a search should reopen it.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const query = searchParams.get('q') ?? ''
+  const [filter, setFilter] = useState<PersonCategory | 'all'>('all')
+
+  const setQuery = (value: string) => {
+    // `replace` so typing does not fill the back button with every keystroke.
+    setSearchParams(value ? { q: value } : {}, { replace: true })
+  }
+
+  const results = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    return people.filter((person) => {
+      if (filter !== 'all' && person.category !== filter) return false
+      if (!needle) return true
+      const haystack = [
+        person.name[lang],
+        person.role[lang],
+        person.tagline[lang],
+        person.eraBadge[lang],
+        person.bio[lang],
+      ]
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(needle)
+    })
+  }, [query, filter, lang])
+
+  const searching = query.trim() !== '' || filter !== 'all'
 
   return (
     <motion.div variants={staggerContainer} initial="initial" animate="animate">
@@ -32,11 +76,43 @@ function PersonaPicker({ onPick }: { onPick: (person: Person) => void }) {
         <p className="mt-1.5 text-[14.5px] text-ink-soft">{t(s.ai.subtitle)}</p>
       </motion.div>
 
+      <motion.div variants={staggerItem} className="mt-4 md:max-w-2xl">
+        <SearchField
+          value={query}
+          onChange={setQuery}
+          placeholder={t(s.ai.searchPlaceholder)}
+        />
+      </motion.div>
+
+      <motion.div variants={staggerItem} className="mt-3 flex flex-wrap gap-2">
+        {/* One `layoutGroup` across all the chips, so the active pill slides
+            from the old chip to the new one instead of cross-fading. */}
+        <FilterChip
+          active={filter === 'all'}
+          onClick={() => setFilter('all')}
+          layoutGroup="ai-filter"
+        >
+          {t(s.common.all)}
+        </FilterChip>
+        {personCategories.map((category) => (
+          <FilterChip
+            key={category.key}
+            active={filter === category.key}
+            onClick={() => setFilter(category.key)}
+            layoutGroup="ai-filter"
+          >
+            {t(category.label)}
+          </FilterChip>
+        ))}
+      </motion.div>
+
       <motion.h2
         variants={staggerItem}
-        className="mt-7 mb-3 text-[17px] font-semibold text-ink"
+        className="mt-6 mb-3 text-[17px] font-semibold text-ink"
       >
-        {t(s.ai.choosePersona)}
+        {searching
+          ? `${results.length} ${t(s.ai.resultsFound)}`
+          : t(s.ai.choosePersona)}
       </motion.h2>
 
       <motion.ul
@@ -45,7 +121,7 @@ function PersonaPicker({ onPick }: { onPick: (person: Person) => void }) {
         animate="animate"
         className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
       >
-        {people.map((person) => (
+        {results.map((person) => (
           <motion.li key={person.id} variants={staggerItem} className="min-w-0">
             <motion.button
               type="button"
@@ -81,6 +157,15 @@ function PersonaPicker({ onPick }: { onPick: (person: Person) => void }) {
           </motion.li>
         ))}
       </motion.ul>
+
+      {results.length === 0 && (
+        <motion.p
+          variants={staggerItem}
+          className="rounded-card bg-surface px-4 py-6 text-center text-[13.5px] text-ink-soft shadow-soft ring-1 ring-line/60"
+        >
+          {t(s.ai.nothingFound)}
+        </motion.p>
+      )}
     </motion.div>
   )
 }

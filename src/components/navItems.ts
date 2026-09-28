@@ -1,11 +1,10 @@
 import {
   BookOpen,
   ClipboardCheck,
+  Flame,
   GraduationCap,
   House,
-  Search,
   Sparkles,
-  Swords,
   User,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -36,15 +35,21 @@ export const navItems: NavItem[] = [
   ...(FEATURE_EXAM_MOCK
     ? [{ to: '/exam', label: s.nav.exam, icon: ClipboardCheck, match: [] }]
     : []),
-  { to: '/explore', label: s.nav.explore, icon: Search, match: ['/person'] },
-  { to: '/ai', label: s.nav.ai, icon: Sparkles, match: [] },
+  // Поиск and AI were two tabs over one list — the same `people`, differing
+  // only in what a tap did. Erlan asked what the difference was, and there
+  // wasn't one worth a tab: the search now sits inside AI, and `/person` keeps
+  // this tab lit because that is where a search result leads.
+  { to: '/ai', label: s.nav.ai, icon: Sparkles, match: ['/person'] },
   {
     to: '/timeline',
     label: s.nav.timeline,
     icon: BookOpen,
     match: ['/map', '/quiz'],
   },
-  { to: '/battle', label: s.nav.battle, icon: Swords, match: [] },
+  // Flame, not crossed swords: the swords now mark the one mode where two
+  // sides actually face each other, and a section and one of its modes sharing
+  // a glyph on the same screen read as a bug.
+  { to: '/battle', label: s.nav.battle, icon: Flame, match: [] },
   { to: '/profile', label: s.nav.profile, icon: User, match: [] },
 ]
 

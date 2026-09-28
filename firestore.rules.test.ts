@@ -896,6 +896,40 @@ d('firestore.rules', () => {
       await assertFails(deleteDoc(doc(mallory, 'partyInvites', `${PARTY}_bob`)))
       await assertSucceeds(deleteDoc(doc(bob, 'partyInvites', `${PARTY}_bob`)))
     })
+
+    /**
+     * The listener, not a document read.
+     *
+     * `watchMyInvites` does not fetch invitations by id — it cannot, since it
+     * does not know which rooms exist. It runs `where('to', '==', uid)` over the
+     * whole collection, and a query the rules refuse fails as one operation:
+     * the snapshot callback never fires, `onChange` is never called, and the
+     * only trace is a console warning. The screen then shows no invitations and
+     * looks exactly like nobody invited you — which is what Erlan reported.
+     *
+     * The single-document test above cannot catch that, because `get` and `list`
+     * are evaluated differently: a `list` is allowed only when the query itself
+     * proves every document it could return satisfies the rule.
+     */
+    it('the invited person can run the listener’s own query', async () => {
+      await seedParty({ members: ['alice'] })
+      await seedFriendship('alice', 'bob')
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'partyInvites', `${PARTY}_bob`), invite())
+      })
+      const bob = env.authenticatedContext('bob').firestore()
+      const mine = query(collection(bob, 'partyInvites'), where('to', '==', 'bob'))
+      const found = await assertSucceeds(getDocs(mine))
+      expect(found.size).toBe(1)
+
+      // And that query is the only one allowed: unconstrained, the collection
+      // would be a directory of who plays with whom.
+      await assertFails(getDocs(query(collection(bob, 'partyInvites'))))
+      const mallory = env.authenticatedContext('mallory').firestore()
+      await assertFails(
+        getDocs(query(collection(mallory, 'partyInvites'), where('to', '==', 'bob'))),
+      )
+    })
   })
 
 })

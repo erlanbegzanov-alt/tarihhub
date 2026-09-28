@@ -16,7 +16,7 @@
  * `navItems.ts`): it is what the course prepares for, and standing it beside
  * Кахут and the duels said it was one game among several.
  */
-import { Swords, Trophy, UserPlus, Users, Zap } from 'lucide-react'
+import { Flame, Swords, Trophy, UserPlus, Users, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
@@ -26,11 +26,10 @@ import { FormDots, LeagueCrest } from '../components/battle'
 import { SectionHeading } from '../components/ui'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
+import { useAlerts } from '../lib/alerts'
 import { fetchBattlePlayer, ratingTierFor } from '../lib/battle'
 import { FEATURE_TEAM_BATTLE } from '../lib/environment'
 import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
-import { watchMyInvites } from '../lib/party'
-import type { PartyInvite } from '../lib/party'
 import { useProfile } from '../lib/progress'
 import { useSession } from '../lib/session'
 
@@ -47,6 +46,7 @@ function ModeTile({
   title,
   subtitle,
   stat,
+  alert = false,
   onClick,
 }: {
   icon: LucideIcon
@@ -55,6 +55,13 @@ function ModeTile({
   subtitle: string
   /** One line of this mode's own record, or `null` when there is none yet. */
   stat?: string | null
+  /**
+   * The stat is something waiting on the reader, not a record — a room
+   * invitation, a friend request. It turns red and the icon gets a dot, because
+   * a count in the same faint grey as "Дуэлей: 7" reads as trivia, and Erlan's
+   * point was that these have to be impossible to walk past.
+   */
+  alert?: boolean
   onClick: () => void
 }) {
   return (
@@ -66,22 +73,35 @@ function ModeTile({
       transition={springSoft}
       className="focus-ring flex flex-col rounded-card bg-surface p-4 text-left shadow-soft ring-1 ring-line/60 transition-colors duration-200"
     >
-      <span
-        className="grid h-10 w-10 place-items-center rounded-xl"
-        style={{
-          background: `color-mix(in srgb, ${accent} 14%, var(--color-surface))`,
-          color: accent,
-        }}
-      >
-        <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
+      <span className="relative">
+        <span
+          className="grid h-10 w-10 place-items-center rounded-xl"
+          style={{
+            background: `color-mix(in srgb, ${accent} 14%, var(--color-surface))`,
+            color: accent,
+          }}
+        >
+          <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </span>
+        {alert && (
+          <span
+            aria-hidden
+            className="absolute -top-1 -right-1 h-[11px] w-[11px] rounded-full bg-wrong ring-2 ring-surface"
+          />
+        )}
       </span>
       <span className="mt-3 text-[15.5px] font-bold text-ink">{title}</span>
       <span className="mt-1 text-[12px] leading-snug text-ink-soft">{subtitle}</span>
-      {stat && (
-        <span className="mt-1.5 text-[11.5px] font-semibold text-ink-faint tabular-nums">
-          {stat}
-        </span>
-      )}
+      {stat &&
+        (alert ? (
+          <span className="mt-2 self-start rounded-full bg-wrong px-2 py-0.5 text-[11px] font-bold text-white tabular-nums">
+            {stat}
+          </span>
+        ) : (
+          <span className="mt-1.5 text-[11.5px] font-semibold text-ink-faint tabular-nums">
+            {stat}
+          </span>
+        ))}
     </motion.button>
   )
 }
@@ -107,14 +127,11 @@ export function Battle() {
     }
   }, [uid])
 
-  // Someone calling you into a room has to be visible from here: nobody opens
-  // Команда on the off-chance, so an invitation nobody sees is an invitation
-  // that never arrived.
-  const [invites, setInvites] = useState<PartyInvite[]>([])
-  useEffect(() => {
-    if (!uid || !FEATURE_TEAM_BATTLE) return
-    return watchMyInvites(uid, setInvites)
-  }, [uid])
+  // What is waiting on the reader — a room invitation, a friend request. Both
+  // arrive from other people and neither used to be visible until you went
+  // looking, so the same counts drive the dot on the nav rail (see
+  // `src/lib/alerts.ts`) and the numbers on the tiles below.
+  const alerts = useAlerts()
 
   const tier = ratingTierFor(rating ?? 0)
 
@@ -129,11 +146,18 @@ export function Battle() {
   /** How many points short of the next league, or `null` at the top. */
   const toNext = tier.next ? Math.max(0, tier.next.min - (rating ?? 0)) : null
 
-  /** "Дуэлей: 7 · 57% побед", or the never-played line. */
-  const modeRecord = (duels: number, wins: number): string =>
+  /**
+   * "Дуэлей: 7 · 57% побед" — or nothing at all.
+   *
+   * It used to fall back to «ещё не играли», which put a third small grey line
+   * on a tile that had nothing to report. Erlan's complaint about too many tiny
+   * fonts is mostly made of lines like that one, and an absent record already
+   * says "ещё не играли" by being absent.
+   */
+  const modeRecord = (duels: number, wins: number): string | null =>
     duels > 0
       ? `${t(s.battle.hubDuelsLabel)}: ${duels} · ${Math.round((wins / duels) * 100)}% ${t(s.battle.hubWinsLabel)}`
-      : t(s.battle.hubNeverPlayed)
+      : null
 
   return (
     <motion.div
@@ -143,7 +167,7 @@ export function Battle() {
       className="mx-auto max-w-2xl lg:max-w-3xl"
     >
       <KahootHeader
-        icon={<Swords className="h-5 w-5" strokeWidth={2} />}
+        icon={<Flame className="h-5 w-5" strokeWidth={2} />}
         title={t(s.battle.title)}
         subtitle={t(s.battle.subtitle)}
         onBack={() => navigate('/')}
@@ -238,14 +262,22 @@ export function Battle() {
           stat={modeRecord(profile.casualDuels, profile.casualWins)}
           onClick={() => navigate('/battle/casual')}
         />
-        {/* Unfinished — test site only until team battle ships. */}
+        {/* Unfinished — test site only until team battle ships. Crossed swords
+            rather than the group-of-people glyph it shared with Кахут: it is the
+            one mode where two sides face each other, and the icon was doing
+            nothing to say so. */}
         {FEATURE_TEAM_BATTLE && (
           <ModeTile
-            icon={Users}
+            icon={Swords}
             accent="var(--color-era-saka)"
             title={t(s.team.title)}
             subtitle={t(s.team.hubSub)}
-            stat={invites.length > 0 ? `${invites.length} ${t(s.team.inviteWaiting)}` : null}
+            stat={
+              alerts.partyInvites > 0
+                ? `${alerts.partyInvites} ${t(s.team.inviteWaiting)}`
+                : null
+            }
+            alert={alerts.partyInvites > 0}
             onClick={() => navigate('/battle/team')}
           />
         )}
@@ -262,6 +294,12 @@ export function Battle() {
             accent="var(--color-era-turkic)"
             title={t(s.friends.title)}
             subtitle={t(s.friends.hubSub)}
+            stat={
+              alerts.friendRequests > 0
+                ? `${alerts.friendRequests} ${t(s.friends.requestsWaiting)}`
+                : null
+            }
+            alert={alerts.friendRequests > 0}
             onClick={() => navigate('/battle/friends')}
           />
         )}

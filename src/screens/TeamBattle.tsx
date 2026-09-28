@@ -41,7 +41,6 @@ import {
   joinParty,
   leaveParty,
   removeMember,
-  roomCapacity,
   setPartyFormat,
   switchTeam,
   teamsReady,
@@ -139,18 +138,18 @@ function SideColumn({
     <div className={cn('flex min-w-0 flex-col', right ? 'items-end' : 'items-start')}>
       <div className="flex items-baseline gap-1.5">
         {right && (
-          <span className="text-[11px] font-semibold text-ink-faint tabular-nums">
+          <span className="text-[12px] font-semibold text-ink-faint tabular-nums">
             {uids.length}/{slots}
           </span>
         )}
         <span
-          className="text-[11px] font-bold tracking-wide uppercase"
+          className="text-[12px] font-bold tracking-wide uppercase"
           style={{ color: SIDE_COLOR[side] }}
         >
           {label}
         </span>
         {!right && (
-          <span className="text-[11px] font-semibold text-ink-faint tabular-nums">
+          <span className="text-[12px] font-semibold text-ink-faint tabular-nums">
             {uids.length}/{slots}
           </span>
         )}
@@ -179,8 +178,8 @@ function SideColumn({
                 avatarTierIndex={player?.avatarTierIndex ?? 0}
               />
               <span className={cn('flex min-w-0 flex-col', right && 'items-end')}>
-                <span className="truncate text-[13.5px] font-semibold text-ink">{name}</span>
-                <span className="truncate text-[10.5px] text-ink-faint tabular-nums">
+                <span className="truncate text-[14px] font-semibold text-ink">{name}</span>
+                <span className="truncate text-[11.5px] text-ink-faint tabular-nums">
                   {[
                     isCaptain ? labels.leader : null,
                     player ? `${labels.level} ${player.level}` : null,
@@ -275,8 +274,22 @@ export function TeamBattle() {
   const [code, setCode] = useState<string | null>(() => readStoredParty())
   const [party, setParty] = useState<Party | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  /**
+   * Firestore's own reason for the last failure, shown in small type under the
+   * friendly notice. Erlan reported the room code "не работает вообще" and
+   * neither of us could get further than that, because every cause — a rule
+   * refusing the write, an expired sign-in, no signal — printed the same
+   * sentence about checking the internet.
+   */
+  const [noticeCode, setNoticeCode] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  /** Clears both lines: every action starts from no complaint on screen. */
+  const clearNotice = () => {
+    setNotice(null)
+    setNoticeCode(null)
+  }
 
   const forgetParty = useCallback((message?: string) => {
     storeParty(null)
@@ -379,13 +392,14 @@ export function TeamBattle() {
   const open = async () => {
     if (!uid || busy) return
     setBusy(true)
-    setNotice(null)
+    clearNotice()
     const created = await createParty(uid, 'casual', newSize)
-    if (created) {
-      storeParty(created)
-      setCode(created)
+    if (created.code) {
+      storeParty(created.code)
+      setCode(created.code)
     } else {
       setNotice(t(s.team.joinError))
+      setNoticeCode(created.reason ?? null)
     }
     setBusy(false)
   }
@@ -394,15 +408,16 @@ export function TeamBattle() {
     event.preventDefault()
     if (!uid || busy) return
     setBusy(true)
-    setNotice(null)
+    clearNotice()
     const outcome = await joinParty(draft, uid)
-    if (outcome === 'joined' || outcome === 'already') {
+    if (outcome.result === 'joined' || outcome.result === 'already') {
       const joined = draft.toUpperCase().replace(/[\s-]/g, '')
       storeParty(joined)
       setCode(joined)
       setDraft('')
     } else {
-      setNotice(t(JOIN_TEXT[outcome]))
+      setNotice(t(JOIN_TEXT[outcome.result]))
+      setNoticeCode(outcome.reason ?? null)
     }
     setBusy(false)
   }
@@ -434,7 +449,7 @@ export function TeamBattle() {
     const mine: TeamKey = party.teams.a.includes(uid) ? 'a' : 'b'
     const target: TeamKey = mine === 'a' ? 'b' : 'a'
     setBusy(true)
-    setNotice(null)
+    clearNotice()
     const moved = await switchTeam(party.code, uid, target)
     if (!moved) setNotice(t(s.team.switchFailed))
     setBusy(false)
@@ -448,7 +463,7 @@ export function TeamBattle() {
   const callFriend = async (to: string) => {
     if (!party || !uid || busy) return
     setBusy(true)
-    setNotice(null)
+    clearNotice()
     const sent = await invitePlayer(party.code, uid, to)
     if (sent) setInvited((prev) => (prev.includes(to) ? prev : [...prev, to]))
     else setNotice(t(s.team.joinError))
@@ -458,17 +473,18 @@ export function TeamBattle() {
   const acceptInvite = async (invite: PartyInvite) => {
     if (!uid || busy) return
     setBusy(true)
-    setNotice(null)
+    clearNotice()
     const outcome = await joinParty(invite.code, uid)
-    if (outcome === 'joined' || outcome === 'already') {
+    if (outcome.result === 'joined' || outcome.result === 'already') {
       storeParty(invite.code)
       setCode(invite.code)
       await dismissInvite(invite.id)
     } else {
-      setNotice(t(JOIN_TEXT[outcome]))
+      setNotice(t(JOIN_TEXT[outcome.result]))
+      setNoticeCode(outcome.reason ?? null)
       // The room is gone: the card would otherwise sit there for ever, calling
       // into nothing.
-      if (outcome === 'notFound') await dismissInvite(invite.id)
+      if (outcome.result === 'notFound') await dismissInvite(invite.id)
     }
     setBusy(false)
   }
@@ -498,16 +514,10 @@ export function TeamBattle() {
                 : 'bg-cream text-ink ring-1 ring-line/70 hover:ring-brand/40',
             )}
           >
+            {/* «4 игроков в комнате» under every tile was four more lines of
+                11px grey: "2х2" already says how many people it takes. */}
             <span className="block text-[17px] leading-none font-bold tabular-nums">
               {size}х{size}
-            </span>
-            <span
-              className={cn(
-                'mt-1.5 block text-[11.5px] tabular-nums',
-                active ? 'text-white/80' : 'text-ink-faint',
-              )}
-            >
-              {roomCapacity(size)} {t(s.team.roomHolds)}
             </span>
           </button>
         )
@@ -620,7 +630,7 @@ export function TeamBattle() {
                 value={draft}
                 onChange={(event) => {
                   setDraft(event.target.value)
-                  setNotice(null)
+                  clearNotice()
                 }}
                 placeholder={t(s.team.joinPlaceholder)}
                 autoComplete="off"
@@ -640,9 +650,14 @@ export function TeamBattle() {
           </motion.form>
 
           {notice && (
-            <motion.p variants={staggerItem} className="mt-3 text-[13px] text-wrong">
-              {notice}
-            </motion.p>
+            <motion.div variants={staggerItem} className="mt-3">
+              <p className="text-[13px] text-wrong">{notice}</p>
+              {noticeCode && (
+                <p className="mt-1 font-mono text-[11px] text-ink-faint">
+                  {t(s.team.failureCode)}: {noticeCode}
+                </p>
+              )}
+            </motion.div>
           )}
         </>
       ) : (
@@ -751,7 +766,7 @@ export function TeamBattle() {
                             avatarGender={players[friendUid]?.avatarGender ?? null}
                             avatarTierIndex={players[friendUid]?.avatarTierIndex ?? 0}
                           />
-                          <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-ink">
+                          <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink">
                             {nameOf(friendUid)}
                           </span>
                           {inRoom ? (
@@ -809,26 +824,44 @@ export function TeamBattle() {
           </motion.section>
 
           {notice && (
-            <motion.p variants={staggerItem} className="mt-3 text-center text-[13px] text-wrong">
-              {notice}
-            </motion.p>
+            <motion.div variants={staggerItem} className="mt-3 text-center">
+              <p className="text-[13px] text-wrong">{notice}</p>
+              {noticeCode && (
+                <p className="mt-1 font-mono text-[11px] text-ink-faint">
+                  {t(s.team.failureCode)}: {noticeCode}
+                </p>
+              )}
+            </motion.div>
           )}
 
-          <motion.div variants={staggerItem} className="mt-5">
-            <p className="text-[11px] font-semibold tracking-wide text-ink-faint uppercase">
-              {t(s.team.formatTitle)}
-            </p>
-            <div className="mt-2.5">{formatPicker(party.size, (size) => void chooseSize(size))}</div>
-          </motion.div>
+          {/* Only the captain can change the format — `chooseSize` refuses for
+              anyone else and said so in a notice. Showing four buttons that
+              answer "это может только капитан" was a whole block of the screen
+              spent on a refusal. */}
+          {isLeader && (
+            <motion.div variants={staggerItem} className="mt-5">
+              <p className="text-[11px] font-semibold tracking-wide text-ink-faint uppercase">
+                {t(s.team.formatTitle)}
+              </p>
+              <div className="mt-2.5">
+                {formatPicker(party.size, (size) => void chooseSize(size))}
+              </div>
+            </motion.div>
+          )}
 
-          <motion.div variants={staggerItem} className="mt-5 flex justify-center">
+          {/* Leaving was a faint grey line of 13px text with no edge to it, and
+              Erlan said he could barely find it. It is a real button now: its
+              own outline, full width, in the colour the app uses for undoing
+              things. Still the last thing on the screen, because it is the one
+              action here you cannot take back. */}
+          <motion.div variants={staggerItem} className="mt-5">
             <button
               type="button"
               onClick={() => void leave()}
               disabled={busy}
-              className="focus-ring inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold text-ink-faint hover:text-wrong disabled:opacity-50"
+              className="focus-ring flex w-full items-center justify-center gap-2 rounded-tile bg-surface px-5 py-3.5 text-[14.5px] font-bold text-wrong ring-1 ring-wrong/35 transition-colors hover:bg-wrong-tint disabled:opacity-50"
             >
-              <LogOut className="h-3.5 w-3.5" strokeWidth={2} />
+              <LogOut className="h-[17px] w-[17px]" strokeWidth={2.2} />
               {t(isLeader ? s.team.disband : s.team.leave)}
             </button>
           </motion.div>

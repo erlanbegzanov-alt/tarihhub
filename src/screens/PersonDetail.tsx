@@ -40,10 +40,10 @@ export function PersonDetail() {
       <div className="py-24 text-center">
         <p className="text-ink-soft">{t(s.person.missing)}</p>
         <Link
-          to="/explore"
+          to="/ai"
           className="focus-ring mt-4 inline-block rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white"
         >
-          {t(s.explore.title)}
+          {t(s.nav.ai)}
         </Link>
       </div>
     )

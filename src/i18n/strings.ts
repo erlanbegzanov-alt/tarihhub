@@ -11,8 +11,13 @@ export const s = {
     course: { kz: 'Курс', ru: 'Курс' },
     /** Short enough for the nav rail; the screen itself says «Пробник ҰБТ». */
     exam: { kz: 'Сынақ', ru: 'Пробник' },
-    explore: { kz: 'Іздеу', ru: 'Поиск' },
+    // Поиск used to be a section of its own. It was the same list of people as
+    // AI, differing only in what a tap did — read the card, or talk to them —
+    // so the rail carried two tabs over one list. The search lives inside AI
+    // now, and `/explore` redirects there.
     ai: { kz: 'AI', ru: 'AI' },
+    /** Screen-reader name for the dot over a tab with something waiting. */
+    newAlerts: { kz: 'жаңа хабарлама бар', ru: 'есть новое' },
     timeline: { kz: 'Тарих', ru: 'История' },
     battle: { kz: 'Батл', ru: 'Батл' },
     profile: { kz: 'Профиль', ru: 'Профиль' },
@@ -390,8 +395,8 @@ export const s = {
     hubPlayRanked: { kz: 'Рейтингте ойнау', ru: 'Играть рейтинг' },
     /** Empty state on the hub for an account that has never duelled. */
     hubNoPlay: {
-      kz: 'Әзірге бірде-бір батл өткізген жоқсыз. Қарапайымнан бастаңыз — рейтингке әсер етпейді.',
-      ru: 'Вы ещё не провели ни одного батла. Начните с обычного — он не влияет на рейтинг.',
+      kz: 'Қарапайым батл рейтингке әсер етпейді — сонан бастаңыз.',
+      ru: 'Обычный батл не влияет на рейтинг — начните с него.',
     },
     /**
      * Per-mode summary line on the hub's mode cards, read as
@@ -472,6 +477,9 @@ export const s = {
       kz: 'Досыңды оның коды арқылы қос',
       ru: 'Добавь друга по его коду',
     },
+    /** On the hub tile, after a count: "2 заявки в друзья". A request nobody
+     *  sees is a request that never arrived, so it is counted where it shows. */
+    requestsWaiting: { kz: 'сұраныс күтіп тұр', ru: 'заявки в друзья' },
 
     myCodeLabel: { kz: 'Сенің кодың', ru: 'Твой код' },
     myCodeHint: {
@@ -550,51 +558,49 @@ export const s = {
    * button that silently searches forever.
    */
   team: {
-    title: { kz: 'Команда', ru: 'Команда' },
+    /**
+     * «Команда» was the wrong name for this screen and Erlan said so: what you
+     * open is one *room* that holds two teams facing each other, so calling the
+     * room a team contradicted the A-versus-B layout inside it. The mode is
+     * «Командный бой»; the thing you create and share a code to is a комната.
+     */
+    title: { kz: 'Командалық шайқас', ru: 'Командный бой' },
     subtitle: { kz: 'Достарыңмен 2х2 … 5х5', ru: 'С друзьями 2х2 … 5х5' },
-    hubSub: { kz: 'Достарды шақыр, бірге ойна', ru: 'Позови друзей и играйте вместе' },
+    hubSub: { kz: 'Достарыңмен 2х2 … 5х5', ru: 'С друзьями 2х2 … 5х5' },
 
-    createButton: { kz: 'Команда құру', ru: 'Создать команду' },
+    createButton: { kz: 'Бөлме құру', ru: 'Создать комнату' },
     createHint: {
-      kz: 'Команда құрсаң, капитан боласың: форматты таңдап, іздеуді сен бастайсың.',
-      ru: 'Создашь команду — станешь капитаном: выбираешь формат и запускаешь поиск.',
+      kz: 'Сен капитансың: форматты таңдап, достарыңды шақырасың.',
+      ru: 'Ты капитан: выбираешь формат и зовёшь друзей.',
     },
     joinTitle: { kz: 'Кодпен кіру', ru: 'Войти по коду' },
     joinPlaceholder: { kz: 'Мысалы, K7PMX2', ru: 'Например, K7PMX2' },
     joinButton: { kz: 'Кіру', ru: 'Войти' },
     joinNotFound: {
-      kz: 'Мұндай команда табылмады. Кодты тексер.',
-      ru: 'Такой команды нет. Проверь код.',
+      kz: 'Мұндай бөлме табылмады. Кодты тексер.',
+      ru: 'Такой комнаты нет. Проверь код.',
     },
-    joinFull: { kz: 'Команда толы.', ru: 'В команде уже нет мест.' },
+    joinFull: { kz: 'Бөлме толы.', ru: 'В комнате нет мест.' },
     joinSearching: {
-      kz: 'Бұл команда қарсылас іздеп жатыр, қазір кіру мүмкін емес.',
-      ru: 'Эта команда уже ищет соперника — сейчас войти нельзя.',
+      kz: 'Бұл бөлме ескі нұсқада ашылған — жаңасын құр.',
+      ru: 'Эта комната из старой версии — создай новую.',
     },
-    joinAlready: { kz: 'Сен бұл командадасың.', ru: 'Ты уже в этой команде.' },
+    joinAlready: { kz: 'Сен бұл бөлмедесің.', ru: 'Ты уже в этой комнате.' },
     joinInvalid: { kz: 'Код 6 таңбадан тұрады.', ru: 'Код — это 6 символов.' },
     joinError: {
       kz: 'Кіру мүмкін болмады. Интернетті тексеріп, қайталап көр.',
       ru: 'Не получилось войти. Проверь интернет и попробуй ещё раз.',
     },
+    /**
+     * Precedes the raw Firestore error code. Every failure used to collapse into
+     * `joinError`, so neither Erlan nor I could tell a denied write from a dead
+     * connection — which is exactly the state "код не работает" left us in.
+     */
+    failureCode: { kz: 'Қате коды', ru: 'Код ошибки' },
 
-    codeLabel: { kz: 'Команда коды', ru: 'Код команды' },
-    codeHint: {
-      kz: 'Кодты достарыңа жібер — олар осы код арқылы кіреді.',
-      ru: 'Отправь код друзьям — они войдут по нему.',
-    },
+    codeLabel: { kz: 'Бөлме коды', ru: 'Код комнаты' },
 
     formatTitle: { kz: 'Формат', ru: 'Формат' },
-    /** Follows a number: "в очереди 4". */
-    inQueue: { kz: 'кезекте', ru: 'в очереди' },
-    queueEmpty: { kz: 'әзірге ешкім жоқ', ru: 'пока никого' },
-    formatLocked: {
-      kz: 'Іздеу кезінде форматты өзгерту мүмкін емес.',
-      ru: 'Во время поиска формат менять нельзя.',
-    },
-
-    rosterTitle: { kz: 'Құрам', ru: 'Состав' },
-    slotEmpty: { kz: 'бос орын', ru: 'свободно' },
 
     /* One room, two sides — see `Teams` in src/lib/party.ts. */
     sideA: { kz: 'А командасы', ru: 'Команда А' },
@@ -608,11 +614,9 @@ export const s = {
     },
     startButton: { kz: 'Бастау', ru: 'Старт' },
     sidesUnequal: {
-      kz: 'Бастау үшін екі жақта ойыншы саны тең болуы керек.',
-      ru: 'Чтобы начать, в обеих командах должно быть поровну игроков.',
+      kz: 'Екі жақта ойыншы саны тең болуы керек.',
+      ru: 'В командах должно быть поровну игроков.',
     },
-    /** Follows a format pill: "5х5 · 10 игроков в комнате". */
-    roomHolds: { kz: 'ойыншы бөлмеде', ru: 'игроков в комнате' },
 
     /* Inviting a friend into the room, instead of dictating the code. */
     inviteTitle: { kz: 'Досыңды шақыр', ru: 'Позвать друга' },
@@ -631,36 +635,25 @@ export const s = {
     inviteWaiting: { kz: 'шақыру күтіп тұр', ru: 'зовут в команду' },
     leaderLabel: { kz: 'капитан', ru: 'капитан' },
     kick: { kz: 'Шығару', ru: 'Убрать' },
-    leave: { kz: 'Командадан шығу', ru: 'Выйти из команды' },
-    disband: { kz: 'Команданы тарату', ru: 'Распустить команду' },
-    gone: { kz: 'Команда таратылды.', ru: 'Команда распущена.' },
-
-    searchButton: { kz: 'Қарсылас іздеу', ru: 'Искать соперника' },
-    searching: { kz: 'Қарсылас іздеп жатырмыз…', ru: 'Ищем соперника…' },
-    stopSearch: { kz: 'Тоқтату', ru: 'Остановить' },
-    needFull: {
-      kz: 'Іздеуді бастау үшін құрам толық болуы керек.',
-      ru: 'Чтобы начать поиск, состав должен быть полным.',
-    },
+    leave: { kz: 'Бөлмеден шығу', ru: 'Выйти из комнаты' },
+    disband: { kz: 'Бөлмені жабу', ru: 'Закрыть комнату' },
+    gone: { kz: 'Бөлме жабылды.', ru: 'Комната закрыта.' },
     onlyLeader: { kz: 'Мұны тек капитан жасайды.', ru: 'Это может только капитан.' },
 
-    downsizeTitle: { kz: 'Күту ұзаққа созылды', ru: 'Ждём уже долго' },
-    downsizeHint: {
-      kz: 'Басқа форматтарда қазір ойыншылар бар. Соған ауысасың ба?',
-      ru: 'В других форматах сейчас есть игроки. Перейти туда?',
-    },
-    downsizeNobody: {
-      kz: 'Дәл қазір басқа форматтарда да ешкім жоқ. Күте тұр немесе достарыңды шақыр.',
-      ru: 'Сейчас и в других форматах никого нет. Подожди или позови друзей.',
-    },
+    /* The queue's thirteen strings stood here — «Искать соперника», «Ждём уже
+       долго», «в очереди» and the rest. The queue itself is gone (see
+       src/lib/party.ts): nothing ever paired two slots, so a full team could
+       only ever wait in it. The text outlived the feature and was still telling
+       Erlan the room "shows the queue", which is why it is deleted rather than
+       reworded. */
 
     matchSoon: {
-      kz: 'Матчтың өзі — келесі қадам. Әзірге мұнда құрам жиналады және кезек көрінеді.',
-      ru: 'Сам матч — следующий шаг. Пока здесь собирается состав и видно очередь.',
+      kz: 'Құрам дайын. Матчтың өзі — келесі қадам.',
+      ru: 'Состав готов. Сам матч — следующий шаг.',
     },
     signInNeeded: {
-      kz: 'Команда тек аккаунтқа кіргенде жұмыс істейді.',
-      ru: 'Команда работает только после входа в аккаунт.',
+      kz: 'Бұл бөлім аккаунтқа кіргенде ғана жұмыс істейді.',
+      ru: 'Этот раздел работает только после входа в аккаунт.',
     },
   },
 
@@ -832,22 +825,27 @@ export const s = {
     xpAdded: { kz: 'XP профиліңе қосылды', ru: 'XP добавлены в профиль' },
   },
 
-  explore: {
-    title: { kz: 'Іздеу', ru: 'Поиск' },
-    placeholder: {
-      kz: 'Тұлға немесе оқиға іздеу...',
-      ru: 'Найти личность или событие...',
-    },
-    resultsFound: { kz: 'нәтиже табылды', ru: 'результатов найдено' },
-  },
-
   ai: {
-    title: { kz: 'AI-мен сөйлесу', ru: 'Разговор с AI' },
+    title: { kz: 'AI', ru: 'AI' },
     subtitle: {
-      kz: 'Тарихи тұлғамен тікелей сөйлесіңіз',
-      ru: 'Поговорите с исторической личностью напрямую',
+      kz: 'Тұлғаны тауып, оның өзінен сұра',
+      ru: 'Найди личность и спроси у неё самой',
     },
     choosePersona: { kz: 'Кіммен сөйлесесіз?', ru: 'С кем поговорим?' },
+
+    /* The search that used to be its own «Поиск» section. One list of people,
+       one field over it: open the card, or ask the person directly. */
+    searchPlaceholder: {
+      kz: 'Тұлғаны іздеу...',
+      ru: 'Найти личность...',
+    },
+    resultsFound: { kz: 'нәтиже табылды', ru: 'результатов найдено' },
+    nothingFound: {
+      kz: 'Ештеңе табылмады. Басқаша жазып көр.',
+      ru: 'Ничего не нашлось. Попробуй написать иначе.',
+    },
+    /** The direct-to-chat button on a row, beside the card it opens. */
+    askButton: { kz: 'Сұрау', ru: 'Спросить' },
     inputPlaceholder: { kz: 'Сұрағыңызды жазыңыз...', ru: 'Напишите вопрос...' },
     send: { kz: 'Жіберу', ru: 'Отправить' },
     typing: { kz: 'жазып жатыр', ru: 'печатает' },

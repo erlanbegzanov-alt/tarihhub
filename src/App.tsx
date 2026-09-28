@@ -23,7 +23,6 @@ const Battle = lazy(() => import('./screens/Battle').then((m) => ({ default: m.B
 const BattleCasual = lazy(() => import('./screens/BattleCasual').then((m) => ({ default: m.BattleCasual })))
 const BattleRanked = lazy(() => import('./screens/BattleRanked').then((m) => ({ default: m.BattleRanked })))
 const BattleDuelScreen = lazy(() => import('./screens/BattleDuelScreen').then((m) => ({ default: m.BattleDuelScreen })))
-const Explore = lazy(() => import('./screens/Explore').then((m) => ({ default: m.Explore })))
 // Behind the flag at the declaration, not just the route, so a production
 // build holds no reference to the screen at all.
 const Friends = FEATURE_TEAM_BATTLE
@@ -62,9 +61,18 @@ function Page({ children }: { children: ReactNode }) {
   )
 }
 
+/** `/explore?q=…` → `/ai?q=…`. A bare `<Navigate>` would drop the query. */
+function RedirectToAI() {
+  const { search } = useLocation()
+  return <Navigate to={`/ai${search}`} replace />
+}
+
 const ROUTES: { path: string; element: ReactNode }[] = [
   { path: '/', element: <Home /> },
-  { path: '/explore', element: <Explore /> },
+  // «Поиск» was its own section over the same list of people as AI. It is one
+  // section now, so this path only forwards — with the query intact, because a
+  // link carrying `?q=Абылай` has to keep searching for Абылай.
+  { path: '/explore', element: <RedirectToAI /> },
   { path: '/person/:id', element: <PersonDetail /> },
   { path: '/course', element: <CourseOutline /> },
   { path: '/lesson/:id', element: <LessonDetail /> },

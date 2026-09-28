@@ -196,13 +196,36 @@ export function watchParty(
 
 /* --------------------------------- writing -------------------------------- */
 
-/** Opens a party with the caller alone in it. Returns its code, or `null`. */
+/**
+ * Firestore's own name for why a write failed — `permission-denied`,
+ * `unavailable`, `unauthenticated` and so on.
+ *
+ * Every failure in here used to collapse into one friendly sentence on screen
+ * ("Не получилось войти. Проверь интернет"), which is precisely the state that
+ * left Erlan reporting "код не работает вообще" and me unable to tell a rule
+ * refusing the write from a phone with no signal. The code is carried out to
+ * the screen so the next report names the cause.
+ */
+function failureCode(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code
+  return typeof code === 'string' ? code : 'unknown'
+}
+
+export interface CreatePartyOutcome {
+  /** The new room's code, or `null` when it could not be opened. */
+  code: string | null
+  /** Firestore's error code when `code` is `null`. */
+  reason?: string
+}
+
+/** Opens a party with the caller alone in it. */
 export async function createParty(
   uid: string,
   mode: BattleMode,
   size: TeamSize,
-): Promise<string | null> {
-  if (!db) return null
+): Promise<CreatePartyOutcome> {
+  if (!db) return { code: null, reason: 'no-firebase' }
+  let reason = 'unknown'
   for (let attempt = 0; attempt < 4; attempt++) {
     const code = generatePartyCode()
     try {
@@ -217,12 +240,15 @@ export async function createParty(
         status: 'idle',
         createdAt: Date.now(),
       })
-      return code
+      return { code }
     } catch (error) {
+      // A denied write is not a code collision, and retrying it three more
+      // times only delays the message, so the last reason is kept and reported.
+      reason = failureCode(error)
       console.warn('[tarihhub] Party code attempt failed, retrying.', error)
     }
   }
-  return null
+  return { code: null, reason }
 }
 
 export type JoinPartyResult =
@@ -234,15 +260,21 @@ export type JoinPartyResult =
   | 'invalid'
   | 'error'
 
+export interface JoinOutcome {
+  result: JoinPartyResult
+  /** Firestore's error code when `result` is `'error'`. */
+  reason?: string
+}
+
 /** Joins by code. The read and the write share a transaction so two friends
  *  tapping "join" at the same moment can't overwrite each other's row. */
-export async function joinParty(rawCode: string, uid: string): Promise<JoinPartyResult> {
+export async function joinParty(rawCode: string, uid: string): Promise<JoinOutcome> {
   const code = normalizePartyCode(rawCode)
-  if (!code) return 'invalid'
-  if (!db) return 'error'
+  if (!code) return { result: 'invalid' }
+  if (!db) return { result: 'error', reason: 'no-firebase' }
   const database = db
   try {
-    return await runTransaction(database, async (transaction) => {
+    const result = await runTransaction(database, async (transaction) => {
       const ref = doc(database, 'parties', code)
       const snapshot = await transaction.get(ref)
       if (!snapshot.exists()) return 'notFound' as JoinPartyResult
@@ -260,9 +292,10 @@ export async function joinParty(rawCode: string, uid: string): Promise<JoinParty
       })
       return 'joined' as JoinPartyResult
     })
+    return { result }
   } catch (error) {
     console.warn('[tarihhub] Could not join the party.', error)
-    return 'error'
+    return { result: 'error', reason: failureCode(error) }
   }
 }
 

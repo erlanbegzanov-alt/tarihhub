@@ -58,10 +58,11 @@ export function Home() {
   const submitSearch = (value: string) => {
     setQuery(value)
     // Any non-empty query navigates. Requiring two characters made Enter look
-    // broken for a single-letter search, and the Explore field has no such minimum.
+    // broken for a single-letter search, and the AI field has no such minimum.
     const needle = value.trim()
     if (needle) {
-      navigate(`/explore?q=${encodeURIComponent(needle)}`)
+      // The search lives in the AI section now; `?q=` is what that field reads.
+      navigate(`/ai?q=${encodeURIComponent(needle)}`)
     }
   }
 
@@ -164,7 +165,7 @@ export function Home() {
             title={t(s.home.popularFigures)}
             action={
               <Link
-                to="/explore"
+                to="/ai"
                 className="focus-ring inline-flex items-center gap-0.5 rounded-lg text-[13px] font-semibold text-brand"
               >
                 {t(s.common.seeAll)}

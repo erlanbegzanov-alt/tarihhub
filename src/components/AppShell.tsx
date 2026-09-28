@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import type { AvatarGender } from '../data/ranks'
+import { useAlerts } from '../lib/alerts'
 import { cn } from '../lib/cn'
 import { springSoft } from '../lib/motion'
 import { levelInfo, useProfile } from '../lib/progress'
@@ -89,10 +90,41 @@ function IdentityAvatar({
   )
 }
 
+/**
+ * The red count over a tab that has something waiting on the reader.
+ *
+ * A number rather than a bare dot: "2 зовут" and "кто-то что-то" are different
+ * messages, and the number costs no extra space here. Above nine it stops
+ * counting — the exact figure stops mattering long before that, and a three-digit
+ * badge would push the tab's label out of line.
+ */
+function AlertBadge({ count, label }: { count: number; label: string }) {
+  if (count <= 0) return null
+  return (
+    <span
+      aria-label={`${label}: ${count}`}
+      className="relative z-10 ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-wrong px-1 text-[10.5px] font-bold text-white tabular-nums"
+    >
+      {count > 9 ? '9+' : count}
+    </span>
+  )
+}
+
+/**
+ * How many waiting things belong to one tab.
+ *
+ * Both kinds live under Батл — friend requests on `/battle/friends`, room
+ * invitations on the team screen — so the whole count sits on that one tab.
+ */
+function badgeFor(to: string, total: number): number {
+  return to === '/battle' ? total : 0
+}
+
 /* ---------------------------- desktop rail ---------------------------- */
 
 function Sidebar({ active }: { active: string }) {
   const { t, lang, toggleLang } = useLang()
+  const { total } = useAlerts()
 
   return (
     <aside
@@ -138,6 +170,7 @@ function Sidebar({ active }: { active: string }) {
                 strokeWidth={isActive ? 2.2 : 1.9}
               />
               <span className="relative z-10">{t(item.label)}</span>
+              <AlertBadge count={badgeFor(item.to, total)} label={t(s.nav.newAlerts)} />
             </Link>
           )
         })}
@@ -174,6 +207,7 @@ function Sidebar({ active }: { active: string }) {
 function MobileTopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
   const { t } = useLang()
   const { displayName, photoURL, identity } = useIdentity()
+  const { total } = useAlerts()
 
   return (
     <div
@@ -183,13 +217,25 @@ function MobileTopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
       )}
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 10px)' }}
     >
+      {/* On a phone the whole rail lives behind this button, so a badge only on
+          the Батл tab would be invisible until the drawer is already open —
+          which is the one moment it is no longer needed. The dot rides the
+          burger itself. */}
       <button
         type="button"
         onClick={onOpenMenu}
-        aria-label={t(s.nav.openMenu)}
-        className="focus-ring grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line/70 bg-cream text-ink transition-colors hover:text-brand"
+        aria-label={
+          total > 0 ? `${t(s.nav.openMenu)} — ${t(s.nav.newAlerts)}` : t(s.nav.openMenu)
+        }
+        className="focus-ring relative grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line/70 bg-cream text-ink transition-colors hover:text-brand"
       >
         <Menu className="h-[19px] w-[19px]" strokeWidth={2} />
+        {total > 0 && (
+          <span
+            aria-hidden
+            className="absolute -top-0.5 -right-0.5 h-[11px] w-[11px] rounded-full bg-wrong ring-2 ring-surface"
+          />
+        )}
       </button>
       <Link to="/" className="focus-ring rounded-lg" aria-label={t(s.appName)}>
         <Wordmark compact className="h-7" />
@@ -222,6 +268,7 @@ function MobileDrawer({
   const { t, lang, toggleLang } = useLang()
   const reduceMotion = useReducedMotion()
   const { displayName, photoURL, identity, level } = useIdentity()
+  const { total } = useAlerts()
 
   useEffect(() => {
     if (!open) return
@@ -319,6 +366,7 @@ function MobileDrawer({
                   >
                     <Icon className="h-[18px] w-[18px]" strokeWidth={isActive ? 2.2 : 1.9} />
                     <span>{t(item.label)}</span>
+                    <AlertBadge count={badgeFor(item.to, total)} label={t(s.nav.newAlerts)} />
                   </Link>
                 )
               })}
