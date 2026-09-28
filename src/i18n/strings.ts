@@ -386,6 +386,8 @@ export const s = {
 
     /** Sits over the mode picker once there is real standing to show above it. */
     hubModes: { kz: 'Режимді таңдаңыз', ru: 'Выберите режим' },
+    /** The hub's one primary action, under the league standing. */
+    hubPlayRanked: { kz: 'Рейтингте ойнау', ru: 'Играть рейтинг' },
     /** Empty state on the hub for an account that has never duelled. */
     hubNoPlay: {
       kz: 'Әзірге бірде-бір батл өткізген жоқсыз. Қарапайымнан бастаңыз — рейтингке әсер етпейді.',
