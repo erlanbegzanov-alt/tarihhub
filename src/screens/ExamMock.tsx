@@ -194,7 +194,7 @@ export function ExamMock() {
         className="mx-auto max-w-2xl lg:max-w-3xl"
       >
         <motion.div variants={staggerItem} className="flex items-center gap-3">
-          <IconButton label={t(s.common.back)} onClick={() => navigate('/battle')}>
+          <IconButton label={t(s.common.back)} onClick={() => navigate('/')}>
             <ArrowLeft className="h-5 w-5" strokeWidth={2} />
           </IconButton>
           <div className="min-w-0 flex-1">
@@ -254,7 +254,7 @@ export function ExamMock() {
         className="mx-auto max-w-2xl pb-4 lg:max-w-3xl"
       >
         <motion.div variants={staggerItem} className="flex items-center gap-3">
-          <IconButton label={t(s.common.back)} onClick={() => navigate('/battle')}>
+          <IconButton label={t(s.common.back)} onClick={() => navigate('/')}>
             <ArrowLeft className="h-5 w-5" strokeWidth={2} />
           </IconButton>
           <h1 className="min-w-0 flex-1 truncate text-lg font-bold tracking-tight text-ink">
@@ -427,7 +427,7 @@ export function ExamMock() {
           </motion.button>
           <motion.button
             type="button"
-            onClick={() => navigate('/battle')}
+            onClick={() => navigate('/')}
             whileTap={{ scale: 0.97 }}
             transition={springSoft}
             className="focus-ring flex-1 rounded-full bg-surface px-5 py-3.5 text-[15px] font-semibold text-brand ring-[1.5px] ring-brand/45 hover:bg-brand-tint"
@@ -459,7 +459,7 @@ export function ExamMock() {
       className="mx-auto max-w-2xl pb-4 lg:max-w-3xl"
     >
       <motion.div variants={staggerItem} className="flex items-center gap-3">
-        <IconButton label={t(s.common.back)} onClick={() => navigate('/battle')}>
+        <IconButton label={t(s.common.back)} onClick={() => navigate('/')}>
           <ArrowLeft className="h-5 w-5" strokeWidth={2} />
         </IconButton>
         <div className="min-w-0 flex-1">

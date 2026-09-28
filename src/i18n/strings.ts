@@ -9,6 +9,8 @@ export const s = {
   nav: {
     home: { kz: 'Басты бет', ru: 'Главная' },
     course: { kz: 'Курс', ru: 'Курс' },
+    /** Short enough for the nav rail; the screen itself says «Пробник ҰБТ». */
+    exam: { kz: 'Сынақ', ru: 'Пробник' },
     explore: { kz: 'Іздеу', ru: 'Поиск' },
     ai: { kz: 'AI', ru: 'AI' },
     timeline: { kz: 'Тарих', ru: 'История' },
@@ -591,6 +593,24 @@ export const s = {
 
     rosterTitle: { kz: 'Құрам', ru: 'Состав' },
     slotEmpty: { kz: 'бос орын', ru: 'свободно' },
+
+    /* One room, two sides — see `Teams` in src/lib/party.ts. */
+    sideA: { kz: 'А командасы', ru: 'Команда А' },
+    sideB: { kz: 'Б командасы', ru: 'Команда Б' },
+    /** An empty slot is an invitation, not a hole: it asks for a name. */
+    invite: { kz: 'шақыру', ru: 'позвать' },
+    switchSide: { kz: 'Басқа жаққа ауысу', ru: 'Перейти в другую команду' },
+    switchFailed: {
+      kz: 'Ауысу мүмкін болмады — ол жақ толы болуы мүмкін.',
+      ru: 'Не получилось перейти — возможно, та сторона уже полная.',
+    },
+    startButton: { kz: 'Бастау', ru: 'Старт' },
+    sidesUnequal: {
+      kz: 'Бастау үшін екі жақта ойыншы саны тең болуы керек.',
+      ru: 'Чтобы начать, в обеих командах должно быть поровну игроков.',
+    },
+    /** Follows a format pill: "5х5 · 10 игроков в комнате". */
+    roomHolds: { kz: 'ойыншы бөлмеде', ru: 'игроков в комнате' },
     leaderLabel: { kz: 'капитан', ru: 'капитан' },
     kick: { kz: 'Шығару', ru: 'Убрать' },
     leave: { kz: 'Командадан шығу', ru: 'Выйти из команды' },

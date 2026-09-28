@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { lazy, Suspense, useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
 import { TestModeBadge } from './components/TestModeBadge'
 import { LanguageProvider } from './i18n/LanguageProvider'
@@ -75,6 +75,10 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: '/quiz/:personId', element: <Quiz /> },
   { path: '/quiz/lesson/:lessonId', element: <Quiz /> },
   { path: '/timeline', element: <Timeline /> },
+  // A section of its own, deliberately not under `/battle`: the mock is what
+  // the course is preparation for, and living in the game picker made it read
+  // as one more game. It keeps its own flag, so it is still test-site only.
+  ...(ExamMock ? [{ path: '/exam', element: <ExamMock /> }] : []),
   { path: '/battle', element: <Battle /> },
   { path: '/battle/casual', element: <BattleCasual /> },
   { path: '/battle/ranked', element: <BattleRanked /> },
@@ -88,7 +92,11 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   // keeps it out of the service worker's precache.
   ...(Friends ? [{ path: '/battle/friends', element: <Friends /> }] : []),
   ...(TeamBattle ? [{ path: '/battle/team', element: <TeamBattle /> }] : []),
-  ...(ExamMock ? [{ path: '/battle/exam', element: <ExamMock /> }] : []),
+  // The mock used to live here. An open tab or a pasted link from before the
+  // move should land on it, not fall through to Home via the catch-all.
+  ...(ExamMock
+    ? [{ path: '/battle/exam', element: <Navigate to="/exam" replace /> }]
+    : []),
   { path: '/battle/kahoot', element: <Kahoot /> },
   { path: '/battle/kahoot/teacher', element: <KahootTeacher /> },
   { path: '/battle/kahoot/student', element: <KahootStudent /> },

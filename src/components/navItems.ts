@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  ClipboardCheck,
   GraduationCap,
   House,
   Search,
@@ -10,6 +11,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import type { LocalizedText } from '../data/types'
 import { s } from '../i18n/strings'
+import { FEATURE_EXAM_MOCK } from '../lib/environment'
 
 export interface NavItem {
   to: string
@@ -27,6 +29,13 @@ export const navItems: NavItem[] = [
     icon: GraduationCap,
     match: ['/lesson', '/quiz/lesson'],
   },
+  // The ҰБТ mock is a section of its own, not one of the games under Батл.
+  // Sitting it in that mode picker beside Кахут and the duels said it was one
+  // game among several; it is the thing the whole course is preparation for.
+  // Right after Курс — learn, then check yourself — and above Батл.
+  ...(FEATURE_EXAM_MOCK
+    ? [{ to: '/exam', label: s.nav.exam, icon: ClipboardCheck, match: [] }]
+    : []),
   { to: '/explore', label: s.nav.explore, icon: Search, match: ['/person'] },
   { to: '/ai', label: s.nav.ai, icon: Sparkles, match: [] },
   {

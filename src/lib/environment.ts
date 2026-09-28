@@ -51,7 +51,7 @@ export const FEATURE_TEAM_BATTLE =
   IS_TEST_CONTOUR || import.meta.env.VITE_FEATURE_TEAM_BATTLE === '1'
 
 /**
- * The ҰБТ mock (`/battle/exam`): a full 20-task variant in the real exam's
+ * The ҰБТ mock (`/exam`): a full 20-task variant in the real exam's
  * shape — 10 standalone tasks and two context blocks of five.
  *
  * Its own flag rather than a ride on `FEATURE_TEAM_BATTLE`, because the two

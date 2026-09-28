@@ -11,7 +11,7 @@
  * different content around the same duel engine (see BattleDuel.tsx), so each
  * keeps its own screen rather than a mode toggle switching content in place.
  */
-import { ChevronRight, ClipboardCheck, Swords, Trophy, UserPlus, Users, Zap } from 'lucide-react'
+import { ChevronRight, Swords, Trophy, UserPlus, Users, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
@@ -23,7 +23,7 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { fetchBattlePlayer, ratingTierFor } from '../lib/battle'
 import { cn } from '../lib/cn'
-import { FEATURE_EXAM_MOCK, FEATURE_TEAM_BATTLE } from '../lib/environment'
+import { FEATURE_TEAM_BATTLE } from '../lib/environment'
 import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { useProfile } from '../lib/progress'
 import { useSession } from '../lib/session'
@@ -202,19 +202,9 @@ export function Battle() {
       </motion.div>
 
       <motion.div variants={staggerItem} className="flex flex-col gap-2.5">
-        {/* First in the list on purpose: for someone sitting ЕНТ this year,
-            a full variant in the real format is the thing worth opening
-            before any duel. Test site only until the bank's difficulty mix
-            matches the specification — see FEATURE_EXAM_MOCK. */}
-        {FEATURE_EXAM_MOCK && (
-          <ModeCard
-            icon={ClipboardCheck}
-            accent="var(--color-era-alash)"
-            title={t(s.exam.title)}
-            subtitle={t(s.exam.hubSub)}
-            onClick={() => navigate('/battle/exam')}
-          />
-        )}
+        {/* The ҰБТ mock used to head this list. It is its own section now
+            (`/exam`, see navItems.ts): standing it beside Кахут and the duels
+            made the thing the course prepares for read as one more game. */}
         <ModeCard
           icon={Zap}
           accent="var(--color-brand)"
