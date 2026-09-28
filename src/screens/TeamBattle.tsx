@@ -339,6 +339,19 @@ export function TeamBattle() {
     [friends],
   )
 
+  /**
+   * Requests nobody has answered yet.
+   *
+   * They cannot be invited — the rules refuse an invite to anyone but an
+   * accepted friend — but they are the difference between "you have no friends"
+   * and "nobody has pressed Принять yet", and the panel used to tell the second
+   * person the first thing.
+   */
+  const pendingFriends = useMemo(
+    () => friends.filter((friend) => friend.status === 'pending').length,
+    [friends],
+  )
+
   /* ------------------------------- the roster ------------------------------ */
 
   // Everyone whose name this screen has to put on the glass: the room, the
@@ -749,7 +762,7 @@ export function TeamBattle() {
 
                 {friendUids.length === 0 ? (
                   <p className="mt-2 text-[12.5px] leading-relaxed text-ink-soft">
-                    {t(s.team.inviteNoFriends)}
+                    {t(pendingFriends > 0 ? s.team.invitePendingOnly : s.team.inviteNoFriends)}
                   </p>
                 ) : (
                   <ul className="mt-3 flex flex-col gap-2.5">

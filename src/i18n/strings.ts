@@ -627,6 +627,16 @@ export const s = {
       kz: 'Достар тізімі бос. «Достар» бөлімінде кодпен қос — сосын осы жерден шақырасың.',
       ru: 'Список друзей пуст. Добавь друга по коду в разделе «Друзья» — потом позовёшь его отсюда.',
     },
+    /**
+     * The honest answer when the list is not empty but nothing in it is usable
+     * yet. Only an accepted friend can be called — the rules refuse an invite to
+     * anyone else — so a screen full of unanswered requests used to say «список
+     * друзей пуст» to someone who had just added three people.
+     */
+    invitePendingOnly: {
+      kz: 'Сұранысыңды әлі қабылдамаған. Қабылдағаннан кейін ғана шақыруға болады.',
+      ru: 'Заявку пока не приняли. Позвать можно только после того, как её примут.',
+    },
     /** Heading over the invitations waiting for the reader. */
     invitesTitle: { kz: 'Сені шақырып жатыр', ru: 'Тебя зовут' },
     inviteAccept: { kz: 'Кіру', ru: 'Войти' },
