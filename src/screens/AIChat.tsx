@@ -84,7 +84,14 @@ function PersonaPicker({ onPick }: { onPick: (person: Person) => void }) {
         />
       </motion.div>
 
-      <motion.div variants={staggerItem} className="mt-3 flex flex-wrap gap-2">
+      {/* Nine chips wrapped to four rows on a phone and pushed the people
+          themselves below the fold. One scrolling row instead: the list starts
+          where the eye already is, and every category is still a swipe away.
+          They wrap again from `sm` up, where four rows was never the problem. */}
+      <motion.div
+        variants={staggerItem}
+        className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
+      >
         {/* One `layoutGroup` across all the chips, so the active pill slides
             from the old chip to the new one instead of cross-fading. */}
         <FilterChip
