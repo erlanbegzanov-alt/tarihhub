@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   generatePartyCode,
+  inviteId,
   normalizePartyCode,
   roomCapacity,
   smallerSide,
   teamsReady,
   toParty,
+  toPartyInvite,
 } from './party'
 
 const NOW = 1_800_000_000_000
@@ -120,6 +122,31 @@ describe('sides of a room', () => {
     expect(toParty('K7PMX2', { leader: 'alice', members: ['alice'], size: 9 })).toBeNull()
     expect(toParty('K7PMX2', { leader: 'alice', members: 'alice', size: 2 })).toBeNull()
     expect(toParty('K7PMX2', { members: ['alice'], size: 2 })).toBeNull()
+  })
+
+  it('reads an invitation, and refuses one that cannot be acted on', () => {
+    const raw = { code: 'K7PMX2', from: 'alice', to: 'bob', createdAt: NOW }
+    expect(toPartyInvite('K7PMX2_bob', raw)).toEqual({
+      id: 'K7PMX2_bob',
+      code: 'K7PMX2',
+      from: 'alice',
+      to: 'bob',
+      createdAt: NOW,
+    })
+    // A code no room could ever have: tapping "Войти" would only ever say
+    // "такой команды нет".
+    expect(toPartyInvite('x', { ...raw, code: 'K7PMX' })).toBeNull()
+    // Inviting yourself is not a thing, and would render as a card calling you
+    // into the room you are already in.
+    expect(toPartyInvite('x', { ...raw, to: 'alice' })).toBeNull()
+    expect(toPartyInvite('x', { ...raw, from: 42 })).toBeNull()
+    expect(toPartyInvite('x', null)).toBeNull()
+  })
+
+  it('gives one invitation per room per person, so a second call replaces the first', () => {
+    expect(inviteId('K7PMX2', 'bob')).toBe('K7PMX2_bob')
+    expect(inviteId('K7PMX2', 'bob')).toBe(inviteId('K7PMX2', 'bob'))
+    expect(inviteId('AAAAAA', 'bob')).not.toBe(inviteId('K7PMX2', 'bob'))
   })
 
   it('treats an unknown mode or status as the safe default', () => {

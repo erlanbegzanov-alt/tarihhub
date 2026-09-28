@@ -613,6 +613,22 @@ export const s = {
     },
     /** Follows a format pill: "5х5 · 10 игроков в комнате". */
     roomHolds: { kz: 'ойыншы бөлмеде', ru: 'игроков в комнате' },
+
+    /* Inviting a friend into the room, instead of dictating the code. */
+    inviteTitle: { kz: 'Досыңды шақыр', ru: 'Позвать друга' },
+    inviteButton: { kz: 'Шақыру', ru: 'Позвать' },
+    inviteSent: { kz: 'шақырылды', ru: 'позвали' },
+    inviteInRoom: { kz: 'бөлмеде', ru: 'в комнате' },
+    inviteNoFriends: {
+      kz: 'Достар тізімі бос. «Достар» бөлімінде кодпен қос — сосын осы жерден шақырасың.',
+      ru: 'Список друзей пуст. Добавь друга по коду в разделе «Друзья» — потом позовёшь его отсюда.',
+    },
+    /** Heading over the invitations waiting for the reader. */
+    invitesTitle: { kz: 'Сені шақырып жатыр', ru: 'Тебя зовут' },
+    inviteAccept: { kz: 'Кіру', ru: 'Войти' },
+    inviteDismiss: { kz: 'Жасыру', ru: 'Скрыть' },
+    /** On the hub's Команда tile: "2 зовут в команду". */
+    inviteWaiting: { kz: 'шақыру күтіп тұр', ru: 'зовут в команду' },
     leaderLabel: { kz: 'капитан', ru: 'капитан' },
     kick: { kz: 'Шығару', ru: 'Убрать' },
     leave: { kz: 'Командадан шығу', ru: 'Выйти из команды' },

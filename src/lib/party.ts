@@ -22,7 +22,17 @@
  * As everywhere else here, nothing throws when Firebase is absent — calls
  * become no-ops and the screen shows its unavailable state.
  */
-import { doc, onSnapshot, runTransaction, setDoc, updateDoc } from 'firebase/firestore'
+import {
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  runTransaction,
+  setDoc,
+  updateDoc,
+  where,
+} from 'firebase/firestore'
 import type { BattleMode } from './battle'
 import { db } from './firebase'
 import { FRIEND_CODE_ALPHABET } from './friends'
@@ -348,6 +358,103 @@ export async function switchTeam(code: string, uid: string, to: TeamKey): Promis
     })
   } catch (error) {
     console.warn('[tarihhub] Could not switch sides.', error)
+    return false
+  }
+}
+
+/* -------------------------------- invites --------------------------------- */
+
+/**
+ * "Come and play with us", from someone in a room to one friend.
+ *
+ * Until this existed the only way in was to read the six-letter code aloud,
+ * which made the Друзья section decorative: you could collect friends and then
+ * had no way to use them. An invite carries the code for them.
+ *
+ * The document id is `${code}_${to}`, so inviting the same person to the same
+ * room twice overwrites the first invite instead of stacking a second card on
+ * their screen.
+ */
+export interface PartyInvite {
+  id: string
+  code: string
+  from: string
+  to: string
+  createdAt: number
+}
+
+/** After this long an invite is treated as stale and not shown: the room it
+ *  points at has almost certainly been disbanded, and joining it would only
+ *  produce "такой команды нет". */
+export const INVITE_TTL_MS = 2 * 60 * 60_000
+
+export function inviteId(code: string, to: string): string {
+  return `${code}_${to}`
+}
+
+export function toPartyInvite(id: string, data: unknown): PartyInvite | null {
+  if (!data || typeof data !== 'object') return null
+  const value = data as Record<string, unknown>
+  if (typeof value.code !== 'string' || typeof value.from !== 'string') return null
+  if (typeof value.to !== 'string' || value.to === value.from) return null
+  if (!normalizePartyCode(value.code)) return null
+  return {
+    id,
+    code: value.code,
+    from: value.from,
+    to: value.to,
+    createdAt: typeof value.createdAt === 'number' ? value.createdAt : 0,
+  }
+}
+
+/** Invites one friend into a room the caller is already in. */
+export async function invitePlayer(code: string, from: string, to: string): Promise<boolean> {
+  if (!db) return false
+  if (from === to) return false
+  try {
+    await setDoc(doc(db, 'partyInvites', inviteId(code, to)), {
+      code,
+      from,
+      to,
+      createdAt: Date.now(),
+    })
+    return true
+  } catch (error) {
+    console.warn('[tarihhub] Could not invite the player.', error)
+    return false
+  }
+}
+
+/** Streams the invitations waiting for one person, newest first and fresh only. */
+export function watchMyInvites(
+  uid: string,
+  onChange: (invites: PartyInvite[]) => void,
+): () => void {
+  if (!db) return () => {}
+  return onSnapshot(
+    query(collection(db, 'partyInvites'), where('to', '==', uid)),
+    (snapshot) => {
+      const now = Date.now()
+      onChange(
+        snapshot.docs
+          .map((entry) => toPartyInvite(entry.id, entry.data()))
+          .filter((invite): invite is PartyInvite => invite !== null)
+          .filter((invite) => now - invite.createdAt <= INVITE_TTL_MS)
+          .sort((a, b) => b.createdAt - a.createdAt),
+      )
+    },
+    (error) => console.warn('[tarihhub] Invite listener failed.', error),
+  )
+}
+
+/** Clears one invite — after joining, or when it is not wanted. */
+export async function dismissInvite(id: string): Promise<boolean> {
+  if (!db) return false
+  try {
+    await deleteDoc(doc(db, 'partyInvites', id))
+    return true
+  } catch (error) {
+    console.warn('[tarihhub] Could not dismiss the invite.', error)
     return false
   }
 }

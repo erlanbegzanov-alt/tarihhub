@@ -829,4 +829,73 @@ d('firestore.rules', () => {
     })
   })
 
+  describe('partyInvites/{inviteId}', () => {
+    /** The pair document `friends.ts` writes, seeded straight past the rules. */
+    async function seedFriendship(a: string, b: string, status = 'accepted') {
+      const pair = a < b ? `${a}_${b}` : `${b}_${a}`
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'friendships', pair), {
+          uids: [a, b].sort(),
+          status,
+          requestedBy: a,
+          createdAt: Date.now(),
+        })
+      })
+    }
+
+    const invite = (over: Record<string, unknown> = {}) => ({
+      code: PARTY,
+      from: 'alice',
+      to: 'bob',
+      createdAt: Date.now(),
+      ...over,
+    })
+
+    it('someone sitting in a room calls a friend into it', async () => {
+      await seedParty({ members: ['alice'] })
+      await seedFriendship('alice', 'bob')
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(setDoc(doc(alice, 'partyInvites', `${PARTY}_bob`), invite()))
+    })
+
+    it('you cannot call anyone into a room you are not in yourself', async () => {
+      await seedParty({ leader: 'carol', members: ['carol'] })
+      await seedFriendship('alice', 'bob')
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertFails(setDoc(doc(alice, 'partyInvites', `${PARTY}_bob`), invite()))
+    })
+
+    it('only an accepted friend can be called, never a stranger', async () => {
+      await seedParty({ members: ['alice'] })
+      const alice = env.authenticatedContext('alice').firestore()
+      // Without this an invite is a way to push a card onto any account whose
+      // id you happen to know.
+      await assertFails(setDoc(doc(alice, 'partyInvites', `${PARTY}_bob`), invite()))
+      // A request that has not been answered yet is not a friendship.
+      await seedFriendship('alice', 'bob', 'pending')
+      await assertFails(setDoc(doc(alice, 'partyInvites', `${PARTY}_bob`), invite()))
+    })
+
+    it('nobody sends an invitation in someone else’s name', async () => {
+      await seedParty({ members: ['alice'] })
+      await seedFriendship('alice', 'bob')
+      const mallory = env.authenticatedContext('mallory').firestore()
+      await assertFails(setDoc(doc(mallory, 'partyInvites', `${PARTY}_bob`), invite()))
+    })
+
+    it('only the person called reads it; either side may clear it', async () => {
+      await seedParty({ members: ['alice'] })
+      await seedFriendship('alice', 'bob')
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'partyInvites', `${PARTY}_bob`), invite())
+      })
+      const bob = env.authenticatedContext('bob').firestore()
+      const mallory = env.authenticatedContext('mallory').firestore()
+      await assertSucceeds(getDoc(doc(bob, 'partyInvites', `${PARTY}_bob`)))
+      await assertFails(getDoc(doc(mallory, 'partyInvites', `${PARTY}_bob`)))
+      await assertFails(deleteDoc(doc(mallory, 'partyInvites', `${PARTY}_bob`)))
+      await assertSucceeds(deleteDoc(doc(bob, 'partyInvites', `${PARTY}_bob`)))
+    })
+  })
+
 })

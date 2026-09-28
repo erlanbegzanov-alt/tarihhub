@@ -608,6 +608,45 @@ service cloud.firestore {
       }
     }
 
+    /*
+     * An invitation into a room (see `src/lib/party.ts`). The document id is
+     * `${code}_${to}`, so calling the same person into the same room twice
+     * replaces the first invite instead of stacking another card on them.
+     *
+     * Two conditions make this an invitation rather than a way to message
+     * strangers: the sender must be sitting in the room they are calling
+     * someone into, and the two must already be accepted friends.
+     */
+    match /partyInvites/{inviteId} {
+      function pairId(a, b) {
+        return a < b ? a + '_' + b : b + '_' + a;
+      }
+      function areFriends(a, b) {
+        return exists(/databases/$(database)/documents/friendships/$(pairId(a, b)))
+          && get(/databases/$(database)/documents/friendships/$(pairId(a, b))).data.status == 'accepted';
+      }
+
+      // Only the person being called reads it. The sender has nothing to read
+      // back, and a wider rule would let anyone enumerate who plays with whom.
+      allow read: if request.auth != null && resource.data.to == request.auth.uid;
+
+      allow create, update: if request.auth != null
+        && request.resource.data.keys().hasOnly(['code', 'from', 'to', 'createdAt'])
+        && request.resource.data.from == request.auth.uid
+        && request.resource.data.to is string
+        && request.resource.data.to != request.auth.uid
+        && request.resource.data.code is string
+        && request.resource.data.code.size() == 6
+        && request.resource.data.createdAt is number
+        && request.auth.uid in get(/databases/$(database)/documents/parties/$(request.resource.data.code)).data.members
+        && areFriends(request.auth.uid, request.resource.data.to);
+
+      // The invited person clears it once they have joined or do not want it;
+      // the sender may take it back.
+      allow delete: if request.auth != null
+        && (resource.data.to == request.auth.uid || resource.data.from == request.auth.uid);
+    }
+
     /* ------------------------------ ai usage ----------------------------- */
     /*
      * The daily cap on the shared Gemini key (see `api/gemini.ts`). The proxy

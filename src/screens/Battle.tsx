@@ -29,6 +29,8 @@ import { useLang } from '../i18n/useLang'
 import { fetchBattlePlayer, ratingTierFor } from '../lib/battle'
 import { FEATURE_TEAM_BATTLE } from '../lib/environment'
 import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { watchMyInvites } from '../lib/party'
+import type { PartyInvite } from '../lib/party'
 import { useProfile } from '../lib/progress'
 import { useSession } from '../lib/session'
 
@@ -103,6 +105,15 @@ export function Battle() {
     return () => {
       alive = false
     }
+  }, [uid])
+
+  // Someone calling you into a room has to be visible from here: nobody opens
+  // Команда on the off-chance, so an invitation nobody sees is an invitation
+  // that never arrived.
+  const [invites, setInvites] = useState<PartyInvite[]>([])
+  useEffect(() => {
+    if (!uid || !FEATURE_TEAM_BATTLE) return
+    return watchMyInvites(uid, setInvites)
   }, [uid])
 
   const tier = ratingTierFor(rating ?? 0)
@@ -234,6 +245,7 @@ export function Battle() {
             accent="var(--color-era-saka)"
             title={t(s.team.title)}
             subtitle={t(s.team.hubSub)}
+            stat={invites.length > 0 ? `${invites.length} ${t(s.team.inviteWaiting)}` : null}
             onClick={() => navigate('/battle/team')}
           />
         )}

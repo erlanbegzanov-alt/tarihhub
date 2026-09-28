@@ -18,7 +18,7 @@
  * The match itself is still the next step: `Старт` is deliberately disabled and
  * says so, rather than pretending to open something that does not exist.
  */
-import { ArrowLeftRight, Check, Copy, LogOut, Plus, UserMinus, Users } from 'lucide-react'
+import { ArrowLeftRight, Check, Copy, LogOut, Plus, UserMinus, Users, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -30,10 +30,14 @@ import { useLang } from '../i18n/useLang'
 import { fetchBattlePlayer, syncBattlePlayer } from '../lib/battle'
 import type { BattlePlayer, BattlePlayerMeta } from '../lib/battle'
 import { cn } from '../lib/cn'
+import { watchFriendships } from '../lib/friends'
+import type { Friendship } from '../lib/friends'
 import { staggerContainer, staggerItem } from '../lib/motion'
 import {
   TEAM_SIZES,
   createParty,
+  dismissInvite,
+  invitePlayer,
   joinParty,
   leaveParty,
   removeMember,
@@ -41,9 +45,10 @@ import {
   setPartyFormat,
   switchTeam,
   teamsReady,
+  watchMyInvites,
   watchParty,
 } from '../lib/party'
-import type { JoinPartyResult, Party, TeamKey, TeamSize } from '../lib/party'
+import type { JoinPartyResult, Party, PartyInvite, TeamKey, TeamSize } from '../lib/party'
 import { levelInfo, useProfile } from '../lib/progress'
 import { resolveRankIdentity } from '../lib/rankIdentity'
 import { OWNER_EMAIL } from '../lib/rankStyle'
@@ -300,12 +305,41 @@ export function TeamBattle() {
 
   const isLeader = Boolean(party && uid && party.leader === uid)
 
+  /* ------------------------ friends and invitations ------------------------ */
+
+  const [friends, setFriends] = useState<Friendship[]>([])
+  useEffect(() => {
+    if (!uid) return
+    return watchFriendships(uid, setFriends)
+  }, [uid])
+
+  const [invites, setInvites] = useState<PartyInvite[]>([])
+  useEffect(() => {
+    if (!uid) return
+    return watchMyInvites(uid, setInvites)
+  }, [uid])
+
+  /** Accepted friends only. A request nobody has answered yet is not someone
+   *  you can call into a game, and the rules refuse such an invite anyway. */
+  const friendUids = useMemo(
+    () => friends.filter((friend) => friend.status === 'accepted').map((friend) => friend.otherUid),
+    [friends],
+  )
+
   /* ------------------------------- the roster ------------------------------ */
+
+  // Everyone whose name this screen has to put on the glass: the room, the
+  // friends it can call into it, and whoever is calling the reader.
+  const wanted = useMemo(() => {
+    const uids = new Set<string>(friendUids)
+    for (const member of party?.members ?? []) uids.add(member)
+    for (const invite of invites) uids.add(invite.from)
+    return [...uids]
+  }, [party, friendUids, invites])
 
   const [players, setPlayers] = useState<Record<string, BattlePlayer | null>>({})
   useEffect(() => {
-    if (!party) return
-    const missing = party.members.filter((member) => !(member in players))
+    const missing = wanted.filter((member) => !(member in players))
     if (missing.length === 0) return
     let alive = true
     void Promise.all(missing.map((member) => fetchBattlePlayer(member))).then((found) => {
@@ -321,7 +355,10 @@ export function TeamBattle() {
     return () => {
       alive = false
     }
-  }, [party, players])
+  }, [wanted, players])
+
+  /** A name for a uid once its public mirror has landed. */
+  const nameOf = (who: string): string => players[who]?.displayName || '…'
 
   /* -------------------------------- actions -------------------------------- */
 
@@ -403,6 +440,39 @@ export function TeamBattle() {
     setBusy(false)
   }
 
+  /** Open seats used to copy the code; they open this instead. */
+  const [invitePanel, setInvitePanel] = useState(false)
+  /** Whom we have called this session, so the row can say so. */
+  const [invited, setInvited] = useState<string[]>([])
+
+  const callFriend = async (to: string) => {
+    if (!party || !uid || busy) return
+    setBusy(true)
+    setNotice(null)
+    const sent = await invitePlayer(party.code, uid, to)
+    if (sent) setInvited((prev) => (prev.includes(to) ? prev : [...prev, to]))
+    else setNotice(t(s.team.joinError))
+    setBusy(false)
+  }
+
+  const acceptInvite = async (invite: PartyInvite) => {
+    if (!uid || busy) return
+    setBusy(true)
+    setNotice(null)
+    const outcome = await joinParty(invite.code, uid)
+    if (outcome === 'joined' || outcome === 'already') {
+      storeParty(invite.code)
+      setCode(invite.code)
+      await dismissInvite(invite.id)
+    } else {
+      setNotice(t(JOIN_TEXT[outcome]))
+      // The room is gone: the card would otherwise sit there for ever, calling
+      // into nothing.
+      if (outcome === 'notFound') await dismissInvite(invite.id)
+    }
+    setBusy(false)
+  }
+
   /* --------------------------------- render -------------------------------- */
 
   const sideLabels: SideLabels = {
@@ -465,6 +535,56 @@ export function TeamBattle() {
         </motion.div>
       ) : !party ? (
         <>
+          {/* Whoever is calling, first: a card that says a friend is waiting
+              beats hunting for a code they read out over voice chat. */}
+          {invites.length > 0 && (
+            <motion.section variants={staggerItem} className="mt-5">
+              <p className="text-[11px] font-bold tracking-wide text-ink-faint uppercase">
+                {t(s.team.invitesTitle)}
+              </p>
+              <ul className="mt-2.5 flex flex-col gap-2">
+                {invites.map((invite) => (
+                  <li
+                    key={invite.id}
+                    className="flex items-center gap-3 rounded-card bg-surface px-4 py-3 shadow-soft ring-1 ring-line/60"
+                  >
+                    <PlayerAvatar
+                      name={nameOf(invite.from)}
+                      photoURL={players[invite.from]?.photoURL ?? ''}
+                      size={36}
+                      me={false}
+                      avatarGender={players[invite.from]?.avatarGender ?? null}
+                      avatarTierIndex={players[invite.from]?.avatarTierIndex ?? 0}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-bold text-ink">
+                        {nameOf(invite.from)}
+                      </span>
+                      <span className="block truncate font-mono text-[11.5px] tracking-[0.1em] text-ink-faint">
+                        {invite.code}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void dismissInvite(invite.id)}
+                      className="focus-ring shrink-0 rounded-full px-2.5 py-1.5 text-[12px] font-semibold text-ink-faint hover:text-wrong"
+                    >
+                      {t(s.team.inviteDismiss)}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void acceptInvite(invite)}
+                      disabled={busy}
+                      className="focus-ring shrink-0 rounded-full bg-brand px-4 py-2 text-[13px] font-bold text-white hover:bg-brand-dark disabled:opacity-50"
+                    >
+                      {t(s.team.inviteAccept)}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </motion.section>
+          )}
+
           {/* Open a room. */}
           <motion.section
             variants={staggerItem}
@@ -570,7 +690,7 @@ export function TeamBattle() {
                 right={false}
                 labels={sideLabels}
                 onKick={isLeader ? (member) => void removeMember(party.code, member) : null}
-                onInvite={() => void copyCode()}
+                onInvite={() => setInvitePanel(true)}
               />
 
               <div className="flex flex-col items-center">
@@ -592,9 +712,74 @@ export function TeamBattle() {
                 right
                 labels={sideLabels}
                 onKick={isLeader ? (member) => void removeMember(party.code, member) : null}
-                onInvite={() => void copyCode()}
+                onInvite={() => setInvitePanel(true)}
               />
             </div>
+
+            {/* Calling a friend by name is the point of having a friends list
+                at all; the code is still on screen for anyone who is not one. */}
+            {invitePanel && (
+              <div className="border-t border-line-soft bg-cream/40 px-4 py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[13px] font-bold text-ink">{t(s.team.inviteTitle)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setInvitePanel(false)}
+                    aria-label={t(s.common.back)}
+                    className="focus-ring grid h-7 w-7 place-items-center rounded-full text-ink-faint hover:text-ink"
+                  >
+                    <X className="h-4 w-4" strokeWidth={2} />
+                  </button>
+                </div>
+
+                {friendUids.length === 0 ? (
+                  <p className="mt-2 text-[12.5px] leading-relaxed text-ink-soft">
+                    {t(s.team.inviteNoFriends)}
+                  </p>
+                ) : (
+                  <ul className="mt-3 flex flex-col gap-2.5">
+                    {friendUids.map((friendUid) => {
+                      const inRoom = party.members.includes(friendUid)
+                      const sent = invited.includes(friendUid)
+                      return (
+                        <li key={friendUid} className="flex items-center gap-2.5">
+                          <PlayerAvatar
+                            name={nameOf(friendUid)}
+                            photoURL={players[friendUid]?.photoURL ?? ''}
+                            size={32}
+                            me={false}
+                            avatarGender={players[friendUid]?.avatarGender ?? null}
+                            avatarTierIndex={players[friendUid]?.avatarTierIndex ?? 0}
+                          />
+                          <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-ink">
+                            {nameOf(friendUid)}
+                          </span>
+                          {inRoom ? (
+                            <span className="shrink-0 text-[11.5px] font-semibold text-ink-faint">
+                              {t(s.team.inviteInRoom)}
+                            </span>
+                          ) : sent ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 text-[11.5px] font-semibold text-brand">
+                              <Check className="h-3.5 w-3.5" strokeWidth={2.4} />
+                              {t(s.team.inviteSent)}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void callFriend(friendUid)}
+                              disabled={busy}
+                              className="focus-ring shrink-0 rounded-full bg-brand-tint px-3.5 py-1.5 text-[12.5px] font-bold text-brand disabled:opacity-50"
+                            >
+                              {t(s.team.inviteButton)}
+                            </button>
+                          )}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
 
             <button
               type="button"
