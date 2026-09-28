@@ -228,9 +228,11 @@ export const s = {
   /** 1v1 duels (`/battle`) — casual, ranked, and the weekly board under them. */
   battle: {
     title: { kz: 'Батл', ru: 'Батл' },
+    // Not «1×1» any more: the section holds the team battle and Кахут too, and
+    // a subtitle that promises duels over a screen of four modes is just wrong.
     subtitle: {
-      kz: 'Қазақстан тарихынан 1×1 жекпе-жек',
-      ru: 'Дуэль 1×1 по истории Казахстана',
+      kz: 'Қазақстан тарихынан ойындар',
+      ru: 'Игры по истории Казахстана',
     },
 
     modeCasual: { kz: 'Қарапайым', ru: 'Обычный' },
