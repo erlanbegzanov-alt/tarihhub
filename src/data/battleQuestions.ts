@@ -2,207 +2,80 @@
  * The battle question bank.
  *
  * Both clients in a duel have to resolve the *same* questions from a plain id
- * list carried in the match document, so the bank is a fixed, hand-picked
- * subset of the questions already written for the quiz — nothing here is new
- * content. Picked for battles specifically: every one is answerable in a few
- * seconds, self-contained (it never leans on a lesson or a person's page
- * being open), and its options are short enough to read under a running
- * timer. No question in this app depends on an image, so nothing had to be
- * excluded on that count.
+ * list carried in the match document, so the bank is drawn from the questions
+ * already written for the quiz — nothing here is new content.
  *
- * Tiered by difficulty for the 3-round duel structure (see `pickRoundQuestionIds`
- * / `ROUND_SIZE` in `lib/battle.ts`). The tiering is positional, not a per-question
- * judgement call from scratch: within a persona's 10 quiz questions, the
- * opening one is the single most iconic fact about them (already the whole of
- * the old, untiered bank), #4 digs one layer deeper (a specific detail a fan
- * would know but a newcomer might not), and #8 is genuinely obscure (an exact
- * unit number, a cited ancient source, a museum's architecture) — verified by
- * hand across a spread of personas from different eras before trusting the
- * pattern, not assumed from one example.
+ * It used to be three hand-typed id lists: every persona's question #1, #4 and
+ * #8, 158 questions in all. That was a sample taken to prove the tiering, and
+ * it got left in as the bank — so 455 of the 613 verified questions never
+ * appeared in a duel at all, and players started recognising the ones that did.
+ * The lists are gone; the pools are now derived by the same rules the sample
+ * was chosen under, which is what lets the whole bank in.
+ *
+ * Two rules decide what gets in and where it lands:
+ *
+ * - **Readable under the clock.** A duel gives 12 seconds a question, so
+ *   anything longer than the longest question that already shipped in a duel
+ *   stays out. Those ceilings are measured, not guessed — see the constants.
+ * - **Difficulty comes from the question, not from taste.** The ҰБТ bank
+ *   declares its own A/B/C level and that is used as-is. A persona's ten climb
+ *   by position: #1 is the single most iconic fact about them, #4 digs a layer
+ *   deeper, #8 is genuinely obscure — verified by hand across personas from
+ *   different eras when the first bank was picked, and now applied to all ten
+ *   instead of to three samples.
+ *
+ * No question in this app depends on an image, so nothing had to be excluded on
+ * that count, and `quiz.ts` carries no lesson-gated questions, so nothing here
+ * can lean on a lesson being open.
  */
 import { quizQuestions } from './quiz'
 import type { QuizQuestion } from './types'
 import { shuffled } from '../lib/shuffle'
 
-/** The whole general pool plus every battle persona's single most iconic fact. */
-const LIGHT_IDS: string[] = [
-  'g1',
-  'g2',
-  'g3',
-  'g4',
-  'g5',
-  'abylai1',
-  'alfarabi1',
-  'tomiris1',
-  'kazybek1',
-  'kenesary1',
-  'abai1',
-  'kurmangazy1',
-  'yasawi1',
-  'kultegin1',
-  'kabanbai1',
-  'aiteke-bi1',
-  'akhmet-baitursynuly1',
-  'alikhan-bokeikhan1',
-  'aliya-moldagulova1',
-  'balasaguni1',
-  'batukhan1',
-  'bauyrzhan-momyshuly1',
-  'bogenbai-batyr1',
-  'bukhar-zhyrau1',
-  'buminkagan1',
-  'dulat-babatayuly1',
-  'esim-khan1',
-  'haknazar-khan1',
-  'isatai-taimanuly1',
-  'kashkari1',
-  'kasym-khan1',
-  'kerey-khan1',
-  'magzhan-zhumabayev1',
-  'makhambet1',
-  'malaisary-batyr1',
-  'manshuk-mametova1',
-  'mirzhakyp-dulatov1',
-  'mukhtar-auezov1',
-  'nauryzbai-batyr1',
-  'nursultan-nazarbayev1',
-  'raiymbek-batyr1',
-  'satbayev1',
-  'shakarim1',
-  'shakshak-zhanibek1',
-  'shokan-ualikhanov1',
-  'syrymdatuly1',
-  'talgat-begeldinov1',
-  'tauke-khan1',
-  'tole-bi1',
-  'tonykok1',
-  'ybyray-altynsarin1',
-  'zhakyp-akbayev1',
-  'zhambyl1',
-  'zhangirkhan1',
-  'zhanibek-khan1',
-  'zhoshykhan1',
-]
+/**
+ * The longest a question and an option may be to stay readable in the 12
+ * seconds a duel allows.
+ *
+ * Both numbers are the longest that already shipped in a duel under the old
+ * hand-picked bank. Using the measured ceiling rather than a fresh opinion
+ * means widening the pools cannot smuggle in anything slower to read than what
+ * players have been answering all along.
+ */
+const MAX_QUESTION_CHARS = 105
+const MAX_OPTION_CHARS = 96
 
-/** One layer more specific per persona than `LIGHT_IDS` — a fan-level detail. */
-const MEDIUM_IDS: string[] = [
-  'abylai4',
-  'alfarabi4',
-  'tomiris4',
-  'kazybek4',
-  'kenesary4',
-  'abai4',
-  'kurmangazy4',
-  'yasawi4',
-  'kultegin4',
-  'kabanbai4',
-  'zhambyl4',
-  'aliya-moldagulova4',
-  'buminkagan4',
-  'kerey-khan4',
-  'tauke-khan4',
-  'bogenbai-batyr4',
-  'shokan-ualikhanov4',
-  'makhambet4',
-  'aiteke-bi4',
-  'akhmet-baitursynuly4',
-  'alikhan-bokeikhan4',
-  'balasaguni4',
-  'batukhan4',
-  'bauyrzhan-momyshuly4',
-  'bukhar-zhyrau4',
-  'dulat-babatayuly4',
-  'esim-khan4',
-  'haknazar-khan4',
-  'isatai-taimanuly4',
-  'kashkari4',
-  'kasym-khan4',
-  'magzhan-zhumabayev4',
-  'malaisary-batyr4',
-  'manshuk-mametova4',
-  'mirzhakyp-dulatov4',
-  'mukhtar-auezov4',
-  'nauryzbai-batyr4',
-  'nursultan-nazarbayev4',
-  'raiymbek-batyr4',
-  'satbayev4',
-  'shakarim4',
-  'shakshak-zhanibek4',
-  'syrymdatuly4',
-  'talgat-begeldinov4',
-  'tole-bi4',
-  'tonykok4',
-  'ybyray-altynsarin4',
-  'zhakyp-akbayev4',
-  'zhangirkhan4',
-  'zhanibek-khan4',
-  'zhoshykhan4',
-]
-
-/** Genuinely obscure per persona — cited sources, exact numbers, minor facts. */
-const HARD_IDS: string[] = [
-  'abylai8',
-  'alfarabi8',
-  'tomiris8',
-  'kazybek8',
-  'kenesary8',
-  'abai8',
-  'kurmangazy8',
-  'yasawi8',
-  'kultegin8',
-  'kabanbai8',
-  'zhambyl8',
-  'aliya-moldagulova8',
-  'buminkagan8',
-  'kerey-khan8',
-  'tauke-khan8',
-  'bogenbai-batyr8',
-  'shokan-ualikhanov8',
-  'makhambet8',
-  'aiteke-bi8',
-  'akhmet-baitursynuly8',
-  'alikhan-bokeikhan8',
-  'balasaguni8',
-  'batukhan8',
-  'bauyrzhan-momyshuly8',
-  'bukhar-zhyrau8',
-  'dulat-babatayuly8',
-  'esim-khan8',
-  'haknazar-khan8',
-  'isatai-taimanuly8',
-  'kashkari8',
-  'kasym-khan8',
-  'magzhan-zhumabayev8',
-  'malaisary-batyr8',
-  'manshuk-mametova8',
-  'mirzhakyp-dulatov8',
-  'mukhtar-auezov8',
-  'nauryzbai-batyr8',
-  'nursultan-nazarbayev8',
-  'raiymbek-batyr8',
-  'satbayev8',
-  'shakarim8',
-  'shakshak-zhanibek8',
-  'syrymdatuly8',
-  'talgat-begeldinov8',
-  'tole-bi8',
-  'tonykok8',
-  'ybyray-altynsarin8',
-  'zhakyp-akbayev8',
-  'zhangirkhan8',
-  'zhanibek-khan8',
-  'zhoshykhan8',
-]
-
-function resolve(ids: string[]): QuizQuestion[] {
-  return ids
-    .map((id) => quizQuestions.find((question) => question.id === id))
-    .filter((question): question is QuizQuestion => question !== undefined)
+function fitsTheClock(question: QuizQuestion): boolean {
+  if (Math.max(question.question.kz.length, question.question.ru.length) > MAX_QUESTION_CHARS) {
+    return false
+  }
+  return question.options.every(
+    (option) => Math.max(option.label.kz.length, option.label.ru.length) <= MAX_OPTION_CHARS,
+  )
 }
 
-const LIGHT = resolve(LIGHT_IDS)
-const MEDIUM = resolve(MEDIUM_IDS)
-const HARD = resolve(HARD_IDS)
+/** 0 light, 1 medium, 2 hard — the three rounds of a duel. */
+type Tier = 0 | 1 | 2
+
+function tierOf(question: QuizQuestion): Tier {
+  // A declared level beats anything inferred: the ҰБТ bank states A/B/C per
+  // question against the exam codifier (see `entQuestions.ts`).
+  if (question.level === 'A') return 0
+  if (question.level === 'B') return 1
+  if (question.level === 'C') return 2
+  // The five general questions are a hand-written set, not a ladder — their
+  // numbers say nothing about difficulty, so they stay where they always were.
+  if (/^g\d+$/.test(question.id)) return 0
+  const position = Number(/(\d+)$/.exec(question.id)?.[1] ?? 0)
+  if (position >= 8) return 2
+  if (position >= 4) return 1
+  return 0
+}
+
+const eligible = quizQuestions.filter(fitsTheClock)
+
+const LIGHT = eligible.filter((question) => tierOf(question) === 0)
+const MEDIUM = eligible.filter((question) => tierOf(question) === 1)
+const HARD = eligible.filter((question) => tierOf(question) === 2)
 
 /**
  * The resolved bank, all three tiers combined. An id that no longer exists is
