@@ -120,6 +120,29 @@ export function smallerSide(teams: Teams): TeamKey {
   return teams.a.length <= teams.b.length ? 'a' : 'b'
 }
 
+/**
+ * How long a room stays worth reopening.
+ *
+ * A room has no expiry of its own and nobody leaves one properly — people just
+ * close the tab, which writes nothing. So the morning after, the stored code
+ * still resolved and the screen showed yesterday's roster as if four people
+ * were sitting in it. Worse, the join-by-code form is only rendered when you
+ * are *not* in a room, so a room that would not let go also hid the only way
+ * into a new one: Erlan could get in by invitation and not by code, and those
+ * two symptoms were one bug.
+ *
+ * Three hours: long enough to survive a lunch break, short enough that a room
+ * never outlives the sitting that made it.
+ */
+export const PARTY_TTL_MS = 3 * 60 * 60_000
+
+/** Yesterday's room — old enough that nobody in it is still at their phone. */
+export function isStaleParty(party: Party, now: number = Date.now()): boolean {
+  // `createdAt` is 0 on a document written before that field existed; such a
+  // room is older than anything this check could catch, so it counts too.
+  return now - party.createdAt > PARTY_TTL_MS
+}
+
 /** Both sides manned and equal — Erlan's rule: no 3 against 5. */
 export function teamsReady(party: Party): boolean {
   const { a, b } = party.teams

@@ -688,6 +688,16 @@ export const s = {
     leave: { kz: 'Бөлмеден шығу', ru: 'Выйти из комнаты' },
     disband: { kz: 'Бөлмені жабу', ru: 'Закрыть комнату' },
     gone: { kz: 'Бөлме жабылды.', ru: 'Комната закрыта.' },
+    /**
+     * A room from a previous sitting. Nobody leaves a room properly — they
+     * close the tab — so yesterday's room came back the next morning with its
+     * whole roster, and since the join form only shows when you are NOT in a
+     * room, it also hid the way into a new one.
+     */
+    staleRoom: {
+      kz: 'Ол бөлме кешеден қалған — жабылды. Жаңасын құр немесе кодпен кір.',
+      ru: 'Та комната осталась с прошлого раза — она закрыта. Создай новую или войди по коду.',
+    },
     onlyLeader: { kz: 'Мұны тек капитан жасайды.', ru: 'Это может только капитан.' },
 
     /* The queue's thirteen strings stood here — «Искать соперника», «Ждём уже

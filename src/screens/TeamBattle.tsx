@@ -39,6 +39,7 @@ import {
   createParty,
   dismissInvite,
   invitePlayer,
+  isStaleParty,
   joinParty,
   leaveParty,
   removeMember,
@@ -308,10 +309,23 @@ export function TeamBattle() {
     }
     return watchParty(
       code,
-      (next) => setParty(next),
+      (next) => {
+        // Yesterday's room, restored from localStorage because closing a tab
+        // writes nothing. Leaving it here does two kinds of damage: it shows a
+        // roster of people who went home, and — since the join-by-code form
+        // only renders when you are not in a room — it hides the only way into
+        // a new one. `leaveParty` also deletes the room outright when the
+        // reader was its captain, so it stops greeting everyone else too.
+        if (isStaleParty(next)) {
+          if (uid) void leaveParty(next.code, uid)
+          forgetParty(t(s.team.staleRoom))
+          return
+        }
+        setParty(next)
+      },
       () => forgetParty(t(s.team.gone)),
     )
-  }, [code, forgetParty, t])
+  }, [code, uid, forgetParty, t])
 
   // Someone who was removed — or who left on another device — should not keep
   // looking at a room they are no longer part of.

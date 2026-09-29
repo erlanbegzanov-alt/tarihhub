@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  PARTY_TTL_MS,
   generatePartyCode,
   inviteId,
+  isStaleParty,
   normalizePartyCode,
   roomCapacity,
   smallerSide,
@@ -115,6 +117,36 @@ describe('sides of a room', () => {
     // Erlan's rule: no 3 against 5, and never one side on its own.
     expect(teamsReady(room(['alice', 'carol'], ['bob']))).toBe(false)
     expect(teamsReady(room(['alice', 'bob'], []))).toBe(false)
+  })
+
+  /**
+   * Nobody leaves a room properly — they close the tab, which writes nothing.
+   * So a room outlived the sitting that made it, came back the next morning
+   * with its whole roster, and — because the join-by-code form only renders
+   * when you are NOT in a room — hid the only way into a new one.
+   */
+  it('lets go of a room from a previous sitting', () => {
+    const fresh = room(['alice'], ['bob'])
+    expect(isStaleParty(fresh, NOW)).toBe(false)
+    expect(isStaleParty(fresh, NOW + PARTY_TTL_MS - 1)).toBe(false)
+    expect(isStaleParty(fresh, NOW + PARTY_TTL_MS + 1)).toBe(true)
+    // A day later is the case Erlan actually hit.
+    expect(isStaleParty(fresh, NOW + 24 * 60 * 60_000)).toBe(true)
+  })
+
+  it('treats a room with no creation time as older than any cutoff', () => {
+    // Documents written before `createdAt` existed read as 0 — older than
+    // anything, so they must never be restored.
+    const ancient = toParty('K7PMX2', {
+      leader: 'alice',
+      members: ['alice'],
+      mode: 'casual',
+      size: 2,
+      teams: { a: ['alice'], b: [] },
+      status: 'idle',
+    })!
+    expect(ancient.createdAt).toBe(0)
+    expect(isStaleParty(ancient, NOW)).toBe(true)
   })
 
   it('drops a malformed one instead of rendering nonsense', () => {
