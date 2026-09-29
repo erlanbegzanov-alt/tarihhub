@@ -42,6 +42,15 @@ export interface TeamMatchPlayer {
   answered: number
   /** They have reached the end of their own run. */
   done: boolean
+  /**
+   * The `startedAt` of the match this run belongs to.
+   *
+   * Deleting a match document does not delete this subcollection — Firestore
+   * keeps documents whose parent is gone — so a second match in the same room
+   * would otherwise open on the first one's finished runs. Readers keep only
+   * the runs stamped with the live match's `startedAt`.
+   */
+  startedAt: number
 }
 
 export interface TeamMatch {
@@ -104,6 +113,7 @@ export function toMatchPlayer(uid: string, data: unknown): TeamMatchPlayer | nul
     score: typeof value.score === 'number' && value.score >= 0 ? value.score : 0,
     answered: typeof value.answered === 'number' && value.answered >= 0 ? value.answered : 0,
     done: value.done === true,
+    startedAt: typeof value.startedAt === 'number' ? value.startedAt : 0,
   }
 }
 
@@ -172,9 +182,18 @@ export function watchTeamMatch(
   )
 }
 
-/** Streams every player's progress. At most ten documents, so no query. */
+/**
+ * Streams every player's progress in ONE match. At most ten documents, so no
+ * query.
+ *
+ * `startedAt` is not optional: runs left behind by an earlier match in the same
+ * room are still in this collection, and counting them would open a fresh match
+ * already finished. Filtering here rather than at each call site means no screen
+ * can forget to do it.
+ */
 export function watchMatchPlayers(
   code: string,
+  startedAt: number,
   onChange: (players: TeamMatchPlayer[]) => void,
 ): () => void {
   if (!db) return () => {}
@@ -184,7 +203,8 @@ export function watchMatchPlayers(
       onChange(
         snapshot.docs
           .map((entry) => toMatchPlayer(entry.id, entry.data()))
-          .filter((player): player is TeamMatchPlayer => player !== null),
+          .filter((player): player is TeamMatchPlayer => player !== null)
+          .filter((player) => player.startedAt === startedAt),
       )
     },
     (error) => console.warn('[tarihhub] Team match players listener failed.', error),
@@ -233,6 +253,7 @@ export async function recordMatchAnswer(
   code: string,
   uid: string,
   side: TeamKey,
+  startedAt: number,
   gained: number,
   done: boolean,
 ): Promise<boolean> {
@@ -242,12 +263,16 @@ export async function recordMatchAnswer(
     await runTransaction(database, async (transaction) => {
       const ref = doc(database, 'teamMatches', code, 'players', uid)
       const snapshot = await transaction.get(ref)
-      const current = snapshot.exists() ? toMatchPlayer(uid, snapshot.data()) : null
+      const stored = snapshot.exists() ? toMatchPlayer(uid, snapshot.data()) : null
+      // A document left by an earlier match in this room is not this run: it
+      // must not carry its score forward, and its side is last game's.
+      const current = stored && stored.startedAt === startedAt ? stored : null
       transaction.set(ref, {
         side: current?.side ?? side,
         score: (current?.score ?? 0) + Math.max(0, gained),
         answered: (current?.answered ?? 0) + 1,
         done: done || current?.done === true,
+        startedAt,
       })
     })
     return true
@@ -259,15 +284,25 @@ export async function recordMatchAnswer(
 
 /** Seats the caller in the match before their first answer, so the others can
  *  see they have arrived rather than reading an absence as "not finished". */
-export async function joinTeamMatch(code: string, uid: string, side: TeamKey): Promise<boolean> {
+export async function joinTeamMatch(
+  code: string,
+  uid: string,
+  side: TeamKey,
+  startedAt: number,
+): Promise<boolean> {
   if (!db) return false
   const database = db
   try {
     await runTransaction(database, async (transaction) => {
       const ref = doc(database, 'teamMatches', code, 'players', uid)
       const snapshot = await transaction.get(ref)
-      if (snapshot.exists()) return
-      transaction.set(ref, { side, score: 0, answered: 0, done: false })
+      const stored = snapshot.exists() ? toMatchPlayer(uid, snapshot.data()) : null
+      // Already seated in THIS match — leave the run alone, it may be underway.
+      // A document from an earlier match in the same room is overwritten: that
+      // reset is the one write the rules allow to lower a score, and only ever
+      // towards a newer match.
+      if (stored && stored.startedAt === startedAt) return
+      transaction.set(ref, { side, score: 0, answered: 0, done: false, startedAt })
     })
     return true
   } catch (error) {
@@ -279,9 +314,11 @@ export async function joinTeamMatch(code: string, uid: string, side: TeamKey): P
 /**
  * Clears the match so the room can play another.
  *
- * Only the document itself: its `players` subcollection is left to Firestore,
- * which hides documents under a deleted parent, and a client loop deleting up
- * to ten subdocuments would be a partial delete waiting to fail halfway.
+ * Only the document itself. Its `players` subcollection stays behind —
+ * Firestore keeps documents whose parent is deleted, and a client loop removing
+ * up to ten of them would be a partial delete waiting to fail halfway. Those
+ * leftovers are harmless because every run is stamped with its match's
+ * `startedAt` and readers keep only the live one's.
  */
 export async function clearTeamMatch(
   code: string,

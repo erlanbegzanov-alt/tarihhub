@@ -25,6 +25,7 @@ import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EmptyPanel } from '../components/battle'
 import { KahootHeader, PlayerAvatar } from '../components/kahoot'
+import { TeamMatchBoard } from '../components/TeamMatchBoard'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { fetchBattlePlayer, syncBattlePlayer } from '../lib/battle'
@@ -48,6 +49,8 @@ import {
   watchParty,
 } from '../lib/party'
 import type { JoinPartyResult, Party, PartyInvite, TeamKey, TeamSize } from '../lib/party'
+import { startTeamMatch, watchTeamMatch } from '../lib/teamMatch'
+import type { TeamMatch } from '../lib/teamMatch'
 import { levelInfo, useProfile } from '../lib/progress'
 import { resolveRankIdentity } from '../lib/rankIdentity'
 import { OWNER_EMAIL } from '../lib/rankStyle'
@@ -318,6 +321,36 @@ export function TeamBattle() {
 
   const isLeader = Boolean(party && uid && party.leader === uid)
 
+  /* ------------------------------- the match ------------------------------- */
+
+  /**
+   * The match shares the room's id, so watching for it *is* the whole handoff:
+   * the captain writes the document, and every other member's screen swaps the
+   * roster for the board on the next snapshot. Nobody is told to press anything
+   * and no field has to be added to the room.
+   */
+  const [match, setMatch] = useState<TeamMatch | null>(null)
+  useEffect(() => {
+    if (!code) {
+      setMatch(null)
+      return
+    }
+    return watchTeamMatch(
+      code,
+      (next) => setMatch(next),
+      () => setMatch(null),
+    )
+  }, [code])
+
+  const startMatch = async () => {
+    if (!party || !uid || busy) return
+    setBusy(true)
+    clearNotice()
+    const started = await startTeamMatch(party, uid)
+    if (!started) setNotice(t(s.team.startFailed))
+    setBusy(false)
+  }
+
   /* ------------------------ friends and invitations ------------------------ */
 
   const [friends, setFriends] = useState<Friendship[]>([])
@@ -556,6 +589,9 @@ export function TeamBattle() {
         <motion.div variants={staggerItem} className="mt-5">
           <EmptyPanel>{t(s.team.signInNeeded)}</EmptyPanel>
         </motion.div>
+      ) : match ? (
+        /* The captain has started: everyone's screen follows the document. */
+        <TeamMatchBoard match={match} uid={uid} onLeave={() => setMatch(null)} />
       ) : !party ? (
         <>
           {/* Whoever is calling, first: a card that says a friend is waiting
@@ -819,19 +855,27 @@ export function TeamBattle() {
               {t(s.team.switchSide)}
             </button>
 
-            <div className="border-t border-line-soft bg-cream/50 px-4 py-4">
-              {/* Deliberately disabled: the match itself is not written yet, and
-                  a button that opened nothing would be worse than an honest
-                  one. `teamsReady` is what will enable it. */}
+            <div className="border-t border-line-soft bg-cream-deep/60 px-4 py-4">
+              {/* Only the captain starts, and only on equal non-empty sides.
+                  The size suffix is gone from the label: «Старт · 1x1» inside a
+                  2х2 room read as "this will be a 1v1 mode", when it was only
+                  counting heads. The real size is spelled out underneath. */}
               <button
                 type="button"
-                disabled
-                className="focus-ring w-full rounded-tile bg-brand px-5 py-3.5 text-[15.5px] font-bold text-white disabled:opacity-50"
+                onClick={() => void startMatch()}
+                disabled={!isLeader || !teamsReady(party) || busy}
+                className="focus-ring w-full rounded-tile bg-brand px-5 py-3.5 text-[15.5px] font-bold text-white transition-colors hover:bg-brand-dark disabled:bg-line disabled:text-ink-faint"
               >
-                {t(s.team.startButton)} · {party.teams.a.length}х{party.teams.b.length}
+                {t(s.team.startButton)}
               </button>
               <p className="mt-2.5 text-center text-[12.5px] leading-relaxed text-ink-soft">
-                {teamsReady(party) ? t(s.team.matchSoon) : t(s.team.sidesUnequal)}
+                {!teamsReady(party)
+                  ? t(s.team.sidesUnequal)
+                  : !isLeader
+                    ? t(s.team.startWaitingLeader)
+                    : party.teams.a.length < party.size
+                      ? `${party.teams.a.length}х${party.teams.b.length} — ${t(s.team.seatsLeft)}`
+                      : t(s.team.matchSoon)}
               </p>
             </div>
           </motion.section>

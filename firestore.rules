@@ -571,37 +571,61 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == resource.data.leader;
 
       /*
-       * One document per player, written only by that player. Scores only ever
-       * climb and `done` never un-sets, so a second tab, a retried write or a
-       * hand-made request cannot rewind a run or replay a question for points.
+       * One document per player, written only by that player. Within a match
+       * scores only ever climb and `done` never un-sets, so a second tab, a
+       * retried write or a hand-made request cannot rewind a run or replay a
+       * question for points.
+       *
+       * `startedAt` is what makes a *second* match in the same room possible.
+       * Deleting the match document does NOT delete this subcollection —
+       * Firestore keeps documents whose parent is gone — so without a round
+       * marker the next match in the same room would open already finished, on
+       * the previous one's scores. Every run therefore carries the `startedAt`
+       * of the match it belongs to, readers ignore runs from an older one, and
+       * the only write allowed to reset a run to zero is one that moves it to a
+       * strictly newer match.
        */
       match /players/{player} {
         function theMatch() {
           return get(/databases/$(database)/documents/teamMatches/$(code)).data;
         }
         function validRun(d) {
-          return d.keys().hasOnly(['side', 'score', 'answered', 'done'])
+          return d.keys().hasOnly(['side', 'score', 'answered', 'done', 'startedAt'])
             && d.score is number && d.score >= 0
             && d.answered is int && d.answered >= 0
             && d.answered <= theMatch().questionIds.size()
-            && d.done is bool;
+            && d.done is bool
+            // Pinned to the live match, so a run can never claim to belong to a
+            // round that is not the one being played.
+            && d.startedAt == theMatch().startedAt;
+        }
+        // The side is pinned to the side the match says this player is on, so
+        // nobody can score into the other team's total.
+        function onOwnSide(d) {
+          return (d.side == 'a' && theMatch().teams.a.hasAny([player]))
+            || (d.side == 'b' && theMatch().teams.b.hasAny([player]));
         }
 
         allow read: if request.auth != null && request.auth.uid in theMatch().members;
-        // The side is pinned to the side the match says this player is on, so
-        // nobody can score into the other team's total.
         allow create: if request.auth != null
           && request.auth.uid == player
           && validRun(request.resource.data)
-          && ((request.resource.data.side == 'a' && theMatch().teams.a.hasAny([player]))
-            || (request.resource.data.side == 'b' && theMatch().teams.b.hasAny([player])));
+          && onOwnSide(request.resource.data);
         allow update: if request.auth != null
           && request.auth.uid == player
           && validRun(request.resource.data)
-          && request.resource.data.side == resource.data.side
-          && request.resource.data.score >= resource.data.score
-          && request.resource.data.answered >= resource.data.answered
-          && (resource.data.done == false || request.resource.data.done == true);
+          && (
+            // Same match: the run only ever moves forward.
+            (resource.data.get('startedAt', 0) == request.resource.data.startedAt
+              && request.resource.data.side == resource.data.side
+              && request.resource.data.score >= resource.data.score
+              && request.resource.data.answered >= resource.data.answered
+              && (resource.data.done == false || request.resource.data.done == true))
+            // A later match in the same room: the run starts over, and the side
+            // comes from the new match — people do swap sides between games.
+            || (resource.data.get('startedAt', 0) < request.resource.data.startedAt
+              && onOwnSide(request.resource.data))
+          );
         // A run is evidence; clearing it would erase points the other side has
         // already been shown. The leader deletes the whole match instead.
         allow delete: if false;

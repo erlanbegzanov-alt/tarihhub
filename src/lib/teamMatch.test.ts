@@ -21,7 +21,7 @@ const RAW = {
 }
 
 function player(over: Partial<TeamMatchPlayer> = {}): TeamMatchPlayer {
-  return { uid: 'alice', side: 'a', score: 0, answered: 0, done: false, ...over }
+  return { uid: 'alice', side: 'a', score: 0, answered: 0, done: false, startedAt: NOW, ...over }
 }
 
 describe('reading a match', () => {
@@ -64,12 +64,15 @@ describe('reading a match', () => {
 
 describe('reading a player', () => {
   it('reads a run', () => {
-    expect(toMatchPlayer('bob', { side: 'b', score: 120, answered: 4, done: true })).toEqual({
+    expect(
+      toMatchPlayer('bob', { side: 'b', score: 120, answered: 4, done: true, startedAt: NOW }),
+    ).toEqual({
       uid: 'bob',
       side: 'b',
       score: 120,
       answered: 4,
       done: true,
+      startedAt: NOW,
     })
   })
 
@@ -80,7 +83,16 @@ describe('reading a player', () => {
 
   it('treats a missing or negative number as nothing scored', () => {
     const empty = toMatchPlayer('bob', { side: 'a' })
-    expect(empty).toEqual({ uid: 'bob', side: 'a', score: 0, answered: 0, done: false })
+    expect(empty).toEqual({
+      uid: 'bob',
+      side: 'a',
+      score: 0,
+      answered: 0,
+      done: false,
+      // A run written before rounds existed belongs to no match, so every live
+      // match's reader drops it — which is the behaviour we want for leftovers.
+      startedAt: 0,
+    })
     // A negative score would subtract from that side's total.
     expect(toMatchPlayer('bob', { side: 'a', score: -50 })?.score).toBe(0)
   })

@@ -657,6 +657,8 @@ d('firestore.rules', () => {
   describe('teamMatches/{code}', () => {
     const ROOM = ['alice', 'bob', 'carol', 'dan']
     const SIDES = sides(ROOM)
+    /** Fixed, because every player run has to name the match it belongs to. */
+    const MATCH_AT = 1_700_000_000_000
 
     /** A match that matches the room `seedRoom()` seeds. */
     function teamMatch(over: Record<string, unknown> = {}) {
@@ -665,7 +667,7 @@ d('firestore.rules', () => {
         leader: 'alice',
         size: 2,
         questionIds: ['q1', 'q2', 'q3'],
-        startedAt: Date.now(),
+        startedAt: MATCH_AT,
         ...over,
         teams,
         members: [...teams.a, ...teams.b],
@@ -751,6 +753,7 @@ d('firestore.rules', () => {
         score: 0,
         answered: 0,
         done: false,
+        startedAt: MATCH_AT,
         ...over,
       })
 
@@ -812,6 +815,65 @@ d('firestore.rules', () => {
         const alice = env.authenticatedContext('alice').firestore()
         await assertFails(
           setDoc(doc(alice, 'teamMatches', PARTY, 'players', 'alice'), run({ answered: 4 })),
+        )
+      })
+
+      it('a run must name the match it is played in', async () => {
+        await seedRoom()
+        await seedMatch()
+        const alice = env.authenticatedContext('alice').firestore()
+        // Without this a run could claim to belong to a round that is not being
+        // played, and the reader's round filter would be trivial to sidestep.
+        await assertFails(
+          setDoc(
+            doc(alice, 'teamMatches', PARTY, 'players', 'alice'),
+            run({ startedAt: MATCH_AT + 1 }),
+          ),
+        )
+        await assertFails(
+          setDoc(doc(alice, 'teamMatches', PARTY, 'players', 'alice'), run({ startedAt: 0 })),
+        )
+      })
+
+      /**
+       * The reason `startedAt` exists at all.
+       *
+       * Deleting a match does not delete this subcollection — Firestore keeps
+       * documents whose parent is gone — so the next match in the same room
+       * meets the previous one's finished runs. Without a way to reset them it
+       * would open already over, on last game's scores.
+       */
+      it('a later match in the same room starts everyone from zero again', async () => {
+        await seedRoom()
+        await seedMatch()
+        await env.withSecurityRulesDisabled(async (ctx) => {
+          await setDoc(
+            doc(ctx.firestore(), 'teamMatches', PARTY, 'players', 'alice'),
+            run({ score: 150, answered: 3, done: true }),
+          )
+        })
+        const alice = env.authenticatedContext('alice').firestore()
+        const AGAIN = MATCH_AT + 60_000
+        // Still the same match: the old run stands.
+        await assertFails(
+          setDoc(doc(alice, 'teamMatches', PARTY, 'players', 'alice'), run({ score: 0 })),
+        )
+        // The captain starts another one in the same room.
+        await seedMatch({ startedAt: AGAIN })
+        await assertSucceeds(
+          setDoc(
+            doc(alice, 'teamMatches', PARTY, 'players', 'alice'),
+            run({ score: 0, answered: 0, done: false, startedAt: AGAIN }),
+          ),
+        )
+        // And the reset does not let anyone file the fresh run under the other
+        // team on the way through.
+        await seedMatch({ startedAt: AGAIN + 60_000 })
+        await assertFails(
+          setDoc(
+            doc(alice, 'teamMatches', PARTY, 'players', 'alice'),
+            run({ side: 'b', score: 0, startedAt: AGAIN + 60_000 }),
+          ),
         )
       })
 
