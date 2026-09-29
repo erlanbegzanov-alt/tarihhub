@@ -170,9 +170,19 @@ export const PRESENCE_GRACE_MS = 10_000
 export const PRESENCE_AFK_CONFIRM_MS = 40_000
 
 /** XP earned for one answer, given the seconds still on the clock. */
-export function answerXp(correct: boolean, secondsLeft: number): number {
+export function answerXp(
+  correct: boolean,
+  secondsLeft: number,
+  /**
+   * The clock this answer was given on. Defaults to the duel's, but a team
+   * match runs a longer one (`TEAM_QUESTION_SECONDS`): clamping its answers at
+   * twelve would pay the same for answering in one second as in three, and the
+   * speed bonus is most of what makes the mode a race.
+   */
+  clockSeconds: number = QUESTION_SECONDS,
+): number {
   if (!correct) return 0
-  const seconds = Math.max(0, Math.min(QUESTION_SECONDS, Math.floor(secondsLeft)))
+  const seconds = Math.max(0, Math.min(clockSeconds, Math.floor(secondsLeft)))
   return XP_PER_CORRECT + seconds * XP_PER_SECOND_LEFT
 }
 

@@ -24,11 +24,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { battleQuestion } from '../data/battleQuestions'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
-import { QUESTION_SECONDS, answerXp } from '../lib/battle'
+import { answerXp } from '../lib/battle'
 import { cn } from '../lib/cn'
 import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import type { TeamKey } from '../lib/party'
 import {
+  TEAM_QUESTION_SECONDS,
   clearTeamMatch,
   everyoneDone,
   joinTeamMatch,
@@ -56,7 +57,7 @@ const TIMED_OUT = -1
 function TimerRing({ seconds }: { seconds: number }) {
   const radius = 14
   const circumference = 2 * Math.PI * radius
-  const left = Math.max(0, Math.min(QUESTION_SECONDS, seconds))
+  const left = Math.max(0, Math.min(TEAM_QUESTION_SECONDS, seconds))
   return (
     <div className="relative h-[34px] w-[34px]" aria-hidden>
       <svg width="34" height="34" className="-rotate-90">
@@ -77,7 +78,7 @@ function TimerRing({ seconds }: { seconds: number }) {
           strokeLinecap="round"
           stroke="var(--color-gold)"
           strokeDasharray={circumference}
-          strokeDashoffset={circumference * (1 - left / QUESTION_SECONDS)}
+          strokeDashoffset={circumference * (1 - left / TEAM_QUESTION_SECONDS)}
           style={{ transition: 'stroke-dashoffset 1s linear' }}
         />
       </svg>
@@ -194,7 +195,7 @@ export function TeamMatchBoard({
   }, [me, index, questions.length])
 
   const [picked, setPicked] = useState<number | null>(null)
-  const [secondsLeft, setSecondsLeft] = useState(QUESTION_SECONDS)
+  const [secondsLeft, setSecondsLeft] = useState(TEAM_QUESTION_SECONDS)
 
   const question = index !== null ? questions[index] : undefined
   const playing = question !== undefined && inMatch
@@ -222,12 +223,12 @@ export function TeamMatchBoard({
         match.startedAt,
         // A wrong answer is worth nothing, however fast it was: `answerXp` pays
         // for speed only on top of a correct one.
-        answerXp(correct, correct ? secondsLeft : 0),
+        answerXp(correct, correct ? secondsLeft : 0, TEAM_QUESTION_SECONDS),
         last,
       )
       advanceTimer.current = window.setTimeout(() => {
         setPicked(null)
-        setSecondsLeft(QUESTION_SECONDS)
+        setSecondsLeft(TEAM_QUESTION_SECONDS)
         setIndex(index + 1)
       }, REVEAL_MS)
     },

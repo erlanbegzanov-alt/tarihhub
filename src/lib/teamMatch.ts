@@ -27,10 +27,27 @@
  */
 import { collection, deleteDoc, doc, onSnapshot, runTransaction, setDoc } from 'firebase/firestore'
 import { pickRoundQuestionIds } from '../data/battleQuestions'
-import { ROUND_SIZE } from './battle'
 import { db } from './firebase'
 import { asTeamSize } from './party'
 import type { Party, TeamKey, Teams, TeamSize } from './party'
+
+/**
+ * How long a team match is, and how long each question stays up.
+ *
+ * Deliberately not the duel's numbers. A duel is a sprint between two people:
+ * nine questions at twelve seconds keeps it under two minutes. A team match is
+ * what a class gathers around, so Erlan asked for at least fifteen questions
+ * and a slightly longer clock — with six or ten people the match is the event,
+ * not a snack between two lessons.
+ *
+ * `pickRoundQuestionIds` takes a per-pool slice and draws from three pools
+ * (light, medium, hard), so five per pool is fifteen questions with the
+ * difficulty ladder intact. The rules cap `questionIds` at 30, so this has room
+ * to grow without a rules deploy.
+ */
+export const TEAM_ROUND_SIZE = 5
+export const TEAM_MATCH_QUESTIONS = TEAM_ROUND_SIZE * 3
+export const TEAM_QUESTION_SECONDS = 15
 
 /** One person's run through the match. */
 export interface TeamMatchPlayer {
@@ -162,15 +179,18 @@ export function everyoneDone(match: TeamMatch, players: TeamMatchPlayer[]): bool
  * lowered, and no client may write another player's document.
  *
  * A player who is actually there cannot take longer than
- * `BATTLE_QUESTIONS * (QUESTION_SECONDS + REVEAL_MS)` — about two minutes —
- * because the board answers for them when their own clock runs out. This cap is
- * three times that, so it can only ever fire on someone who has left.
+ * `TEAM_MATCH_QUESTIONS * (TEAM_QUESTION_SECONDS + REVEAL_MS)` — about four
+ * minutes — because the board answers for them when their own clock runs out.
+ * This cap is three times that, so it can only ever fire on someone who has
+ * left. It is tied to those two constants on purpose: the first version of this
+ * was six minutes against a two-minute match, and raising the match to fifteen
+ * questions would have quietly left barely a minute of margin.
  *
  * Derived from `startedAt` and the wall clock rather than stored, so every
  * screen crosses it at the same moment without anyone writing a flag, and a
  * reload reaches the same answer from the same documents.
  */
-export const MATCH_STALL_MS = 6 * 60_000
+export const MATCH_STALL_MS = 12 * 60_000
 
 /** Whether the match should be shown as over: everyone finished, or long
  *  enough has passed that whoever is missing is not coming back. */
@@ -262,7 +282,7 @@ export async function startTeamMatch(party: Party, uid: string): Promise<boolean
       size: party.size,
       teams: { a, b },
       members: [...a, ...b],
-      questionIds: pickRoundQuestionIds(ROUND_SIZE, null),
+      questionIds: pickRoundQuestionIds(TEAM_ROUND_SIZE, null),
       startedAt: Date.now(),
     })
     return true

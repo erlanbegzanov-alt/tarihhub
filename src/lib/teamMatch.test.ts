@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { battleQuestion, pickRoundQuestionIds } from '../data/battleQuestions'
 import {
   MATCH_STALL_MS,
+  TEAM_MATCH_QUESTIONS,
+  TEAM_QUESTION_SECONDS,
+  TEAM_ROUND_SIZE,
   answeredTotal,
   everyoneDone,
   matchOutcome,
@@ -153,10 +157,23 @@ describe('when the match is over', () => {
   })
 
   it('leaves room for the slowest honest player', () => {
-    // A player who is present is answered for by their own clock: nine
-    // questions at QUESTION_SECONDS plus the reveal is about two minutes, so
-    // the cap must sit well above that or it would cut a real run short.
-    expect(MATCH_STALL_MS).toBeGreaterThan(3 * 60_000)
+    // A player who is present is answered for by their own clock, so the
+    // longest possible honest run is the whole match at full time. The cap has
+    // to stay clear of that by a wide margin, and it has to be checked against
+    // the constants rather than a number typed once: raising the match from 9
+    // questions to 15 nearly ate a six-minute cap.
+    const longestHonestRunMs = TEAM_MATCH_QUESTIONS * (TEAM_QUESTION_SECONDS + 2) * 1000
+    expect(MATCH_STALL_MS).toBeGreaterThan(2 * longestHonestRunMs)
+  })
+
+  it('gives a team match fifteen questions, five from each difficulty pool', () => {
+    const ids = pickRoundQuestionIds(TEAM_ROUND_SIZE, null)
+    expect(TEAM_MATCH_QUESTIONS).toBe(15)
+    expect(ids).toHaveLength(TEAM_MATCH_QUESTIONS)
+    // No question may be asked twice inside one match.
+    expect(new Set(ids).size).toBe(TEAM_MATCH_QUESTIONS)
+    // Every id has to resolve, or the board would render a blank question.
+    expect(ids.every((id) => battleQuestion(id) !== undefined)).toBe(true)
   })
 
   it('counts how far the room has got together', () => {
