@@ -151,6 +151,37 @@ export function everyoneDone(match: TeamMatch, players: TeamMatchPlayer[]): bool
   return match.members.every((uid) => byUid.get(uid)?.done === true)
 }
 
+/**
+ * How long a match may stay unfinished before every screen calls it over
+ * anyway.
+ *
+ * `everyoneDone` is derived from the runs, which is the right shape — but
+ * `members` is fixed when the match is created, so somebody who closes the tab
+ * mid-match leaves a run that can never reach `done`, and the rest of the room
+ * waits on them for ever. Nobody can clear that: a run may never be deleted or
+ * lowered, and no client may write another player's document.
+ *
+ * A player who is actually there cannot take longer than
+ * `BATTLE_QUESTIONS * (QUESTION_SECONDS + REVEAL_MS)` — about two minutes —
+ * because the board answers for them when their own clock runs out. This cap is
+ * three times that, so it can only ever fire on someone who has left.
+ *
+ * Derived from `startedAt` and the wall clock rather than stored, so every
+ * screen crosses it at the same moment without anyone writing a flag, and a
+ * reload reaches the same answer from the same documents.
+ */
+export const MATCH_STALL_MS = 6 * 60_000
+
+/** Whether the match should be shown as over: everyone finished, or long
+ *  enough has passed that whoever is missing is not coming back. */
+export function matchOver(
+  match: TeamMatch,
+  players: TeamMatchPlayer[],
+  now: number = Date.now(),
+): boolean {
+  return everyoneDone(match, players) || now - match.startedAt > MATCH_STALL_MS
+}
+
 /** How far the whole room has got, for the progress line while people play. */
 export function answeredTotal(players: TeamMatchPlayer[]): number {
   return players.reduce((sum, player) => sum + player.answered, 0)

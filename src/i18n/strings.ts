@@ -638,6 +638,14 @@ export const s = {
     matchStillPlaying: { kz: 'әлі ойнап жатыр', ru: 'ещё играют' },
     matchYourScore: { kz: 'Сенің ұпайың', ru: 'Твои очки' },
     matchDraw: { kz: 'Тең түсті', ru: 'Ничья' },
+
+    // Shown only when the stall cap ended the match instead of the last player
+    // finishing (see `MATCH_STALL_MS`): without a line like this the room would
+    // wonder why the result arrived while somebody was still "playing".
+    matchEndedOnStall: {
+      kz: 'Бір ойыншы ойынды тастап кетті — оның жинағаны сол қалпында есептелді.',
+      ru: 'Кто-то ушёл, не доиграв — его счёт учтён как есть.',
+    },
     matchAgain: { kz: 'Тағы бір рет', ru: 'Ещё раз' },
     matchWaitingLeader: {
       kz: 'Жаңа ұрысты капитан бастайды.',

@@ -33,6 +33,7 @@ import {
   everyoneDone,
   joinTeamMatch,
   matchOutcome,
+  matchOver,
   recordMatchAnswer,
   teamScores,
   watchMatchPlayers,
@@ -252,7 +253,19 @@ export function TeamMatchBoard({
   /* ------------------------------- the room ------------------------------- */
 
   const scores = teamScores(players)
-  const over = everyoneDone(match, players)
+  // Ticks only while the match is still open, so the stall cap can be crossed
+  // without anybody touching the screen — a room waiting on somebody who has
+  // closed their tab gets its result without a reload — and stops the moment it
+  // is over rather than re-rendering the result page once a second for ever.
+  const [now, setNow] = useState(() => Date.now())
+  const over = matchOver(match, players, now)
+  useEffect(() => {
+    if (over) return
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [over])
+  /** True when the cap ended it rather than the last player finishing. */
+  const endedOnStall = over && !everyoneDone(match, players)
   const outcome = matchOutcome(scores)
   const stillPlaying = match.members.filter(
     (member) => players.find((player) => player.uid === member)?.done !== true,
@@ -298,6 +311,11 @@ export function TeamMatchBoard({
           {me && (
             <p className="mt-3 text-[13px] tabular-nums text-ink-faint">
               {t(s.team.matchYourScore)}: {me.score}
+            </p>
+          )}
+          {endedOnStall && (
+            <p className="mt-3 text-[13px] leading-relaxed text-ink-soft">
+              {t(s.team.matchEndedOnStall)}
             </p>
           )}
           <p className="mt-4 text-[12.5px] leading-relaxed text-ink-faint">

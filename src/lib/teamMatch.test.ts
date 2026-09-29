@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MATCH_STALL_MS,
   answeredTotal,
   everyoneDone,
   matchOutcome,
+  matchOver,
   teamScores,
   toMatchPlayer,
   toTeamMatch,
@@ -134,6 +136,27 @@ describe('when the match is over', () => {
     // only the documents present would end the match while someone is loading.
     const present = ['alice', 'bob', 'carol'].map((uid) => player({ uid, done: true }))
     expect(everyoneDone(match, present)).toBe(false)
+  })
+
+  it('ends anyway once the stall cap passes, so one closed tab cannot hang the room', () => {
+    // dan closed his tab: his run can never reach `done`, and no client is
+    // allowed to delete or lower it. Without the cap everyone else waits for
+    // ever — the failure most likely to happen in front of an audience.
+    const three = ['alice', 'bob', 'carol'].map((uid) => player({ uid, done: true }))
+    expect(matchOver(match, three, NOW + MATCH_STALL_MS - 1)).toBe(false)
+    expect(matchOver(match, three, NOW + MATCH_STALL_MS + 1)).toBe(true)
+  })
+
+  it('does not wait for the cap when everyone actually finished', () => {
+    const all = ['alice', 'bob', 'carol', 'dan'].map((uid) => player({ uid, done: true }))
+    expect(matchOver(match, all, NOW + 1000)).toBe(true)
+  })
+
+  it('leaves room for the slowest honest player', () => {
+    // A player who is present is answered for by their own clock: nine
+    // questions at QUESTION_SECONDS plus the reveal is about two minutes, so
+    // the cap must sit well above that or it would cut a real run short.
+    expect(MATCH_STALL_MS).toBeGreaterThan(3 * 60_000)
   })
 
   it('counts how far the room has got together', () => {
