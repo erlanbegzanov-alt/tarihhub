@@ -9,6 +9,11 @@
          resolved theme before first paint. A second `media`-scoped tag would
          override an explicit "light" choice on a dark-mode device. -->
     <meta name="theme-color" content="#F7F3EA" />
+    <!-- Both spellings on purpose: iOS still reads the `apple-` one, and Chrome
+         warns on every load that it is deprecated in favour of this one.
+         Keeping only the standard name would lose iOS standalone mode; keeping
+         only the Apple name leaves a warning in a production console. -->
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta

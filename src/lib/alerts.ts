@@ -51,13 +51,21 @@ export function useAlerts(): Alerts {
       setInvites([])
       return
     }
+    // Both listeners hang off the one flag, which is what the contract above
+    // already promises ("zeroes ... when the team feature is off"). Production
+    // has the flag off and does not route `/battle/friends`, so nobody there
+    // can send or answer a friend request: the listener could only ever report
+    // zero, while still costing every signed-in student a live Firestore
+    // subscription — and a console warning for each of them if the production
+    // rules ever lag behind this file. `FEATURE_TEAM_BATTLE` is a build-time
+    // constant, so in a production build everything below this line is dropped.
+    if (!FEATURE_TEAM_BATTLE) return
+
     const stopFriends = watchFriendships(uid, setFriendships)
-    // The friends list works without the team feature; rooms do not exist
-    // without it, so there is nothing to listen for.
-    const stopInvites = FEATURE_TEAM_BATTLE ? watchMyInvites(uid, setInvites) : null
+    const stopInvites = watchMyInvites(uid, setInvites)
     return () => {
       stopFriends()
-      stopInvites?.()
+      stopInvites()
     }
   }, [uid])
 
