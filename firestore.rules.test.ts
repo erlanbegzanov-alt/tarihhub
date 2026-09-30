@@ -427,6 +427,101 @@ d('firestore.rules', () => {
     })
   })
 
+  describe('the owner tier', () => {
+    // Index 7 is the developer badge. It is granted by identity in
+    // src/lib/rankStyle.ts, and until now the rules let anyone claim it: the
+    // public mirrors other people read — the weekly board, a duel opponent
+    // card, a Кахут player row — simply stored whatever index was written.
+    const OWNER = 'erlanbegzanov@gmail.com'
+
+    it('lets the owner wear their own tier', async () => {
+      const db = env
+        .authenticatedContext('erlan', { email: OWNER, email_verified: true })
+        .firestore()
+      await assertSucceeds(
+        setDoc(
+          doc(db, 'battlePlayers/erlan'),
+          validBattlePlayer({ avatarTierIndex: 7, titleTierIndex: 7 }),
+        ),
+      )
+    })
+
+    it('refuses the developer badge to everybody else', async () => {
+      const db = env
+        .authenticatedContext('mallory', { email: 'mallory@example.com', email_verified: true })
+        .firestore()
+      await assertFails(
+        setDoc(
+          doc(db, 'battlePlayers/mallory'),
+          validBattlePlayer({ avatarTierIndex: 7, titleTierIndex: 7 }),
+        ),
+      )
+      await assertFails(
+        setDoc(
+          doc(db, 'battlePlayers/mallory'),
+          validBattlePlayer({ avatarTierIndex: 0, titleTierIndex: 7 }),
+        ),
+      )
+    })
+
+    it('refuses it on an unverified claim to the owner address', async () => {
+      // An email claim nobody verified must not stand in for the account.
+      const db = env
+        .authenticatedContext('impostor', { email: OWNER, email_verified: false })
+        .firestore()
+      await assertFails(
+        setDoc(
+          doc(db, 'battlePlayers/impostor'),
+          validBattlePlayer({ avatarTierIndex: 7, titleTierIndex: 7 }),
+        ),
+      )
+    })
+
+    it('still lets an ordinary player wear any tier they could really reach', async () => {
+      const db = env
+        .authenticatedContext('bob', { email: 'bob@example.com', email_verified: true })
+        .firestore()
+      await assertSucceeds(
+        setDoc(
+          doc(db, 'battlePlayers/bob'),
+          validBattlePlayer({ avatarTierIndex: 6, titleTierIndex: 6 }),
+        ),
+      )
+    })
+
+    it('closes the same hole in a live Кахут room', async () => {
+      // A classroom is where impersonation actually pays off: everyone in the
+      // room sees the stored tier rendered as a title next to a name.
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'kahootSessions/ABC123'), {
+          hostUid: 'teacher',
+          gameId: 'g1',
+          state: 'lobby',
+          questionIndex: 0,
+          startedAt: null,
+          createdAt: 1_700_000_000_000,
+        })
+      })
+      const db = env
+        .authenticatedContext('mallory', { email: 'mallory@example.com', email_verified: true })
+        .firestore()
+      await assertFails(
+        setDoc(doc(db, 'kahootSessions/ABC123/players/mallory'), {
+          uid: 'mallory',
+          displayName: 'Аружан',
+          photoURL: '',
+          score: 0,
+          lastAnswerIndex: null,
+          lastAnswerAt: null,
+          joinedAt: 1_700_000_000_000,
+          avatarGender: 'f',
+          avatarTierIndex: 7,
+          titleTierIndex: 7,
+        }),
+      )
+    })
+  })
+
   describe('aiUsage/{bucket}/days/{day}', () => {
     const path = (bucket: string) => `aiUsage/${bucket}/days/2026-03-01`
 

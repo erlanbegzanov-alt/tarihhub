@@ -120,6 +120,31 @@ service cloud.firestore {
     // close enough that the 60s scoring throttle keeps its intent.
     // Empty, or an https URL on the one host a shared identity photo ever comes
     // from (a Google account image). Reused by the Кахут player row below.
+    // The owner tier, index 7, sits one past the seven-rung ladder in
+    // src/data/ranks.ts. It is granted by identity and cannot be earned by
+    // any amount of XP — src/lib/rankStyle.ts says exactly that and checks
+    // the signed-in session for it. These rules did not: both public mirrors
+    // bounded the index at 0..7 and stopped there, so any signed-in user
+    // could write 7 to their own row and be rendered to every other viewer —
+    // the weekly board, a duel opponent card, every student in a Кахут room —
+    // with the gold ring and the "Разработчик" title. That is convincing
+    // impersonation of the developer in front of classmates, most of them
+    // minors.
+    //
+    // The verified flag is required as well as the address: an ID token
+    // whose email claim was never verified must not stand in for it.
+    function ownerTierMax() {
+      // Read through get() with a default, never as a bare field. A token
+      // without an email claim — which is most of them — makes
+      // request.auth.token.email an error, not a null, and an error denies
+      // the whole write. That is the same missing-key trap this file already
+      // documents for document fields, and it bit here first: two unrelated
+      // battlePlayers tests went red the moment the bare form went in.
+      return request.auth.token.get('email', '') == 'erlanbegzanov@gmail.com'
+        && request.auth.token.get('email_verified', false) == true
+        ? 7 : 6;
+    }
+
     function validSharedPhoto(url) {
       return url is string && url.size() <= 300
         && (url == '' || url.matches('https://lh3[.]googleusercontent[.]com(/.*)?'));
@@ -141,8 +166,10 @@ service cloud.firestore {
         // different, host-authored field.
         && validSharedPhoto(d.photoURL)
         && d.level is number && d.level >= 1 && d.level <= 500
-        && d.avatarTierIndex is number && d.avatarTierIndex >= 0 && d.avatarTierIndex <= 7
-        && d.titleTierIndex is number && d.titleTierIndex >= 0 && d.titleTierIndex <= 7
+        && d.avatarTierIndex is number
+        && d.avatarTierIndex >= 0 && d.avatarTierIndex <= ownerTierMax()
+        && d.titleTierIndex is number
+        && d.titleTierIndex >= 0 && d.titleTierIndex <= ownerTierMax()
         && d.updatedAt is number
         && d.updatedAt <= request.time.toMillis() + 300000
         && d.updatedAt >= request.time.toMillis() - 300000;
@@ -334,9 +361,9 @@ service cloud.firestore {
           && d.displayName is string && d.displayName.size() <= 40
           && validSharedPhoto(d.photoURL)
           && d.avatarTierIndex is number
-          && d.avatarTierIndex >= 0 && d.avatarTierIndex <= 7
+          && d.avatarTierIndex >= 0 && d.avatarTierIndex <= ownerTierMax()
           && d.titleTierIndex is number
-          && d.titleTierIndex >= 0 && d.titleTierIndex <= 7;
+          && d.titleTierIndex >= 0 && d.titleTierIndex <= ownerTierMax();
       }
       match /players/{uid} {
         allow read: if request.auth != null;
