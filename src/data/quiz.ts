@@ -1,4 +1,5 @@
 import { shuffled } from '../lib/shuffle'
+import { dateQuestions } from './dateQuestions'
 import { entQuestions } from './entQuestions'
 import { lessonQuestions } from './lessonQuestions'
 import type {
@@ -11109,7 +11110,16 @@ const persona: QuizQuestion[] = [
   },
 ]
 
-export const quizQuestions: QuizQuestion[] = [...general, ...persona, ...entQuestions]
+export const quizQuestions: QuizQuestion[] = [
+  ...general,
+  ...persona,
+  ...entQuestions,
+  // Key dates, from the sheet in Erlan's vault. They join the untagged
+  // (general) side of the bank, so the duel, the team match and the standalone
+  // quiz all draw them; the ҰБТ mock does not, because `buildVariant` assembles
+  // its variants from `entQuestions` alone.
+  ...dateQuestions,
+]
 
 export const QUIZ_LENGTH = 5
 /**
