@@ -119,7 +119,7 @@ export function PortraitPanel({
           'relative z-10 font-semibold leading-none tracking-tight',
           initialSize,
         )}
-        style={{ color: `color-mix(in srgb, ${color} 78%, #17211e)` }}
+        style={{ color: `color-mix(in srgb, ${color} 78%, var(--color-ink))` }}
       >
         {initial}
       </span>

@@ -11,6 +11,12 @@
   --color-line: #e7e0d2;
   --color-line-soft: #f0ebe0;
   --color-ink: #17211e;
+  /* The veil behind a modal. Deliberately NOT redefined in `.dark` below:
+     every other colour here flips with the theme, but a scrim's job is to
+     darken whatever is behind it, and `bg-ink/55` did the opposite at night —
+     `--color-ink` is near-white in dark mode, so the veil meant to dim the
+     duel board brightened it instead. */
+  --color-scrim: #0d1210;
   --color-ink-soft: #5a6763;
   --color-ink-faint: #93a09b;
 

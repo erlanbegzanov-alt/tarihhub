@@ -88,6 +88,19 @@ const REVEAL_MS = 950
 /** Gap between matchmaking sweeps while waiting in the queue. */
 const POLL_MS = 1500
 /**
+ * How the sweep interval grows while nobody is found, and where it stops.
+ * 1.5s doubling to 12s means the first minute costs the same eight queries it
+ * always did, while an hour costs ~300 instead of ~2,400.
+ */
+const SEARCH_BACKOFF = 2
+const SEARCH_POLL_MAX_MS = 12_000
+/**
+ * When a search gives up on its own. Nothing about waiting longer than three
+ * minutes finds an opponent in a 53-player app — it only spends the shared
+ * daily read quota on a tab nobody is looking at.
+ */
+const SEARCH_GIVE_UP_MS = 3 * 60_000
+/**
  * How long a finished player waits for an opponent who may have closed the tab
  * before the duel is scored on whatever they had. Without this the screen would
  * have no way out of "waiting" at all.
@@ -282,7 +295,7 @@ function Fighter({
       <span
         className="rounded-full px-2.5 py-0.5 text-[10.5px] font-bold tabular-nums"
         style={{
-          color: `color-mix(in srgb, ${color} 82%, #17211e)`,
+          color: `color-mix(in srgb, ${color} 82%, var(--color-ink))`,
           background: `color-mix(in srgb, ${color} 14%, var(--color-surface))`,
         }}
       >
@@ -375,6 +388,8 @@ export function BattleDuel({
   const [roundBanner, setRoundBanner] = useState<number | null>(null)
   /** True once the search has run long enough to offer the bot (casual only). */
   const [botOffered, setBotOffered] = useState(false)
+  /** The search stopped itself rather than running down the shared read quota. */
+  const [searchGaveUp, setSearchGaveUp] = useState(false)
   /**
    * The opponent's heartbeat has gone quiet. Flagging is not the same as
    * ending: this only raises the stamp and the offer, and clears itself again
@@ -537,19 +552,45 @@ export function BattleDuel({
 
     // …and in parallel, keep sweeping the queue ourselves. There is no
     // server-side matchmaker, so both sides look for each other.
+    // Backing off, and eventually stopping.
+    //
+    // This swept every 1.5 seconds for as long as the screen was open. Casual
+    // ends itself by falling back to a bot at BOT_AUTO_MS, but ranked has no
+    // bot on purpose, so a ranked search left open just kept sweeping. Each
+    // sweep is a real query: 1.5s forever is ~57,600 reads a day from ONE
+    // forgotten tab, and the whole project's free quota is 50,000 a day. One
+    // student switching apps mid-search could take the site down for everyone
+    // until midnight, with no malice and nothing on screen to suggest it.
+    //
+    // So the interval widens the longer nobody is found, and the search gives
+    // up outright at SEARCH_GIVE_UP_MS. The first minute is unchanged, which
+    // is the part a real player actually waits through.
+    let delay = POLL_MS
+    let poll = 0
     const sweep = () => {
-      void findMatch(uid, mode, ratingTierIndex ?? null).then((foundId) => {
-        if (stopped || !foundId) return
+      if (Date.now() - searchStartedAt > SEARCH_GIVE_UP_MS) {
         stopped = true
-        openMatch(foundId)
+        window.clearTimeout(poll)
+        setSearchGaveUp(true)
+        return
+      }
+      void findMatch(uid, mode, ratingTierIndex ?? null).then((foundId) => {
+        if (stopped) return
+        if (foundId) {
+          stopped = true
+          openMatch(foundId)
+          return
+        }
+        delay = Math.min(delay * SEARCH_BACKOFF, SEARCH_POLL_MAX_MS)
+        poll = window.setTimeout(sweep, delay)
       })
     }
+    setSearchGaveUp(false)
     sweep()
-    const poll = window.setInterval(sweep, POLL_MS)
 
     return () => {
       stopped = true
-      window.clearInterval(poll)
+      window.clearTimeout(poll)
       unwatch()
       void leaveQueue(uid)
       void clearClaim(uid)
@@ -1031,7 +1072,7 @@ export function BattleDuel({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, ease: easeOut }}
-            className="absolute inset-0 z-20 grid place-items-center bg-ink/55 backdrop-blur-[2px]"
+            className="absolute inset-0 z-20 grid place-items-center bg-scrim/55 backdrop-blur-[2px]"
           >
             <motion.div
               initial={{ scale: 0.85, opacity: 0 }}
@@ -1170,10 +1211,10 @@ export function BattleDuel({
                     aria-hidden
                   />
                   <p className="mt-4 text-[14.5px] font-semibold text-ink">
-                    {t(s.battle.searching)}
+                    {t(searchGaveUp ? s.battle.searchGaveUpTitle : s.battle.searching)}
                   </p>
                   <p className="mx-auto mt-1.5 max-w-sm text-[13px] leading-relaxed text-ink-soft">
-                    {t(s.battle.searchingHint)}
+                    {t(searchGaveUp ? s.battle.searchGaveUpText : s.battle.searchingHint)}
                   </p>
 
                   {/* Casual only, and only once the queue has proved empty for

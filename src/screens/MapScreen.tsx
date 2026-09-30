@@ -178,7 +178,7 @@ export function MapScreen() {
           {eraKey && !ERA_MAP_IMAGES[eraKey] && (
             <p
               className="mt-2.5 px-1 text-[12.5px] leading-relaxed font-medium"
-              style={{ color: `color-mix(in srgb, ${eraColor(eraKey)} 78%, #17211e)` }}
+              style={{ color: `color-mix(in srgb, ${eraColor(eraKey)} 78%, var(--color-ink))` }}
             >
               {territory ? t(territory.label) : t(s.map.noTerritory)}
             </p>

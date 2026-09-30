@@ -304,6 +304,129 @@ d('firestore.rules', () => {
 
   /* -------------------------- aiUsage --------------------------- */
 
+  describe('battleMatches/{matchId}', () => {
+    // This whole collection had no tests, and that is where the worst hole in
+    // the ruleset was hiding: a slot score the client later hands to
+    // `recordBattleResult` as real profile XP, and compares to decide a
+    // ranked win, with nothing bounding it on update.
+    const liveMatch = (over: Record<string, unknown> = {}) => ({
+      players: ['alice', 'bob'],
+      mode: 'ranked',
+      questionIds: ['q1', 'q2'],
+      createdAt: 1_700_000_000_000,
+      status: 'active',
+      p1: { xp: 0, doneAt: null },
+      p2: { xp: 0, doneAt: null },
+      ...over,
+    })
+
+    const seed = async (over: Record<string, unknown> = {}) => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'battleMatches/m1'), liveMatch(over))
+      })
+    }
+
+    it('lets a player score their own slot within the honest ceiling', async () => {
+      await seed()
+      const db = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(
+        updateDoc(doc(db, 'battleMatches/m1'), { p1: { xp: 594, doneAt: 1_700_000_100_000 } }),
+      )
+    })
+
+    it('refuses a slot score no real duel could produce', async () => {
+      // The exploit: one write, no questions answered, 99999 into your own
+      // slot. It inflates lifetime XP and forces `won` on the ranked ladder.
+      await seed()
+      const db = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        updateDoc(doc(db, 'battleMatches/m1'), { p1: { xp: 99_999, doneAt: 1_700_000_100_000 } }),
+      )
+      await assertFails(
+        updateDoc(doc(db, 'battleMatches/m1'), { p1: { xp: -50, doneAt: 1_700_000_100_000 } }),
+      )
+    })
+
+    it('still refuses writing into the slot that is not theirs', async () => {
+      await seed()
+      const db = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        updateDoc(doc(db, 'battleMatches/m1'), { p2: { xp: 0, doneAt: 1_700_000_100_000 } }),
+      )
+    })
+
+    it('is invisible to anyone who is not playing it', async () => {
+      await seed()
+      const db = env.authenticatedContext('mallory').firestore()
+      await assertFails(getDoc(doc(db, 'battleMatches/m1')))
+      await assertFails(updateDoc(doc(db, 'battleMatches/m1'), { p1: { xp: 10, doneAt: null } }))
+    })
+  })
+
+  describe('battleQueue / battleClaims', () => {
+    it('accepts the queue slot the app actually writes', async () => {
+      const db = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(
+        setDoc(doc(db, 'battleQueue/alice'), {
+          uid: 'alice',
+          mode: 'ranked',
+          joinedAt: 1_700_000_000_000,
+        }),
+      )
+    })
+
+    it('refuses a payload hung off the queue slot', async () => {
+      // Every other player sweeping for a match reads this document, so junk
+      // attached here is billed to everyone searching, not just to its author.
+      const db = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        setDoc(doc(db, 'battleQueue/alice'), {
+          uid: 'alice',
+          mode: 'ranked',
+          joinedAt: 1_700_000_000_000,
+          payload: 'x'.repeat(5000),
+        }),
+      )
+    })
+
+    it('refuses a queue slot under a uid that is not theirs', async () => {
+      const db = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        setDoc(doc(db, 'battleQueue/bob'), {
+          uid: 'bob',
+          mode: 'casual',
+          joinedAt: 1_700_000_000_000,
+        }),
+      )
+    })
+
+    it('only lets a claim be planted on somebody genuinely waiting', async () => {
+      const db = env.authenticatedContext('alice').firestore()
+      // Bob is not in the queue: a claim on him would jam his matchmaking.
+      await assertFails(
+        setDoc(doc(db, 'battleClaims/bob'), {
+          claimedBy: 'alice',
+          matchId: 'm1',
+          createdAt: 1_700_000_000_000,
+        }),
+      )
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'battleQueue/bob'), {
+          uid: 'bob',
+          mode: 'casual',
+          joinedAt: 1_700_000_000_000,
+        })
+      })
+      await assertSucceeds(
+        setDoc(doc(db, 'battleClaims/bob'), {
+          claimedBy: 'alice',
+          matchId: 'm1',
+          createdAt: 1_700_000_000_000,
+        }),
+      )
+    })
+  })
+
   describe('aiUsage/{bucket}/days/{day}', () => {
     const path = (bucket: string) => `aiUsage/${bucket}/days/2026-03-01`
 

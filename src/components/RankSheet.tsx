@@ -87,7 +87,7 @@ export function RankSheet({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, ease: easeOut }}
-            className="absolute inset-0 bg-ink/45 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-scrim/45 backdrop-blur-[2px]"
           />
 
           <motion.div

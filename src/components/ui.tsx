@@ -26,7 +26,7 @@ export function EraBadge({
         className,
       )}
       style={{
-        color: `color-mix(in srgb, ${color} 82%, #17211e)`,
+        color: `color-mix(in srgb, ${color} 82%, var(--color-ink))`,
         background: `color-mix(in srgb, ${color} 14%, var(--color-surface))`,
       }}
     >
@@ -264,7 +264,7 @@ export function XpPill({ children }: { children: ReactNode }) {
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full bg-gold-tint px-2.5 py-1 text-xs font-bold"
-      style={{ color: 'color-mix(in srgb, var(--color-gold) 78%, #17211e)' }}
+      style={{ color: 'color-mix(in srgb, var(--color-gold) 78%, var(--color-ink))' }}
     >
       {children}
     </span>

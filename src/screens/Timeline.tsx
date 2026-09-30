@@ -118,7 +118,7 @@ export function Timeline() {
                     <span
                       className="mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
                       style={{
-                        color: `color-mix(in srgb, ${color} 82%, #17211e)`,
+                        color: `color-mix(in srgb, ${color} 82%, var(--color-ink))`,
                         background: `color-mix(in srgb, ${color} 13%, var(--color-surface))`,
                       }}
                     >

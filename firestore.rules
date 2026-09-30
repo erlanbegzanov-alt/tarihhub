@@ -195,7 +195,12 @@ service cloud.firestore {
     // let any signed-in user silently empty the whole queue.
     match /battleQueue/{uid} {
       allow read: if request.auth != null;
+      // Every other collection here pins its shape; these two did not, so a
+      // caller could hang an arbitrary payload off their own queue slot — and
+      // this document is read by every other player sweeping for a match, so
+      // the bloat is billed to everyone searching, not just to its author.
       allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['uid', 'mode', 'joinedAt'])
         && request.resource.data.uid == uid
         && request.resource.data.mode in ['casual', 'ranked'];
       allow delete: if request.auth != null && request.auth.uid == uid;
@@ -220,6 +225,7 @@ service cloud.firestore {
     match /battleClaims/{candidateUid} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['claimedBy', 'matchId', 'createdAt'])
         && request.auth.uid == request.resource.data.claimedBy
         && request.auth.uid != candidateUid
         && exists(/databases/$(database)/documents/battleQueue/$(candidateUid));
@@ -243,8 +249,21 @@ service cloud.firestore {
         && request.resource.data.status == 'active'
         && request.resource.data.p1.xp == 0 && request.resource.data.p2.xp == 0
         && request.resource.data.p1.doneAt == null && request.resource.data.p2.doneAt == null;
+      // A slot score is NOT cosmetic: the client reads its own slot back out
+      // of this document and hands it straight to `recordBattleResult`, which
+      // adds it to the real profile XP, and compares it against the other slot
+      // to decide a ranked win. Create pins both slots to 0 but update used to
+      // bound neither, so one `updateDoc` writing `p1.xp: 99999` — no
+      // questions answered — both inflated lifetime XP and forced a win.
+      // 600 is the honest ceiling with a little room: `MAX_BATTLE_XP` in
+      // src/lib/battle.ts is BATTLE_QUESTIONS 9 x (XP_PER_CORRECT 30 +
+      // QUESTION_SECONDS 12 x XP_PER_SECOND_LEFT 3) = 594.
       allow update: if request.auth != null
         && request.auth.uid in resource.data.players
+        && request.resource.data.p1.xp is number
+        && request.resource.data.p1.xp >= 0 && request.resource.data.p1.xp <= 600
+        && request.resource.data.p2.xp is number
+        && request.resource.data.p2.xp >= 0 && request.resource.data.p2.xp <= 600
         && request.resource.data.players == resource.data.players
         && request.resource.data.mode == resource.data.mode
         && request.resource.data.questionIds == resource.data.questionIds

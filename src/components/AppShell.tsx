@@ -294,7 +294,7 @@ function MobileDrawer({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="absolute inset-0 bg-ink/50"
+            className="absolute inset-0 bg-scrim/50"
             aria-hidden="true"
           />
           <motion.nav

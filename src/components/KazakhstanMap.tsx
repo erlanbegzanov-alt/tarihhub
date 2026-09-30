@@ -116,7 +116,7 @@ function PlaceCallout({
         <span
           className="rounded px-1 py-px text-[9px] font-bold tracking-wide whitespace-nowrap uppercase sm:text-[11px]"
           style={{
-            color: `color-mix(in srgb, ${color} 82%, #17211e)`,
+            color: `color-mix(in srgb, ${color} 82%, var(--color-ink))`,
             textShadow:
               '0 0 3px #fff, 0 0 3px #fff, 0 1px 2px #fff, 0 -1px 2px #fff',
           }}

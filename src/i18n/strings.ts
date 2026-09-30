@@ -284,6 +284,12 @@ export const s = {
       kz: 'Дәл қазір ешкім кезекте болмаса, күте тұрыңыз — біреу қосылғанда бірден бастаймыз.',
       ru: 'Если сейчас в очереди никого нет — подождите: как только кто-то зайдёт, батл начнётся сразу.',
     },
+    /** The search stopped itself — see SEARCH_GIVE_UP_MS in BattleDuel.tsx. */
+    searchGaveUpTitle: { kz: 'Қарсылас табылмады', ru: 'Соперник не нашёлся' },
+    searchGaveUpText: {
+      kz: 'Дәл қазір ешкім іздеп жатқан жоқ. Кейінірек қайта байқап көр.',
+      ru: 'Сейчас никто не ищет игру. Попробуй чуть позже.',
+    },
     /* --------------------------- the bot opponent --------------------------- */
 
     /** Chip on the bot's own side of the duel head, its result and its history
