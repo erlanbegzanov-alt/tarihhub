@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { codifierTopics } from './codifier'
 import { contextBlocks } from './contextBlocks'
 import { entQuestions } from './entQuestions'
 import { lessonQuestions } from './lessonQuestions'
@@ -112,6 +113,21 @@ describe('context blocks', () => {
       expect(b.questions[0].pattern, `${b.id}: first question`).toBe(
         b.kind === 'map' ? 'P10' : 'P12',
       )
+    }
+  })
+
+  it('tags every context question with a topic the codifier actually has', () => {
+    // This does not catch tagging a question with the WRONG real topic — that
+    // one is only caught by reading, and it has already happened twice: the
+    // Golden Horde block first carried topics 30 and 31 (nineteenth century)
+    // and the Soviet block carried 44 and 45 (virgin lands, stagnation). What
+    // it does catch is a number that exists nowhere, which is invisible on the
+    // page and silently corrupts the coverage the mock reports.
+    const known = new Set(codifierTopics.map((t) => t.id))
+    for (const b of contextBlocks) {
+      for (const q of b.questions) {
+        expect(known.has(q.topicId!), `${q.id}: topicId ${q.topicId}`).toBe(true)
+      }
     }
   })
 
