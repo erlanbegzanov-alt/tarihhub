@@ -10,31 +10,10 @@ import type { EraKey, MapSite } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
+import { pathsView } from '../lib/mapView'
+import type { View } from '../lib/mapView'
 import { canHover, springSoft } from '../lib/motion'
 import { SITE_ICONS, siteColor } from './siteMeta'
-
-interface View {
-  minX: number
-  minY: number
-  width: number
-  height: number
-}
-
-const COORD_RE = /(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/g
-
-function pathsView(paths: string[], pad: number): View {
-  const points = paths.flatMap((path) => [...path.matchAll(COORD_RE)])
-  const xs = points.map((m) => Number(m[1]))
-  const ys = points.map((m) => Number(m[2]))
-  const minX = Math.min(...xs) - pad
-  const minY = Math.min(...ys) - pad
-  return {
-    minX,
-    minY,
-    width: Math.max(...xs) + pad - minX,
-    height: Math.max(...ys) + pad - minY,
-  }
-}
 
 /**
  * The shared geo coordinate space (see geo.ts / geoWide.ts) is far wider than

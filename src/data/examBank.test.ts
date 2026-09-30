@@ -102,10 +102,16 @@ describe('context blocks', () => {
   })
 
   it('opens each block by making the reader identify the stimulus', () => {
-    // The stimulus never names the event, so question one is always P12 —
-    // the mechanic of tasks 16 and 19 in the official sample.
+    // The stimulus never names what it is, so question one always makes the
+    // reader work that out. Which pattern that is depends on the stimulus: a
+    // document is identified by P12 (official sample, tasks 16 and 19), a map
+    // by P10 (tasks 11 and 12). P12 is defined as recognising an event *from a
+    // document*, so it is not the right tag for a map and never was — the rule
+    // simply predated the first map block.
     for (const b of contextBlocks) {
-      expect(b.questions[0].pattern, `${b.id}: first question`).toBe('P12')
+      expect(b.questions[0].pattern, `${b.id}: first question`).toBe(
+        b.kind === 'map' ? 'P10' : 'P12',
+      )
     }
   })
 

@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Clock,
   FileText,
+  Map as MapIcon,
   RotateCcw,
   Target,
   X,
@@ -18,6 +19,7 @@ import { levelLabels, patternLabels, topicLabel } from '../data/codifier'
 import type { ExamLevel } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
+import { ExamMapStimulus } from '../components/ExamMapStimulus'
 import { cn } from '../lib/cn'
 import {
   EXAM_STANDALONE_COUNT,
@@ -503,11 +505,11 @@ export function ExamMock() {
                 onClick={() => setPassageOpen((open) => !open)}
                 className="focus-ring flex w-full items-center gap-3 px-4 py-3 text-left"
               >
-                <FileText
-                  className="h-4 w-4 shrink-0 text-ink-faint"
-                  strokeWidth={2}
-                  aria-hidden
-                />
+                {item.block.kind === 'map' ? (
+                  <MapIcon className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={2} aria-hidden />
+                ) : (
+                  <FileText className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={2} aria-hidden />
+                )}
                 <span className="min-w-0 flex-1">
                   <span className="block text-[11.5px] font-semibold tracking-wide text-ink-faint uppercase">
                     {blockLabel}
@@ -526,7 +528,7 @@ export function ExamMock() {
                 />
               </button>
               <AnimatePresence initial={false}>
-                {passageOpen && item.block.passage && (
+                {passageOpen && (item.block.passage || item.block.map) && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
@@ -534,9 +536,23 @@ export function ExamMock() {
                     transition={{ duration: 0.25, ease: easeOut }}
                     className="overflow-hidden"
                   >
-                    <p className="border-t border-line-soft px-4 py-3.5 text-[14px] leading-relaxed text-ink-soft">
-                      {t(item.block.passage)}
-                    </p>
+                    <div className="border-t border-line-soft px-4 py-3.5">
+                      {item.block.passage && (
+                        <p className="text-[14px] leading-relaxed text-ink-soft">
+                          {t(item.block.passage)}
+                        </p>
+                      )}
+                      {/* Tasks 11–15 of a real variant are unanswerable without
+                          the map itself, so this is the stimulus, not an
+                          illustration beside one. */}
+                      {item.block.map && (
+                        <ExamMapStimulus
+                          eraKey={item.block.map.eraKey}
+                          markers={item.block.map.markers}
+                          className={item.block.passage ? 'mt-3.5' : undefined}
+                        />
+                      )}
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
