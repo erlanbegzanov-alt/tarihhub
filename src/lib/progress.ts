@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { nextDailyStreak } from './daily'
 import type { AvatarGender } from '../data/ranks'
 
 // Bumped from 'tarihhub_profile' — the old key held pre-launch seed data
@@ -119,6 +120,15 @@ export interface ProfileState {
   totalVisits: number
   /** Local `YYYY-MM-DD` date of the most recent recorded visit, or '' if never. */
   lastVisitDate: string
+  /**
+   * Local `YYYY-MM-DD` of the last day the daily set was *finished*, or ''.
+   * Kept apart from `lastVisitDate` on purpose: that one counts opening the
+   * app, which is not work done, and this streak is meant to be worth
+   * protecting. See `src/lib/daily.ts`.
+   */
+  dailyDate: string
+  /** Consecutive days the daily set was finished. Resets to 1 after any gap. */
+  dailyStreak: number
   /** Ids of person detail pages actually opened, deduped. */
   peopleViewed: string[]
   /** Whether the full timeline page has been opened at least once. */
@@ -183,6 +193,8 @@ export const DEFAULT_STATE: ProfileState = {
   unlockedBadges: [],
   totalVisits: 0,
   lastVisitDate: '',
+  dailyDate: '',
+  dailyStreak: 0,
   peopleViewed: [],
   timelineViewed: false,
   lessonProgress: {},
@@ -362,6 +374,12 @@ export function normalizeProfile(value: unknown): ProfileState {
       typeof parsed.lastVisitDate === 'string'
         ? parsed.lastVisitDate
         : DEFAULT_STATE.lastVisitDate,
+    dailyDate:
+      typeof parsed.dailyDate === 'string' ? parsed.dailyDate : DEFAULT_STATE.dailyDate,
+    dailyStreak:
+      typeof parsed.dailyStreak === 'number'
+        ? parsed.dailyStreak
+        : DEFAULT_STATE.dailyStreak,
     peopleViewed: Array.isArray(parsed.peopleViewed)
       ? parsed.peopleViewed.filter(
           (id): id is string => typeof id === 'string',
@@ -505,7 +523,7 @@ export function useProfile(): ProfileState {
 }
 
 /** Local (not UTC) `YYYY-MM-DD` for the given date, so day boundaries follow the user's clock. */
-function localDateString(date: Date = new Date()): string {
+export function localDateString(date: Date = new Date()): string {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
@@ -560,6 +578,36 @@ export function completeQuiz(correct: number, total: number, xp: number): void {
     ...state,
     xp: state.xp + xp,
     quizzesCompleted: state.quizzesCompleted + 1,
+    unlockedBadges: [...unlocked],
+  })
+}
+
+/**
+ * Records a finished daily set: XP, the quiz counter, and the daily streak.
+ *
+ * Pays **once per calendar day**. A second run of the same set is not an error
+ * and the screen lets it happen — re-reading the five questions is the point —
+ * but it earns nothing, so the set can never be farmed for XP by reloading.
+ * That guard lives here rather than in the screen because the screen is not
+ * the only thing that could ever call this.
+ *
+ * The daily streak is separate from `streak`, which counts app opens; see the
+ * field comments on `ProfileState`.
+ */
+export function completeDaily(correct: number, total: number, xp: number): void {
+  const today = localDateString()
+  if (state.dailyDate === today) return
+
+  const unlocked = new Set(state.unlockedBadges)
+  if (state.quizzesCompleted + 1 >= 5) unlocked.add('strategist')
+  if (correct === total) unlocked.add('sage')
+
+  write({
+    ...state,
+    xp: state.xp + xp,
+    quizzesCompleted: state.quizzesCompleted + 1,
+    dailyDate: today,
+    dailyStreak: nextDailyStreak(state.dailyDate, state.dailyStreak, today),
     unlockedBadges: [...unlocked],
   })
 }

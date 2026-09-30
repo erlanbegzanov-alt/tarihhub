@@ -80,6 +80,9 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: '/ai', element: <AIChat /> },
   { path: '/ai/:personId', element: <AIChat /> },
   { path: '/quiz', element: <Quiz /> },
+  // The set of the day. A static segment outranks `/quiz/:personId` in the
+  // router, so "daily" is never read as a person id.
+  { path: '/quiz/daily', element: <Quiz daily /> },
   { path: '/quiz/:personId', element: <Quiz /> },
   { path: '/quiz/lesson/:lessonId', element: <Quiz /> },
   { path: '/timeline', element: <Timeline /> },

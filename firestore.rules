@@ -18,7 +18,8 @@ service cloud.firestore {
     function validProfileShape(d) {
       return d.keys().hasOnly([
           'xp', 'streak', 'quizzesCompleted', 'unlockedBadges', 'totalVisits',
-          'lastVisitDate', 'peopleViewed', 'timelineViewed', 'lessonProgress',
+          'lastVisitDate', 'dailyDate', 'dailyStreak',
+          'peopleViewed', 'timelineViewed', 'lessonProgress',
           'completedLessons', 'lessonQuizBest', 'sectionChecksDone',
           'avatarGender', 'displayedRankTier', 'displayedAvatarTier',
           'casualDuels', 'casualWins', 'casualStreak', 'recentCasualDuels',
@@ -35,6 +36,14 @@ service cloud.firestore {
         && d.rankedWins is number && d.rankedWins >= 0 && d.rankedWins <= 1000000
         && d.rankedStreak is number && d.rankedStreak >= 0 && d.rankedStreak <= 100000
         && d.lastVisitDate is string && d.lastVisitDate.size() <= 10
+        // Read through `get` with a default rather than asserted directly: a
+        // client still running a build from before the daily set exists writes
+        // a document with neither field, and `d.dailyDate is string` would
+        // reject that whole document — the same stale-build failure that made
+        // every party write fail on 2026-09-28. Absent is a valid old shape.
+        && d.get('dailyDate', '') is string && d.get('dailyDate', '').size() <= 10
+        && d.get('dailyStreak', 0) is number
+        && d.get('dailyStreak', 0) >= 0 && d.get('dailyStreak', 0) <= 100000
         && d.timelineViewed is bool
         && d.unlockedBadges is list && d.unlockedBadges.size() <= 200
         && d.peopleViewed is list && d.peopleViewed.size() <= 5000

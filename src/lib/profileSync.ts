@@ -68,6 +68,12 @@ export function mergeProfiles(
   // more recently active copy supplies both.
   const remoteIsNewer = remote.lastVisitDate >= local.lastVisitDate
 
+  // The daily streak needs its own comparison, not `remoteIsNewer`: opening
+  // the app and finishing the set are different events, so a device that was
+  // merely opened later must not hand over a staler daily streak. Whichever
+  // side finished a set more recently supplies both halves.
+  const remoteDailyIsNewer = remote.dailyDate >= local.dailyDate
+
   // Same idea for the casual win streak: it isn't a lifetime counter like
   // `casualWins`, so whichever side played the more recent duel supplies it.
   const remoteCasualAt = remote.recentCasualDuels[0]?.at ?? 0
@@ -114,6 +120,8 @@ export function mergeProfiles(
     totalVisits: Math.max(remote.totalVisits, local.totalVisits),
     streak: remoteIsNewer ? remote.streak : local.streak,
     lastVisitDate: remoteIsNewer ? remote.lastVisitDate : local.lastVisitDate,
+    dailyDate: remoteDailyIsNewer ? remote.dailyDate : local.dailyDate,
+    dailyStreak: remoteDailyIsNewer ? remote.dailyStreak : local.dailyStreak,
     unlockedBadges: [
       ...new Set([...remote.unlockedBadges, ...local.unlockedBadges]),
     ],

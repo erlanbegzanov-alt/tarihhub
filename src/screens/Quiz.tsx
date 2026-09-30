@@ -6,20 +6,32 @@ import { PortraitPanel } from '../components/PortraitPanel'
 import { IconButton, ProgressBar, XpPill } from '../components/ui'
 import { getLesson } from '../data/lessons'
 import { getPerson } from '../data/people'
+import { battleQuestion } from '../data/battleQuestions'
 import { XP_PER_QUIZ, buildLessonQuiz, buildQuiz } from '../data/quiz'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
+import { dailyQuestionIds } from '../lib/daily'
 import {
   LESSON_PASS_RATIO,
+  completeDaily,
   completeQuiz,
+  localDateString,
   recordLessonQuizResult,
 } from '../lib/progress'
+import { shuffled } from '../lib/shuffle'
 
 const LETTERS = ['A', 'B', 'C', 'D']
 
-export function Quiz() {
+/**
+ * `daily` is the set of the day (`/quiz/daily`): five questions derived from
+ * today's date, the same five on every device, paying once per calendar day.
+ * It rides on this screen rather than getting one of its own — everything
+ * below about asking, marking and advancing is already exactly what it needs,
+ * and a second copy of it would be a second place for the two to drift apart.
+ */
+export function Quiz({ daily = false }: { daily?: boolean } = {}) {
   const { personId, lessonId } = useParams()
   const navigate = useNavigate()
   const { t } = useLang()
@@ -33,9 +45,24 @@ export function Quiz() {
   // purpose: a retry re-draws and re-shuffles, so passing a lesson can't come
   // down to memorising which option sat in which slot last time.
   const questions = useMemo(
-    () => (lessonId ? buildLessonQuiz(lessonId, lesson?.sections) : buildQuiz(personId)),
+    () => {
+      if (daily) {
+        // Resolved against the battle bank, which is where the ids come from.
+        // `battleQuestion` returns undefined for an id that no longer exists,
+        // so a question renamed in `quiz.ts` shortens the set rather than
+        // rendering a blank card — the same forgiving rule a duel follows.
+        const picked = dailyQuestionIds(localDateString())
+          .map((id) => battleQuestion(id))
+          .filter((question): question is NonNullable<typeof question> => Boolean(question))
+        // The five are fixed, but their options are not: shuffling per device
+        // keeps "ответ B" from travelling round the class faster than the
+        // questions do.
+        return picked.map((question) => ({ ...question, options: shuffled(question.options) }))
+      }
+      return lessonId ? buildLessonQuiz(lessonId, lesson?.sections) : buildQuiz(personId)
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `round` is the retry counter: bumping it is exactly what should re-draw the questions.
-    [lessonId, personId, round],
+    [daily, lessonId, personId, round],
   )
 
   const [index, setIndex] = useState(0)
@@ -72,7 +99,10 @@ export function Quiz() {
       if (!xpAwardedRef.current) {
         xpAwardedRef.current = true
         setXpEarnedThisRound(XP_PER_QUIZ)
-        completeQuiz(correctCount, questions.length, XP_PER_QUIZ)
+        // `completeDaily` pays nothing if today's set is already finished, so
+        // a second visit costs the reader nothing and earns them nothing.
+        if (daily) completeDaily(correctCount, questions.length, XP_PER_QUIZ)
+        else completeQuiz(correctCount, questions.length, XP_PER_QUIZ)
       } else {
         setXpEarnedThisRound(0)
       }

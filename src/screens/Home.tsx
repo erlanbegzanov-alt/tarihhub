@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ChevronDown, ChevronRight, ChevronUp, GraduationCap, Play } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, ChevronUp, Flame, GraduationCap, Play } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PersonCard } from '../components/PersonCard'
@@ -17,7 +17,8 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
-import { useProfile } from '../lib/progress'
+import { dailyDone, streakAlive } from '../lib/daily'
+import { localDateString, useProfile } from '../lib/progress'
 
 // Collapsed height of the "continue learning" list before it needs its own
 // expand toggle — past this, an unbounded number of in-progress lessons would
@@ -87,6 +88,10 @@ export function Home() {
             placeholder={t(s.home.searchPlaceholder)}
           />
         </form>
+      </motion.div>
+
+      <motion.div variants={staggerItem}>
+        <DailySet />
       </motion.div>
 
       {/*
@@ -329,6 +334,79 @@ export function Home() {
           </motion.div>
         </motion.section>
       </div>
+    </motion.div>
+  )
+}
+
+/**
+ * The set of the day, first thing on the home screen.
+ *
+ * Sits above everything else because it is the only part of the app with a
+ * deadline: the other cards are there whenever the reader comes, this one
+ * expires at midnight. Three states, and only the middle one nags — a card
+ * that shouts every day stops being read.
+ */
+function DailySet() {
+  const { t } = useLang()
+  const profile = useProfile()
+  const today = localDateString()
+  const done = dailyDone(profile.dailyDate, today)
+  // Finished yesterday, not yet today: the streak is standing but will not
+  // survive the night. This is the only moment worth a warning.
+  const atRisk = !done && streakAlive(profile.dailyDate, today)
+  const streak = streakAlive(profile.dailyDate, today) ? profile.dailyStreak : 0
+
+  return (
+    <motion.div whileHover={canHover && !done ? { y: -3 } : undefined} transition={springSoft}>
+      <Link
+        to="/quiz/daily"
+        className={cn(
+          'focus-ring group flex items-center gap-4 rounded-card bg-surface p-4 sm:p-5',
+          'shadow-soft ring-1 transition-shadow duration-300 hover:shadow-lift',
+          atRisk ? 'ring-brand/40' : 'ring-line/60',
+        )}
+      >
+        <span
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-full"
+          style={{
+            background: done
+              ? 'color-mix(in srgb, var(--color-correct) 14%, var(--color-surface))'
+              : 'color-mix(in srgb, var(--color-brand) 14%, var(--color-surface))',
+          }}
+        >
+          {done ? (
+            <Check className="h-6 w-6 text-correct" strokeWidth={2.5} />
+          ) : (
+            <Flame className="h-6 w-6 text-brand" strokeWidth={2} />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[16px] font-semibold text-ink">
+            {t(done ? s.home.dailyDoneTitle : s.home.dailyTitle)}
+          </h3>
+          <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-soft">
+            {t(atRisk ? s.home.dailyAtRisk : done ? s.home.dailyDoneText : s.home.dailyText)}
+          </p>
+          {streak > 0 && (
+            <div className="mt-2 flex items-center gap-1.5">
+              <Flame className="h-4 w-4 text-brand" strokeWidth={2.5} />
+              <span className="text-[13px] font-bold text-ink">
+                {streak}
+                <span className="font-semibold text-ink-faint">
+                  {' '}
+                  {t(s.home.dailyStreakDays)}
+                </span>
+              </span>
+            </div>
+          )}
+        </div>
+        {!done && (
+          <span className="inline-flex shrink-0 items-center gap-0.5 text-[13px] font-semibold text-brand">
+            <span className="hidden sm:inline">{t(s.home.dailyAction)}</span>
+            <ChevronRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5" />
+          </span>
+        )}
+      </Link>
     </motion.div>
   )
 }

@@ -48,6 +48,8 @@ function validProfile(over: Record<string, unknown> = {}) {
     unlockedBadges: ['flame'],
     totalVisits: 5,
     lastVisitDate: '2026-03-01',
+    dailyDate: '2026-03-01',
+    dailyStreak: 3,
     peopleViewed: ['p1'],
     timelineViewed: true,
     lessonProgress: { l1: 100 },
@@ -136,6 +138,53 @@ d('firestore.rules', () => {
       await assertSucceeds(
         setDoc(doc(db, 'users/alice/profile/state'), validProfile({ xp: 140 }), { merge: true }),
       )
+    })
+
+    it('lets an account whose stored doc predates the daily set keep syncing', async () => {
+      // The stale-build case, and the reason the two daily fields are read
+      // through `get` with a default instead of asserted directly. A phone
+      // still running yesterday's bundle writes a profile with neither field;
+      // if that were denied, the reader would simply stop syncing, with no
+      // error they could see and no way to recover (`allow delete: if false`).
+      const legacy = validProfile()
+      delete (legacy as Record<string, unknown>).dailyDate
+      delete (legacy as Record<string, unknown>).dailyStreak
+      const db = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(setDoc(doc(db, 'users/alice/profile/state'), legacy))
+    })
+
+    it('accepts a profile carrying the daily set fields', async () => {
+      const db = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(
+        setDoc(
+          doc(db, 'users/alice/profile/state'),
+          validProfile({ dailyDate: '2026-09-30', dailyStreak: 12 }),
+        ),
+      )
+    })
+
+    it('rejects an absurd daily streak', async () => {
+      const db = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        setDoc(doc(db, 'users/alice/profile/state'), validProfile({ dailyStreak: 9_000_000 })),
+      )
+      await assertFails(
+        setDoc(doc(db, 'users/alice/profile/state'), validProfile({ dailyStreak: -1 })),
+      )
+    })
+
+    it('lets the daily streak fall back to 1 after a missed day', async () => {
+      // Unlike xp or totalVisits this is not a lifetime counter, so it must
+      // NOT be in `progressCountersMonotonic` — a reader who skips a day has
+      // to be able to write the reset, or their next finish is denied for ever.
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(
+          doc(ctx.firestore(), 'users/alice/profile/state'),
+          validProfile({ dailyStreak: 30 }),
+        )
+      })
+      const db = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(updateDoc(doc(db, 'users/alice/profile/state'), { dailyStreak: 1 }))
     })
 
     it('rejects a decreasing lifetime counter on update', async () => {

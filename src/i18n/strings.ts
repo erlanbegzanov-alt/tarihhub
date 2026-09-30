@@ -59,6 +59,24 @@ export const s = {
     },
     courseAction: { kz: 'Курсты ашу', ru: 'Открыть курс' },
     complete: { kz: 'аяқталды', ru: 'завершено' },
+    /** The set of the day — see `src/lib/daily.ts`. */
+    dailyTitle: { kz: 'Бүгінгі бес сұрақ', ru: 'Пять вопросов дня' },
+    dailyText: {
+      kz: 'Барлығына бірдей бес сұрақ. Бір минут — және серияң сақталады.',
+      ru: 'Одни и те же пять вопросов у всех. Минута — и серия цела.',
+    },
+    dailyAction: { kz: 'Бастау', ru: 'Начать' },
+    dailyDoneTitle: { kz: 'Бүгінгісі бітті', ru: 'На сегодня всё' },
+    dailyDoneText: {
+      kz: 'Келесі бесеуі ертең таңертең ашылады.',
+      ru: 'Следующие пять откроются завтра утром.',
+    },
+    dailyStreakDays: { kz: 'күн қатарынан', ru: 'дней подряд' },
+    /** Shown when yesterday was done but today is not — the only nagging line. */
+    dailyAtRisk: {
+      kz: 'Серия бүгін үзіледі',
+      ru: 'Серия оборвётся сегодня',
+    },
   },
 
   person: {

@@ -98,6 +98,16 @@ export function battleQuestion(id: string): QuizQuestion | undefined {
  */
 const POOLS = [LIGHT, MEDIUM, HARD] as const
 
+/**
+ * The same three pools, in the same ascending order, for readers that need to
+ * choose questions by some rule other than a duel round — the daily set picks
+ * a fixed count from each (see `src/lib/daily.ts`). Exposed `readonly` rather
+ * than as a copy so the daily ring is built over exactly the arrays a duel
+ * draws from: a question that stops fitting the clock has to disappear from
+ * both at once, not from one of them.
+ */
+export const battlePools: readonly (readonly QuizQuestion[])[] = POOLS
+
 function poolPlanForTier(tierIndex: number | null): readonly [number, number, number] {
   if (tierIndex === null) return [0, 1, 2]
   if (tierIndex <= 0) return [0, 0, 1]
