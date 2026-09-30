@@ -28,10 +28,13 @@ const contextCountries = wideEurasiaCountries.filter((c) => !CENTRAL_ASIA_IDS.ha
 export function ExamMapStimulus({
   eraKey,
   markers,
+  route,
   className,
 }: {
   eraKey: EraKey
   markers: MapMarker[]
+  /** Marker numbers to join into a line, in order. */
+  route?: number[]
   className?: string
 }) {
   const territory = eraTerritory(eraKey)
@@ -54,6 +57,12 @@ export function ExamMapStimulus({
   // Strokes are in user units, so they thicken as the frame narrows unless they
   // are scaled against it. 900 is roughly the Central Asia frame's own width.
   const k = view.width / 900
+
+  const byNumber = new Map(markers.map((m) => [m.n, m]))
+  const routePoints = (route ?? [])
+    .map((n) => byNumber.get(n))
+    .filter((m): m is MapMarker => Boolean(m))
+    .map((m) => projectLonLat(m.lon, m.lat))
 
   return (
     <div className={cn('overflow-hidden rounded-lg bg-cream', className)}>
@@ -99,6 +108,22 @@ export function ExamMapStimulus({
             strokeWidth={2 * k}
           />
         ))}
+
+        {/* Drawn before the pins so the line passes behind them, and dashed
+            because it is a schematic between marked points rather than a
+            surveyed road. A number with no marker is skipped rather than
+            drawn at the origin, which would put a stray line in the corner. */}
+        {routePoints.length > 1 && (
+          <polyline
+            points={routePoints.map(([x, y]) => `${x},${y}`).join(' ')}
+            fill="none"
+            stroke="var(--color-ink-soft)"
+            strokeWidth={2.5 * k}
+            strokeDasharray={`${7 * k} ${5 * k}`}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )}
 
         {markers.map((marker) => {
           const [x, y] = projectLonLat(marker.lon, marker.lat)

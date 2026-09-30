@@ -549,6 +549,7 @@ export function ExamMock() {
                         <ExamMapStimulus
                           eraKey={item.block.map.eraKey}
                           markers={item.block.map.markers}
+                          route={item.block.map.route}
                           className={item.block.passage ? 'mt-3.5' : undefined}
                         />
                       )}

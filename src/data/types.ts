@@ -198,8 +198,13 @@ export interface ContextBlock {
   title: LocalizedText
   /** The document or biography text. Usually absent for `kind: 'map'`. */
   passage?: LocalizedText
-  /** For `kind: 'map'` — which era to draw and which objects carry numbers. */
-  map?: { eraKey: EraKey; markers: MapMarker[] }
+  /**
+   * For `kind: 'map'` — which era to draw and which objects carry numbers.
+   * `route` joins marker numbers into a line, the way a real variant draws a
+   * trade road or a campaign with arrows. It is a schematic between the marked
+   * points, not a surveyed track, so a block using it says so in its own text.
+   */
+  map?: { eraKey: EraKey; markers: MapMarker[]; route?: number[] }
   /** Exactly 5. Checked when a variant is assembled. */
   questions: QuizQuestion[]
 }

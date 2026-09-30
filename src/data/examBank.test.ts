@@ -115,6 +115,54 @@ describe('context blocks', () => {
     }
   })
 
+  it('gives every block the stimulus its kind promises', () => {
+    // A map block with no `map` renders a title and nothing else, and its five
+    // tasks become unanswerable — which is exactly the state the bank was in
+    // before `ExamMapStimulus` existed.
+    for (const b of contextBlocks) {
+      if (b.kind === 'map') expect(b.map, `${b.id}: map`).toBeTruthy()
+      else expect(b.passage, `${b.id}: passage`).toBeTruthy()
+    }
+  })
+
+  it('numbers map markers from 1 with no gaps', () => {
+    // The questions refer to markers by number («город под №1»), so a gap or a
+    // repeat makes a question point at nothing or at two places at once.
+    for (const b of contextBlocks) {
+      if (!b.map) continue
+      const numbers = b.map.markers.map((m) => m.n)
+      expect(new Set(numbers).size, `${b.id}: repeated marker number`).toBe(numbers.length)
+      expect([...numbers].sort((x, y) => x - y), `${b.id}: marker numbering`).toEqual(
+        numbers.map((_, i) => i + 1),
+      )
+    }
+  })
+
+  it('draws routes only through markers that exist', () => {
+    // An unknown number is skipped rather than drawn, so a typo here shortens
+    // the line silently instead of failing — nobody would notice from the page.
+    for (const b of contextBlocks) {
+      if (!b.map?.route) continue
+      const known = new Set(b.map.markers.map((m) => m.n))
+      const unknown = b.map.route.filter((n) => !known.has(n))
+      expect(unknown, `${b.id}: route points at missing markers`).toEqual([])
+    }
+  })
+
+  it('puts map markers somewhere the map actually covers', () => {
+    // A swapped lon/lat lands the pin in the Indian Ocean and crops the frame
+    // around it, which reads as a broken map rather than a wrong coordinate.
+    for (const b of contextBlocks) {
+      if (!b.map) continue
+      for (const m of b.map.markers) {
+        expect(m.lon, `${b.id}: marker ${m.n} lon`).toBeGreaterThan(40)
+        expect(m.lon, `${b.id}: marker ${m.n} lon`).toBeLessThan(95)
+        expect(m.lat, `${b.id}: marker ${m.n} lat`).toBeGreaterThan(38)
+        expect(m.lat, `${b.id}: marker ${m.n} lat`).toBeLessThan(57)
+      }
+    }
+  })
+
   it('does not let the title or the passage give the answer away', () => {
     // A title reading "Восстание 1916 года" would turn the identification
     // question into a reading exercise.
