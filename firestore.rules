@@ -352,6 +352,16 @@ service cloud.firestore {
       // `avatarTierIndex`/`titleTierIndex`: unbounded, a single crafted row
       // used to crash the lobby's leaderboard for the whole class the instant
       // it rendered.
+      //
+      // `lastAnswerIndex`, `lastAnswerAt` and `joinedAt` sat in the key list
+      // and were never typed. The readers in `kahoot.ts` coerce them, so
+      // nothing crashed, but two of them decide what the class sees:
+      // `lastAnswerAt` is what `answeredThisRound` compares against the
+      // question's start, so a far-future value showed a student as having
+      // answered every question without answering any; and `joinedAt` is the
+      // leaderboard's tie-break, so `0` won every tie forever. Bounding them
+      // does not make either timestamp trustworthy — both are the client's own
+      // clock — it only stops the absurd values.
       function validKahootPlayer(d) {
         return d.keys().hasOnly([
             'uid', 'displayName', 'photoURL', 'score', 'lastAnswerIndex',
@@ -360,18 +370,43 @@ service cloud.firestore {
           ])
           && d.displayName is string && d.displayName.size() <= 40
           && validSharedPhoto(d.photoURL)
+          // null until the first answer; otherwise one of the four options.
+          // `KAHOOT_OPTIONS` is 4 and fixed, like the duel's.
+          && (d.lastAnswerIndex == null
+            || (d.lastAnswerIndex is int
+              && d.lastAnswerIndex >= 0 && d.lastAnswerIndex <= 3))
+          // No lower bound beyond zero: on a write that does not touch it, the
+          // merged document still carries the previous answer's time, which is
+          // legitimately minutes old. Only the future is a lie.
+          && (d.lastAnswerAt == null
+            || (d.lastAnswerAt is number && d.lastAnswerAt >= 0
+              && d.lastAnswerAt <= request.time.toMillis() + 300000))
+          && d.joinedAt is number && d.joinedAt > 0
           && d.avatarTierIndex is number
           && d.avatarTierIndex >= 0 && d.avatarTierIndex <= ownerTierMax()
           && d.titleTierIndex is number
           && d.titleTierIndex >= 0 && d.titleTierIndex <= ownerTierMax();
       }
       match /players/{uid} {
+        // Five minutes each way: every one of these timestamps is a client's
+        // `Date.now()`, and a school Android with a drifting clock is an
+        // honest player, not an attacker.
+        function joinedNow(v) {
+          return v >= request.time.toMillis() - 300000
+            && v <= request.time.toMillis() + 300000;
+        }
         allow read: if request.auth != null;
         allow create: if request.auth != null && request.auth.uid == uid
           && validKahootPlayer(request.resource.data)
+          && joinedNow(request.resource.data.joinedAt)
           && request.resource.data.score is number && request.resource.data.score == 0;
         allow update: if request.auth != null && request.auth.uid == uid
           && validKahootPlayer(request.resource.data)
+          // Unchanged on an answer; re-stamped when a student reloads in the
+          // lobby, which rewrites the whole row through `joinSession`. Both
+          // are honest, and `0` is neither.
+          && (request.resource.data.joinedAt == resource.data.joinedAt
+            || joinedNow(request.resource.data.joinedAt))
           && request.resource.data.score is number
           && request.resource.data.score >= resource.data.score
           && request.resource.data.score <= resource.data.score + 1200
@@ -647,6 +682,18 @@ service cloud.firestore {
         function validRun(d) {
           return d.keys().hasOnly(['side', 'score', 'answered', 'done', 'startedAt'])
             && d.score is number && d.score >= 0
+            // One question's honest maximum is 75: `answerXp` pays
+            // `XP_PER_CORRECT` (30) plus `TEAM_QUESTION_SECONDS` (15) x
+            // `XP_PER_SECOND_LEFT` (3). 80 leaves the same little room the
+            // battle ceiling leaves, and scaling by the match's own question
+            // count keeps a shorter or longer round bounded on its own terms
+            // rather than against a frozen 15.
+            //
+            // Without this a run was `score >= 0` and nothing else, and the
+            // update rule only asked that it climb — so one hand-written write
+            // set a run to any number it liked and took the game for its side.
+            // This is the same hole `battleMatches` had on its slots.
+            && d.score <= 80 * theMatch().questionIds.size()
             && d.answered is int && d.answered >= 0
             && d.answered <= theMatch().questionIds.size()
             && d.done is bool
@@ -674,6 +721,11 @@ service cloud.firestore {
             (resource.data.get('startedAt', 0) == request.resource.data.startedAt
               && request.resource.data.side == resource.data.side
               && request.resource.data.score >= resource.data.score
+              // At most one question's worth per write, so the total ceiling
+              // cannot be reached in a single jump either. `recordMatchAnswer`
+              // adds one answer at a time, so this is the shape of the only
+              // honest write there is.
+              && request.resource.data.score <= resource.data.score + 80
               && request.resource.data.answered >= resource.data.answered
               && (resource.data.done == false || request.resource.data.done == true))
             // A later match in the same room: the run starts over, and the side

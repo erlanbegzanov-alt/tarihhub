@@ -513,11 +513,120 @@ d('firestore.rules', () => {
           score: 0,
           lastAnswerIndex: null,
           lastAnswerAt: null,
-          joinedAt: 1_700_000_000_000,
+          // Must be ~now: the create rule bounds it, and a fixed 2023 stamp
+          // would make this test fail for a reason that is not the tier.
+          joinedAt: Date.now(),
           avatarGender: 'f',
           avatarTierIndex: 7,
           titleTierIndex: 7,
         }),
+      )
+    })
+  })
+
+  /*
+   * The lobby row every classmate sees. Three of its fields sat in the key
+   * list and were never typed: the readers in `kahoot.ts` coerce them, so
+   * nothing crashed, but two of them decide what the class is shown.
+   */
+  describe('kahootSessions/{code}/players/{uid}', () => {
+    const CODE = 'XYZ789'
+
+    async function seedSession() {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'kahootSessions', CODE), {
+          hostUid: 'teacher',
+          gameId: 'g1',
+          state: 'lobby',
+          questionIndex: 0,
+          startedAt: null,
+          createdAt: 1_700_000_000_000,
+        })
+      })
+    }
+
+    const player = (over: Record<string, unknown> = {}) => ({
+      uid: 'alice',
+      displayName: 'Әлия',
+      photoURL: '',
+      score: 0,
+      lastAnswerIndex: null,
+      lastAnswerAt: null,
+      joinedAt: Date.now(),
+      avatarGender: 'f',
+      avatarTierIndex: 0,
+      titleTierIndex: 0,
+      ...over,
+    })
+
+    async function seedPlayer(over: Record<string, unknown> = {}) {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'kahootSessions', CODE, 'players', 'alice'), player(over))
+      })
+    }
+
+    it('seats an honest student', async () => {
+      await seedSession()
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(setDoc(doc(alice, 'kahootSessions', CODE, 'players', 'alice'), player()))
+    })
+
+    it('refuses an answer that is not one of the four options', async () => {
+      await seedSession()
+      const alice = env.authenticatedContext('alice').firestore()
+      const at = (over: Record<string, unknown>) =>
+        setDoc(doc(alice, 'kahootSessions', CODE, 'players', 'alice'), player(over))
+      await assertFails(at({ lastAnswerIndex: 7 }))
+      await assertFails(at({ lastAnswerIndex: -1 }))
+      await assertFails(at({ lastAnswerIndex: 'a' }))
+      await assertSucceeds(at({ lastAnswerIndex: 3 }))
+    })
+
+    it('refuses an answer timed in the future', async () => {
+      // `answeredThisRound` asks whether `lastAnswerAt` is at or after the
+      // question's start. A stamp a day out showed a student as having
+      // answered every question in the game without answering one.
+      await seedSession()
+      const alice = env.authenticatedContext('alice').firestore()
+      const at = (over: Record<string, unknown>) =>
+        setDoc(doc(alice, 'kahootSessions', CODE, 'players', 'alice'), player(over))
+      await assertFails(at({ lastAnswerAt: Date.now() + 86_400_000 }))
+      await assertSucceeds(at({ lastAnswerAt: Date.now() }))
+      // A stamp from earlier in the same game is honest: a write that does
+      // not touch it still carries the previous time through the merge.
+      await assertSucceeds(at({ lastAnswerAt: Date.now() - 600_000 }))
+    })
+
+    it('refuses a join time that wins every tie forever', async () => {
+      // The leaderboard sorts by score, then by `joinedAt` ascending.
+      await seedSession()
+      const alice = env.authenticatedContext('alice').firestore()
+      const at = (over: Record<string, unknown>) =>
+        setDoc(doc(alice, 'kahootSessions', CODE, 'players', 'alice'), player(over))
+      await assertFails(at({ joinedAt: 0 }))
+      await assertFails(at({ joinedAt: 1_700_000_000_000 }))
+      await assertFails(at({ joinedAt: 'now' }))
+    })
+
+    it('keeps the join time put once the game is under way', async () => {
+      await seedSession()
+      await seedPlayer()
+      const alice = env.authenticatedContext('alice').firestore()
+      const ref = doc(alice, 'kahootSessions', CODE, 'players', 'alice')
+      // Answering leaves it alone.
+      await assertSucceeds(updateDoc(ref, { lastAnswerIndex: 2, lastAnswerAt: Date.now() }))
+      await assertFails(updateDoc(ref, { joinedAt: 0 }))
+      // Re-stamping is allowed, because reloading in the lobby rewrites the
+      // whole row through `joinSession` — it just has to be ~now.
+      await assertSucceeds(updateDoc(ref, { joinedAt: Date.now() }))
+    })
+
+    it('lets nobody write another student row', async () => {
+      await seedSession()
+      await seedPlayer()
+      const bob = env.authenticatedContext('bob').firestore()
+      await assertFails(
+        setDoc(doc(bob, 'kahootSessions', CODE, 'players', 'alice'), player({ score: 5000 })),
       )
     })
   })
@@ -1001,6 +1110,15 @@ d('firestore.rules', () => {
       // Swapping the questions mid-match would change what everyone else is
       // already being scored on.
       await assertFails(updateDoc(doc(alice, 'teamMatches', PARTY), { questionIds: ['q9'] }))
+      // `startTeamMatch` writes with a plain `setDoc`, which an audit flagged
+      // as needing a transaction: two taps on a slow phone would stage two
+      // matches, and the second one's new `startedAt` would orphan every run
+      // already filed against the first. It cannot happen, and this is why —
+      // a `set` over an existing document is an update, and an update is
+      // refused. The second tap fails; the match the room is playing stands.
+      await assertFails(
+        setDoc(doc(alice, 'teamMatches', PARTY), teamMatch({ startedAt: MATCH_AT + 5000 })),
+      )
       await assertFails(deleteDoc(doc(bob, 'teamMatches', PARTY)))
       await assertSucceeds(deleteDoc(doc(alice, 'teamMatches', PARTY)))
     })
@@ -1142,6 +1260,49 @@ d('firestore.rules', () => {
             run({ side: 'b', score: 0, startedAt: AGAIN + 60_000 }),
           ),
         )
+      })
+
+      /**
+       * A run used to be `score >= 0` and nothing more, and the update rule
+       * only asked that it climb. One hand-written write took the game.
+       *
+       * The ceiling is one question's honest maximum (75, rounded to 80 for
+       * room) times the match's own question count — three here, so 240.
+       */
+      it('a run cannot score more than the match is worth', async () => {
+        await seedRoom()
+        await seedMatch()
+        const alice = env.authenticatedContext('alice').firestore()
+        const at = (over: Record<string, unknown>) =>
+          setDoc(doc(alice, 'teamMatches', PARTY, 'players', 'alice'), run(over))
+        // Three questions, every one answered correctly on the first second.
+        await assertSucceeds(at({ score: 240, answered: 3, done: true }))
+        await assertFails(at({ score: 241, answered: 3, done: true }))
+        await assertFails(at({ score: 99_999, answered: 3, done: true }))
+      })
+
+      it('a run climbs by at most one question per write', async () => {
+        await seedRoom()
+        await seedMatch()
+        await env.withSecurityRulesDisabled(async (ctx) => {
+          await setDoc(
+            doc(ctx.firestore(), 'teamMatches', PARTY, 'players', 'alice'),
+            run({ score: 100, answered: 1 }),
+          )
+        })
+        const alice = env.authenticatedContext('alice').firestore()
+        const at = (over: Record<string, unknown>) =>
+          setDoc(doc(alice, 'teamMatches', PARTY, 'players', 'alice'), run(over))
+        // Refused first, and the order matters: a successful write moves the
+        // stored score up, so asserting the honest climb before the jump would
+        // leave 240 only 60 above the new base and the test would pass on a
+        // rule that was never checked.
+        //
+        // 240 is inside the total ceiling, so only the per-write cap can
+        // refuse it — which is the point of having both.
+        await assertFails(at({ score: 240, answered: 2 }))
+        // One more question's worth: the only write `recordMatchAnswer` makes.
+        await assertSucceeds(at({ score: 180, answered: 2 }))
       })
 
       it('a run cannot be deleted, and a stranger cannot read one', async () => {
