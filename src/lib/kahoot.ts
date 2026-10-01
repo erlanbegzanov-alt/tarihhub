@@ -86,6 +86,17 @@ export interface KahootQuestion {
   text: string
   /** `null` until a photo is uploaded, and again if the teacher removes it. */
   photoURL: string | null
+  /**
+   * What the photo shows, in the teacher's own words.
+   *
+   * Not decoration: in this app a photo is often the question itself — a
+   * portrait to name, a map to read. Rendering it with `alt=""` tells a
+   * screen reader to skip it, which leaves a student with no way to answer at
+   * all. Empty here means the teacher wrote nothing, and the player screens
+   * fall back to saying an image is present rather than pretending there is
+   * none.
+   */
+  photoAlt: string
   options: string[]
   correctIndex: number
 }
@@ -105,6 +116,8 @@ export type KahootStatus = 'lobby' | 'question' | 'reveal' | 'done'
 export interface KahootLiveQuestion {
   text: string
   photoURL: string | null
+  /** Travels with the photo — see `KahootQuestion.photoAlt`. */
+  photoAlt: string
   options: string[]
 }
 
@@ -194,6 +207,7 @@ export function emptyQuestion(): KahootQuestion {
     id: newQuestionId(),
     text: '',
     photoURL: null,
+    photoAlt: '',
     options: Array.from({ length: KAHOOT_OPTIONS }, () => ''),
     correctIndex: 0,
   }
@@ -250,6 +264,7 @@ function normalizeQuestion(value: unknown): KahootQuestion {
     id: stringOr(data.id, newQuestionId()),
     text: stringOr(data.text, ''),
     photoURL: typeof data.photoURL === 'string' && data.photoURL ? data.photoURL : null,
+    photoAlt: stringOr(data.photoAlt, ''),
     options: Array.from({ length: KAHOOT_OPTIONS }, (_, index) =>
       stringOr(options[index], ''),
     ),
@@ -285,6 +300,7 @@ function normalizeLiveQuestion(value: unknown): KahootLiveQuestion | null {
   return {
     text: stringOr(data.text, ''),
     photoURL: typeof data.photoURL === 'string' && data.photoURL ? data.photoURL : null,
+    photoAlt: stringOr(data.photoAlt, ''),
     options: Array.from({ length: KAHOOT_OPTIONS }, (_, index) =>
       stringOr(options[index], ''),
     ),
@@ -386,6 +402,7 @@ export async function saveGame(game: KahootGame): Promise<boolean> {
         id: question.id,
         text: question.text.trim(),
         photoURL: question.photoURL,
+        photoAlt: question.photoAlt.trim(),
         options: question.options.map((option) => option.trim()),
         correctIndex: question.correctIndex,
       })),
@@ -532,6 +549,7 @@ export async function openQuestion(
       currentQuestion: {
         text: question.text,
         photoURL: question.photoURL,
+        photoAlt: question.photoAlt,
         options: question.options,
       },
       revealedCorrectIndex: null,

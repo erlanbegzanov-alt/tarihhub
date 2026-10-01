@@ -809,6 +809,17 @@ export const s = {
     removeQuestion: { kz: 'Сұрақты өшіру', ru: 'Удалить вопрос' },
     photoAdd: { kz: 'Фото', ru: 'Фото' },
     photoRemove: { kz: 'Фотоны өшіру', ru: 'Удалить фото' },
+    /** The teacher describes the photo, because here a photo is often the question. */
+    photoAltLabel: { kz: 'Фотода не бар', ru: 'Что на фото' },
+    photoAltPlaceholder: {
+      kz: 'Мысалы: Абылай ханның портреті',
+      ru: 'Например: портрет Абылай хана',
+    },
+    /** Read out when the teacher left the description empty. */
+    photoUndescribed: {
+      kz: 'Сұраққа сурет (сипаттамасы жоқ)',
+      ru: 'Изображение к вопросу (без описания)',
+    },
     photoFailed: {
       kz: 'Фото жүктелмеді. Сұрақты фотосыз да сақтауға болады.',
       ru: 'Фото не загрузилось. Вопрос можно сохранить и без него.',

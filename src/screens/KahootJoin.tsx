@@ -300,7 +300,7 @@ export function KahootJoin() {
               {question.photoURL && (
                 <img
                   src={question.photoURL}
-                  alt=""
+                  alt={question.photoAlt || t(s.kahoot.photoUndescribed)}
                   className="mb-3.5 max-h-64 w-full rounded-tile object-cover ring-1 ring-line"
                 />
               )}

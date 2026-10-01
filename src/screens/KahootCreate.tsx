@@ -313,13 +313,13 @@ export function KahootCreate() {
                       <>
                         <img
                           src={question.photoURL}
-                          alt=""
+                          alt={question.photoAlt}
                           className="h-[60px] w-[60px] rounded-tile object-cover ring-1 ring-line"
                         />
                         <button
                           type="button"
                           aria-label={t(s.kahoot.photoRemove)}
-                          onClick={() => patch(index, { photoURL: null })}
+                          onClick={() => patch(index, { photoURL: null, photoAlt: '' })}
                           className="focus-ring absolute -top-1.5 -right-1.5 grid h-6 w-6 place-items-center rounded-full bg-surface text-ink-soft shadow-soft ring-1 ring-line hover:text-wrong"
                         >
                           <X className="h-3.5 w-3.5" strokeWidth={2.4} />
@@ -370,9 +370,29 @@ export function KahootCreate() {
                   />
                 </div>
                 {!question.photoURL && (
-                  <p className="mt-1.5 pl-[72px] text-[10.5px] text-ink-faint">
+                  <p className="mt-1.5 pl-[72px] text-[12px] text-ink-soft">
                     {t(s.kahoot.photoDropHint)}
                   </p>
+                )}
+
+                {/* Shown only once there is a photo to describe. A photo here is
+                    often the question itself — a portrait to name, a map to
+                    read — so a student using a screen reader cannot answer at
+                    all without this. Left empty, the player screens say an
+                    image is present rather than claiming there is none. */}
+                {question.photoURL && (
+                  <label className="mt-1.5 block pl-[72px]">
+                    <span className="block text-[12px] font-semibold text-ink-soft">
+                      {t(s.kahoot.photoAltLabel)}
+                    </span>
+                    <input
+                      value={question.photoAlt}
+                      onChange={(event) => patch(index, { photoAlt: event.target.value })}
+                      placeholder={t(s.kahoot.photoAltPlaceholder)}
+                      maxLength={120}
+                      className={cn(FIELD, 'mt-1 w-full bg-cream')}
+                    />
+                  </label>
                 )}
 
                 <ul className="mt-2.5 grid gap-2">
