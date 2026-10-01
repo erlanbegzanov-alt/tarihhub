@@ -693,7 +693,7 @@ export function Profile() {
                     >
                       {t(badge.title)}
                     </p>
-                    <p className="mt-1 text-[11.5px] leading-snug text-ink-faint">
+                    <p className="mt-1 text-[14px] leading-snug text-ink-soft">
                       {unlocked ? t(badge.description) : t(s.profile.locked)}
                     </p>
                   </motion.div>

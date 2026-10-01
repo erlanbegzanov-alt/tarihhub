@@ -1473,7 +1473,7 @@ export function BattleDuel({
                 }}
               >
                 {outcome.won ? (
-                  <Trophy className="h-7 w-7 text-gold" strokeWidth={1.8} />
+                  <Trophy className="h-7 w-7 text-gold-ink" strokeWidth={1.8} />
                 ) : (
                   <Crown
                     className="h-7 w-7"

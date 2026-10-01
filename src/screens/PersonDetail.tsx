@@ -108,7 +108,7 @@ export function PersonDetail() {
             <IconButton
               label={t(s.person.bookmark)}
               onClick={() => setSaved((prev) => !prev)}
-              className={cn('bg-surface/90 backdrop-blur-sm', saved && 'text-gold')}
+              className={cn('bg-surface/90 backdrop-blur-sm', saved && 'text-gold-ink')}
             >
               <Bookmark
                 className="h-[18px] w-[18px]"
@@ -135,7 +135,7 @@ export function PersonDetail() {
               <IconButton
                 label={t(s.person.bookmark)}
                 onClick={() => setSaved((prev) => !prev)}
-                className={saved ? 'text-gold' : undefined}
+                className={saved ? 'text-gold-ink' : undefined}
               >
                 <Bookmark
                   className="h-[18px] w-[18px]"

@@ -82,7 +82,7 @@ export function BattleCasual() {
             </p>
           </div>
           <div className="px-3 py-4 text-center">
-            <p className="text-2xl leading-none font-bold tabular-nums text-gold">
+            <p className="text-2xl leading-none font-bold tabular-nums text-gold-ink">
               {profile.casualStreak}
             </p>
             <p className="mt-1.5 text-[11px] leading-tight text-ink-faint">

@@ -59,7 +59,7 @@ export function WeeklyTopBadge({
       title={label}
       className={cn(
         'inline-flex shrink-0 items-center gap-1 rounded-full',
-        'bg-gold-tint text-gold ring-1 ring-gold/40',
+        'bg-gold-tint text-gold-ink ring-1 ring-gold/40',
         compact ? 'p-1' : 'px-2 py-0.5 text-[11px] font-bold whitespace-nowrap',
         className,
       )}

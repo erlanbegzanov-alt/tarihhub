@@ -207,14 +207,14 @@ export function KahootCreate() {
       {!ready ? (
         <motion.p
           variants={staggerItem}
-          className="mt-5 rounded-card bg-surface p-5 text-center text-[13.5px] leading-relaxed text-ink-faint shadow-soft ring-1 ring-line/60"
+          className="mt-5 rounded-card bg-surface p-5 text-center text-[14px] leading-relaxed text-ink-soft shadow-soft ring-1 ring-line/60"
         >
           {t(s.battle.unavailable)}
         </motion.p>
       ) : loadError ? (
         <motion.p
           variants={staggerItem}
-          className="mt-5 rounded-card bg-surface p-5 text-center text-[13.5px] leading-relaxed text-ink-faint shadow-soft ring-1 ring-line/60"
+          className="mt-5 rounded-card bg-surface p-5 text-center text-[14px] leading-relaxed text-ink-soft shadow-soft ring-1 ring-line/60"
         >
           {t(s.kahoot.loadFailed)}
         </motion.p>

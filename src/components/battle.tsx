@@ -288,7 +288,7 @@ export function LeagueCard({
               {t(s.battle.ratingPerLoss)}
             </span>
           </div>
-          <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
+          <p className="mt-1.5 text-[14px] leading-relaxed text-ink-soft">
             {t(s.battle.ratingFloor)}
           </p>
         </div>
@@ -350,7 +350,7 @@ export function FindMatchCard({
   return (
     <div className="rounded-card bg-surface px-5 py-9 text-center shadow-soft ring-1 ring-line/60">
       <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-gold-tint">
-        <Trophy className="h-7 w-7 text-gold" strokeWidth={1.8} />
+        <Trophy className="h-7 w-7 text-gold-ink" strokeWidth={1.8} />
       </span>
       <p className="mx-auto mt-4 max-w-sm text-[14.5px] leading-relaxed text-ink-soft">
         {t(mode === 'ranked' ? s.battle.rankedHint : s.battle.casualHint)}
@@ -695,7 +695,7 @@ export function MatchList({ children }: { children: ReactNode }) {
 /** Matching empty state, so "nothing yet" still looks like part of the list. */
 export function EmptyPanel({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-card bg-surface p-5 text-center text-[13.5px] leading-relaxed text-ink-faint shadow-soft ring-1 ring-line/60">
+    <p className="rounded-card bg-surface p-5 text-center text-[14px] leading-relaxed text-ink-soft shadow-soft ring-1 ring-line/60">
       {children}
     </p>
   )

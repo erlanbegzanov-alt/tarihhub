@@ -28,6 +28,13 @@
 
   /* ---- Reward / XP ---- */
   --color-gold: #c9a227;
+  /* Gold as TEXT, which --color-gold cannot be: it reads 2.03 on its own
+     track, 2.17 on gold-tint, 2.18 on cream and 2.42 on surface — not one
+     of them reaches even 3.0, and this is the XP colour, the number a
+     student is actually playing for. Same two-token shape as
+     --color-brand / --color-brand-dark. Fills and graphics keep
+     --color-gold untouched, so nothing gold changes colour. */
+  --color-gold-ink: #856b1a;
   --color-gold-tint: #fbf2d9;
 
   /* ---- Rank tier ladder (src/components/RankBadge.tsx) ---- */
@@ -116,6 +123,8 @@
 
   /* ---- Reward / XP ---- */
   --color-gold: #d9b23c;
+  /* Dark gold already clears AA (7.09 on its tint), so text keeps it. */
+  --color-gold-ink: #d9b23c;
   --color-gold-tint: #33290f;
 
   /* ---- Feedback ---- */

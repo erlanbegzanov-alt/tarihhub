@@ -394,7 +394,7 @@ export function LessonDetail() {
                     </button>
                   </div>
 
-                  <p className="mt-5 flex items-start gap-2 text-[12.5px] leading-relaxed text-ink-faint">
+                  <p className="mt-5 flex items-start gap-2 text-[14px] leading-relaxed text-ink-soft">
                     <BookOpen className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
                     {t(s.lesson.sourceNote)}
                   </p>
@@ -476,7 +476,7 @@ export function LessonDetail() {
             </div>
           ) : quizReady ? (
             <div className="text-center">
-              <p className="mb-3 text-[13px] leading-relaxed text-ink-faint">
+              <p className="mb-3 text-[14px] leading-relaxed text-ink-soft">
                 {t(s.lesson.gateNote)}
               </p>
               <motion.div

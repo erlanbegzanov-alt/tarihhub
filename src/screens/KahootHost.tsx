@@ -218,7 +218,7 @@ export function KahootHost() {
       {!ready || failed ? (
         <motion.p
           variants={staggerItem}
-          className="mt-5 rounded-card bg-surface p-5 text-center text-[13.5px] leading-relaxed text-ink-faint shadow-soft ring-1 ring-line/60"
+          className="mt-5 rounded-card bg-surface p-5 text-center text-[14px] leading-relaxed text-ink-soft shadow-soft ring-1 ring-line/60"
         >
           {t(ready ? s.kahoot.roomFailed : s.battle.unavailable)}
         </motion.p>
@@ -368,7 +368,7 @@ export function KahootHost() {
             <div>
               <div className="text-center">
                 <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-gold-tint">
-                  <Trophy className="h-7 w-7 text-gold" strokeWidth={1.8} />
+                  <Trophy className="h-7 w-7 text-gold-ink" strokeWidth={1.8} />
                 </span>
                 <h2 className="mt-4 text-2xl font-bold tracking-tight text-ink">
                   {t(s.kahoot.finalTitle)}

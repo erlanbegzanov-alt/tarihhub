@@ -200,7 +200,7 @@ export function Quiz({ daily = false }: { daily?: boolean } = {}) {
           {missed ? (
             <RotateCcw className="h-9 w-9 text-brand" strokeWidth={1.8} />
           ) : (
-            <Trophy className="h-9 w-9 text-gold" strokeWidth={1.8} />
+            <Trophy className="h-9 w-9 text-gold-ink" strokeWidth={1.8} />
           )}
         </motion.span>
 
@@ -235,7 +235,7 @@ export function Quiz({ daily = false }: { daily?: boolean } = {}) {
             </p>
           </div>
           <div className="rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60">
-            <p className="text-3xl font-bold text-gold">+{xpEarnedThisRound}</p>
+            <p className="text-3xl font-bold text-gold-ink">+{xpEarnedThisRound}</p>
             <p className="mt-1 text-[12.5px] text-ink-faint">
               {t(s.quiz.xpEarned)}
             </p>

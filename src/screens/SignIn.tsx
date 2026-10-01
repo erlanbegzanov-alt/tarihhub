@@ -224,7 +224,7 @@ export function SignIn() {
           {!isFirebaseReady && (
             <p className="flex gap-2.5 rounded-tile bg-gold-tint px-3.5 py-3 text-[12.5px] leading-relaxed text-ink-soft">
               <CloudOff
-                className="mt-0.5 h-4 w-4 shrink-0 text-gold"
+                className="mt-0.5 h-4 w-4 shrink-0 text-gold-ink"
                 strokeWidth={2}
               />
               {t(s.auth.notConfigured)}

@@ -211,7 +211,7 @@ export function PlayerBoard({
             <span
               className={cn(
                 'text-center text-[13px] font-bold tabular-nums',
-                position < 3 ? 'text-gold' : 'text-ink-faint',
+                position < 3 ? 'text-gold-ink' : 'text-ink-faint',
               )}
             >
               {position + 1}
