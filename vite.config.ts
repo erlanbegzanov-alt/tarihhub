@@ -29,6 +29,38 @@ export default defineConfig(({ mode }) => {
     ...(examMockOn ? [] : ['**/ExamMock-*.js']),
   ]
   return {
+    build: {
+      rolldownOptions: {
+        output: {
+          // The quiz-question bank is imported by exactly two lazy screens —
+          // Quiz and LessonDetail — and a dependency shared by two lazy
+          // chunks gets hoisted into the entry. So ~2 MB of questions ended
+          // up in the file every visitor downloads before the home screen
+          // paints, on a phone, on school wifi, for a median session of one
+          // visit.
+          //
+          // The `globIgnores` below already names `quiz-*.js` and has done
+          // for a long time: this chunk is what the service-worker config has
+          // been expecting all along. That rule simply stopped matching
+          // anything when the chunking changed, and nothing failed — the
+          // precache quietly grew instead.
+          //
+          // It was also 43 KB from a silent failure. Workbox skips any file
+          // over `maximumFileSizeToCacheInBytes` (2 MB) without an error, and
+          // the entry chunk had reached 2 054 060 bytes. One more screen and
+          // the app shell would have dropped out of the offline precache with
+          // nothing at all to show for it.
+          advancedChunks: {
+            groups: [
+              {
+                name: 'quiz',
+                test: /[\\/]src[\\/]data[\\/](quiz|lessonQuestions|dateQuestions)\.ts$/,
+              },
+            ],
+          },
+        },
+      },
+    },
     define: {
       'import.meta.env.VITE_APP_ENV': JSON.stringify(env.VITE_APP_ENV ?? ''),
       'import.meta.env.VITE_FEATURE_TEAM_BATTLE': JSON.stringify(env.VITE_FEATURE_TEAM_BATTLE ?? ''),
