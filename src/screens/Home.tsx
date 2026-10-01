@@ -220,7 +220,13 @@ export function Home() {
                       to={`/lesson/${lesson.id}`}
                       className={cn(
                         'focus-ring block w-full rounded-card bg-surface p-3.5 text-left',
-                        'shadow-soft ring-1 ring-line/60 transition-shadow duration-300 hover:shadow-lift',
+                        // Flatter than the cards above on purpose: these are rows
+                        // of one list, not separate objects, and four of them each
+                        // casting a card's shadow read as four things competing
+                        // with the thing Home is actually pointing at. The ring
+                        // still gives every row an edge; hover lifts it one step,
+                        // never to the card tier.
+                        'ring-1 ring-line/60 transition-shadow duration-300 hover:shadow-soft',
                       )}
                     >
                       <div className="flex items-center gap-3.5">
@@ -362,7 +368,14 @@ function DailySet() {
         to="/quiz/daily"
         className={cn(
           'focus-ring group flex items-center gap-4 rounded-card bg-surface p-4 sm:p-5',
-          'shadow-soft ring-1 transition-shadow duration-300 hover:shadow-lift',
+          'ring-1 transition-shadow duration-300',
+          // The lift is unconditional while the set is unfinished, and that is
+          // the whole point of this line. Every other surface on Home carried
+          // its emphasis under 'hover:', and hover never fires on a phone — so
+          // on the screen most readers actually use, nothing was emphasised at
+          // all and this card looked like one more list row. Finished, it steps
+          // back to the standing tier: it has nothing left to ask for.
+          done ? 'shadow-soft hover:shadow-lift' : 'shadow-lift',
           atRisk ? 'ring-brand/40' : 'ring-line/60',
         )}
       >

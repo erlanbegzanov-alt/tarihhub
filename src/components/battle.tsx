@@ -691,12 +691,3 @@ export function MatchList({ children }: { children: ReactNode }) {
     </motion.ul>
   )
 }
-
-/** Matching empty state, so "nothing yet" still looks like part of the list. */
-export function EmptyPanel({ children }: { children: ReactNode }) {
-  return (
-    <p className="rounded-card bg-surface p-5 text-center text-[14px] leading-relaxed text-ink-soft shadow-soft ring-1 ring-line/60">
-      {children}
-    </p>
-  )
-}

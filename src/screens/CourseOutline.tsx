@@ -108,7 +108,7 @@ export function CourseOutline() {
 
               {/* lessons */}
               {lessons.length === 0 ? (
-                <p className="mt-2.5 px-1 text-[13px] text-ink-faint">
+                <p className="mt-2.5 px-1 text-[13px] text-ink-soft">
                   {t(s.course.unitEmpty)}
                 </p>
               ) : (

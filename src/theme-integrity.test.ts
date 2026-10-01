@@ -64,7 +64,26 @@ describe('the theme', () => {
     expect(offenders).toEqual([])
   })
 
-  // A third rule belongs here — "every colour token declared in the light
+  it('keeps the one-line panel in one place', () => {
+    // Eight Kahoot screens had copied these nine classes verbatim before this
+    // rule existed, and the look they copied was already wrong in one of them.
+    // The panel is `EmptyPanel` in `components/ui.tsx` now; the only legal
+    // occurrence of the string is its own definition.
+    //
+    // This sits in the theme suite, despite not being a colour rule, because
+    // it is the only suite that reads the sources as text — and the failure is
+    // the same one the rules above catch: a look with nine owners gets fixed
+    // in one of them.
+    const panel =
+      'p-5 text-center text-[14px] leading-relaxed text-ink-soft shadow-soft'
+    const offenders = files
+      .filter((file) => file.path !== 'components/ui.tsx')
+      .filter((file) => file.text.includes(panel))
+      .map((file) => file.path)
+    expect(offenders).toEqual([])
+  })
+
+  // A fourth rule belongs here — "every colour token declared in the light
   // block has a counterpart in `.dark`, except the scrim" — and it is not
   // written, deliberately. This suite runs under vitest's node environment,
   // where a CSS import resolves to an empty string, so the check would pass

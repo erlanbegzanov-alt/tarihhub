@@ -260,6 +260,39 @@ export function StatTile({ value, label }: { value: ReactNode; label: string }) 
 
 /* ------------------------------------------------------------------ */
 
+/**
+ * The one-line panel a section shows instead of its list: nothing yet, nothing
+ * loaded, nothing available offline.
+ *
+ * It lives here rather than beside the battle list it was written for because
+ * eight Kahoot screens had copied its nine classes verbatim, and the Kahoot
+ * screens cannot import `battle.tsx` without dragging ranks, avatars and the
+ * rating lib into their chunk. Nine copies of one look is how the unreadable
+ * `ink-faint` spread: the fix lands in one of them and the other eight keep
+ * the bug.
+ */
+export function EmptyPanel({
+  children,
+  className,
+}: {
+  children: ReactNode
+  /** Outer spacing only — the panel owns its own look. */
+  className?: string
+}) {
+  return (
+    <p
+      className={cn(
+        'rounded-card bg-surface p-5 text-center text-[14px] leading-relaxed text-ink-soft shadow-soft ring-1 ring-line/60',
+        className,
+      )}
+    >
+      {children}
+    </p>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+
 export function XpPill({ children }: { children: ReactNode }) {
   return (
     <span

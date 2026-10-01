@@ -19,14 +19,13 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { KahootHeader } from '../components/kahoot'
 import {
-  EmptyPanel,
   FindMatchCard,
   FormDots,
   MatchList,
   MatchRow,
   useMyIdentity,
 } from '../components/battle'
-import { SectionHeading, XpPill } from '../components/ui'
+import { EmptyPanel, SectionHeading, XpPill } from '../components/ui'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { staggerContainer, staggerItem } from '../lib/motion'

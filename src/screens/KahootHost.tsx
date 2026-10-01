@@ -17,6 +17,7 @@ import {
   LobbyRow,
   PlayerBoard,
 } from '../components/kahoot'
+import { EmptyPanel } from '../components/ui'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
@@ -216,12 +217,9 @@ export function KahootHost() {
       />
 
       {!ready || failed ? (
-        <motion.p
-          variants={staggerItem}
-          className="mt-5 rounded-card bg-surface p-5 text-center text-[14px] leading-relaxed text-ink-soft shadow-soft ring-1 ring-line/60"
-        >
-          {t(ready ? s.kahoot.roomFailed : s.battle.unavailable)}
-        </motion.p>
+        <motion.div variants={staggerItem}>
+          <EmptyPanel className="mt-5">{t(ready ? s.kahoot.roomFailed : s.battle.unavailable)}</EmptyPanel>
+        </motion.div>
       ) : !room || !code ? (
         <div className="py-16 text-center">
           <Loader2

@@ -22,7 +22,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KahootHeader, PlayerAvatar } from '../components/kahoot'
 import {
-  EmptyPanel,
   FindMatchCard,
   FormDots,
   LeagueCard,
@@ -31,7 +30,7 @@ import {
   RatingMove,
   useMyIdentity,
 } from '../components/battle'
-import { SectionHeading } from '../components/ui'
+import { EmptyPanel, SectionHeading } from '../components/ui'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { fetchBattlePlayer, fetchWeeklyLeaderboard, isoWeekStart } from '../lib/battle'

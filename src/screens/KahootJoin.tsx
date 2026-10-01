@@ -11,6 +11,7 @@ import { Check, Loader2, Trophy, Users, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { CountdownBar, KahootHeader, LobbyRow, PlayerBoard } from '../components/kahoot'
+import { EmptyPanel } from '../components/ui'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { answerXp } from '../lib/battle'
@@ -227,9 +228,7 @@ export function KahootJoin() {
 
       {!ready || blocked ? (
         <motion.div variants={staggerItem} className="mt-5">
-          <p className="rounded-card bg-surface p-5 text-center text-[14px] leading-relaxed text-ink-soft shadow-soft ring-1 ring-line/60">
-            {t(blocked ? BLOCKED_TEXT[blocked] : s.battle.unavailable)}
-          </p>
+          <EmptyPanel>{t(blocked ? BLOCKED_TEXT[blocked] : s.battle.unavailable)}</EmptyPanel>
           <button
             type="button"
             onClick={() => navigate('/battle/kahoot/student')}

@@ -10,7 +10,7 @@ import { GraduationCap, Loader2, Pencil, Play, Plus, Trash2 } from 'lucide-react
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KahootHeader } from '../components/kahoot'
-import { SectionHeading } from '../components/ui'
+import { EmptyPanel, SectionHeading } from '../components/ui'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
@@ -57,12 +57,9 @@ export function KahootTeacher() {
       />
 
       {!ready ? (
-        <motion.p
-          variants={staggerItem}
-          className="mt-5 rounded-card bg-surface p-5 text-center text-[14px] leading-relaxed text-ink-soft shadow-soft ring-1 ring-line/60"
-        >
-          {t(s.battle.unavailable)}
-        </motion.p>
+        <motion.div variants={staggerItem}>
+          <EmptyPanel className="mt-5">{t(s.battle.unavailable)}</EmptyPanel>
+        </motion.div>
       ) : (
         <motion.div variants={staggerItem} className="mt-5">
           <SectionHeading title={t(s.kahoot.myGames)} />
@@ -88,9 +85,7 @@ export function KahootTeacher() {
               />
             </div>
           ) : games.length === 0 ? (
-            <p className="mt-3 rounded-card bg-surface p-5 text-center text-[14px] leading-relaxed text-ink-soft shadow-soft ring-1 ring-line/60">
-              {t(s.kahoot.gamesEmpty)}
-            </p>
+            <EmptyPanel className="mt-3">{t(s.kahoot.gamesEmpty)}</EmptyPanel>
           ) : (
             <ul className="mt-3 grid gap-2.5">
               {games.map((game) => (
