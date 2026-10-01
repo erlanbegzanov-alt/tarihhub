@@ -52,6 +52,16 @@ export default defineConfig(({ mode }) => {
           // nothing at all to show for it.
           advancedChunks: {
             groups: [
+              // These two come FIRST and they are the whole trick. Grouping
+              // a module pulls its dependencies in with it, and the first
+              // attempt swallowed  — which Home needs, via
+              // the daily set, on every single load. The entry then imported
+              // one tiny helper out of a 1.8 MB chunk, so the browser
+              // preloaded all of it and the split bought nothing. Pinning
+              // the shared modules to their own groups first keeps the quiz
+              // group to the question data it is meant to hold.
+              { name: 'shuffle', test: /[\/]src[\/]lib[\/]shuffle.ts$/ },
+              { name: 'entQuestions', test: /[\/]src[\/]data[\/]entQuestions.ts$/ },
               {
                 name: 'quiz',
                 test: /[\\/]src[\\/]data[\\/](quiz|lessonQuestions|dateQuestions)\.ts$/,

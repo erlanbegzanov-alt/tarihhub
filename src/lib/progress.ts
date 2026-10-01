@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { nextDailyStreak } from './daily'
+import { nextDailyStreak } from './dailyStreak'
 import type { AvatarGender } from '../data/ranks'
 
 // Bumped from 'tarihhub_profile' — the old key held pre-launch seed data

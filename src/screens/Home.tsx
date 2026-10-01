@@ -17,7 +17,7 @@ import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
-import { dailyDone, streakAlive } from '../lib/daily'
+import { dailyDone, streakAlive } from '../lib/dailyStreak'
 import { localDateString, useProfile } from '../lib/progress'
 
 // Collapsed height of the "continue learning" list before it needs its own
