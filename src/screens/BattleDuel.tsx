@@ -15,7 +15,7 @@
  * always labelled, and never in ranked (see `src/lib/battleBot.ts`).
  */
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { Crown, Loader2, Trophy, UserX } from 'lucide-react'
+import { Check, Crown, Loader2, Trophy, UserX, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BotChip,
@@ -86,6 +86,11 @@ import { useSession } from '../lib/session'
 /** How long a revealed answer stays on screen before the next question. */
 const REVEAL_MS = 950
 /** Gap between matchmaking sweeps while waiting in the queue. */
+/** Where the countdown turns red. Four of twelve seconds is the last third. */
+const URGENT_SECONDS = 4
+/** The chip a duel option carries before it is answered. */
+const OPTION_LETTERS = ['A', 'B', 'C', 'D']
+
 const POLL_MS = 1500
 /**
  * How the sweep interval grows while nobody is found, and where it stops.
@@ -307,34 +312,45 @@ function Fighter({
 
 /** The per-question countdown, drawn as a ring that empties as it runs. */
 function TimerRing({ seconds }: { seconds: number }) {
-  const radius = 14
+  const radius = 18
   const circumference = 2 * Math.PI * radius
   const left = Math.max(0, Math.min(QUESTION_SECONDS, seconds))
+  // Gold reads 2.03:1 against its own track — the arc was the weakest mark on
+  // the most time-critical screen, and it never changed, so the only thing
+  // signalling "hurry" was a 12px digit. Brand reaches 3.61 on that track and
+  // wrong 4.17, and the switch at four seconds IS the urgency signal.
+  const urgent = left <= URGENT_SECONDS
+  const stroke = urgent ? 'var(--color-wrong)' : 'var(--color-brand)'
   return (
-    <div className="relative h-[34px] w-[34px]" aria-hidden>
-      <svg width="34" height="34" className="-rotate-90">
+    <div className="relative h-[44px] w-[44px]" aria-hidden>
+      <svg width="44" height="44" className="-rotate-90">
         <circle
-          cx="17"
-          cy="17"
+          cx="22"
+          cy="22"
           r={radius}
           fill="none"
           strokeWidth="4"
           stroke="var(--color-line-soft)"
         />
         <circle
-          cx="17"
-          cy="17"
+          cx="22"
+          cy="22"
           r={radius}
           fill="none"
           strokeWidth="4"
           strokeLinecap="round"
-          stroke="var(--color-gold)"
+          stroke={stroke}
           strokeDasharray={circumference}
           strokeDashoffset={circumference * (1 - left / QUESTION_SECONDS)}
           style={{ transition: 'stroke-dashoffset 1s linear' }}
         />
       </svg>
-      <span className="absolute inset-0 grid place-items-center text-[12px] font-bold tabular-nums text-ink">
+      <span
+        className={cn(
+          'absolute inset-0 grid place-items-center text-[15px] font-bold tabular-nums',
+          urgent ? 'text-wrong' : 'text-ink',
+        )}
+      >
         {left}
       </span>
     </div>
@@ -649,15 +665,23 @@ export function BattleDuel({
 
   /* ------------------------------ the clock ------------------------------ */
 
+  // The banner is part of this: it blurs the board for 1400ms, and the clock
+  // used to start in the same commit, so the first question of every round
+  // spent 1.4 of its 12 seconds behind a scrim nobody can dismiss. That is
+  // 11.7% of the answer budget, and in a ranked duel whichever client paints
+  // the banner first gets to read first — a fairness problem, not only a
+  // legibility one. The countdown now begins when the board is actually
+  // readable.
   useEffect(() => {
     if (phase !== 'duel' || picked !== null || questions.length === 0) return
+    if (roundBanner !== null) return
     setSecondsLeft(QUESTION_SECONDS)
     const tick = window.setInterval(
       () => setSecondsLeft((prev) => Math.max(0, prev - 1)),
       1000,
     )
     return () => window.clearInterval(tick)
-  }, [phase, index, picked, questions.length])
+  }, [phase, index, picked, questions.length, roundBanner])
 
   const question = questions[index]
 
@@ -1320,7 +1344,35 @@ export function BattleDuel({
                             'bg-cream/60 text-ink-faint ring-line/50',
                         )}
                       >
-                        {t(option.label)}
+                        {/* Colour alone used to carry the whole verdict here —
+                            a pale tint and a hairline ring, identical text
+                            colour either way. Under deuteranopia the two tints
+                            are the same beige, so a colour-blind player could
+                            not tell whether they had just won the round. Quiz,
+                            the ҰБТ mock and the section checks all already
+                            turn the letter into a filled Check or X; the one
+                            surface running against a clock did not. */}
+                        <span className="flex items-center gap-3">
+                          <span
+                            className={cn(
+                              'grid h-8 w-8 shrink-0 place-items-center rounded-full',
+                              'text-[13px] font-bold transition-colors duration-200',
+                              !revealed && 'bg-surface text-ink-soft',
+                              revealed && isCorrect && 'bg-correct text-white',
+                              revealed && isPicked && !isCorrect && 'bg-wrong text-white',
+                              revealed && !isCorrect && !isPicked && 'bg-surface text-ink-faint',
+                            )}
+                          >
+                            {revealed && isCorrect ? (
+                              <Check className="h-4 w-4" strokeWidth={3} />
+                            ) : revealed && isPicked ? (
+                              <X className="h-4 w-4" strokeWidth={3} />
+                            ) : (
+                              OPTION_LETTERS[optionIndex]
+                            )}
+                          </span>
+                          <span className="min-w-0 flex-1">{t(option.label)}</span>
+                        </span>
                       </motion.button>
                     </li>
                   )
