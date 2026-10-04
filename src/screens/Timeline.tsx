@@ -23,6 +23,16 @@ export function Timeline() {
     recordTimelineViewed()
   }, [])
 
+  // Only the eras the timeline actually has an event for. A chip that filters
+  // to "0 оқиға" over a blank screen reads as a broken app, and one did:
+  // Botai sat under the Saka era, so the stone-and-bronze filter was empty.
+  // The retag fixed that case; this makes the next one impossible rather than
+  // waiting for someone to notice it on a projector.
+  const eraKeysWithEvents = useMemo(
+    () => timelineEraKeys.filter((key) => timeline.some((entry) => entry.eraKey === key)),
+    [],
+  )
+
   const entries = useMemo(
     () =>
       filter === 'all'
@@ -53,7 +63,7 @@ export function Timeline() {
         >
           {t(s.common.all)}
         </FilterChip>
-        {timelineEraKeys.map((key) => (
+        {eraKeysWithEvents.map((key) => (
           <FilterChip
             key={key}
             active={filter === key}

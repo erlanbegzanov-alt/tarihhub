@@ -104,6 +104,13 @@ function PlaceCallout({
   const reduce = useReducedMotion()
   const { left, top } = position(view, place.lon, place.lat)
 
+  // The era hue carries the map, but at 9px it also has to be read. Mixed
+  // toward the ink it follows the theme in the right direction in both: darker
+  // on the light map, lighter on the dark one. 62% is the largest share of the
+  // hue at which all ten eras clear 4.5:1 either way — the same constant the
+  // course screen uses, and golden binds it there too.
+  const inkMix = `color-mix(in srgb, ${color} 62%, var(--color-ink))`
+
   if (place.kind === 'region') {
     return (
       <motion.div
@@ -116,9 +123,13 @@ function PlaceCallout({
         <span
           className="rounded px-1 py-px text-[9px] font-bold tracking-wide whitespace-nowrap uppercase sm:text-[11px]"
           style={{
-            color: `color-mix(in srgb, ${color} 82%, var(--color-ink))`,
+            color: inkMix,
+            // The halo is what makes a label legible over varied terrain, so
+            // it has to be the ground's colour, not white. `--color-surface`
+            // is near-black at night; hard-coded white put a glow there.
             textShadow:
-              '0 0 3px #fff, 0 0 3px #fff, 0 1px 2px #fff, 0 -1px 2px #fff',
+              '0 0 3px var(--color-surface), 0 0 3px var(--color-surface),' +
+              ' 0 1px 2px var(--color-surface), 0 -1px 2px var(--color-surface)',
           }}
         >
           {t(place.name)}
@@ -140,12 +151,13 @@ function PlaceCallout({
         'items-center gap-1 rounded-full py-0.5 pr-1.5 pl-0.5',
         'text-[9px] font-semibold whitespace-nowrap sm:text-[10.5px]',
         'border',
-        isCapital ? 'text-white' : 'bg-surface text-ink',
+        isCapital ? undefined : 'bg-surface text-ink',
       )}
       style={{
         left,
         top,
-        background: isCapital ? color : undefined,
+        color: isCapital ? 'var(--color-surface)' : undefined,
+        background: isCapital ? inkMix : undefined,
         borderColor: isCapital
           ? color
           : `color-mix(in srgb, ${color} 28%, var(--color-line))`,
@@ -158,14 +170,14 @@ function PlaceCallout({
         className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full sm:h-4 sm:w-4"
         style={{
           background: isCapital
-            ? 'rgba(255,255,255,0.24)'
+            ? 'color-mix(in srgb, var(--color-surface) 24%, transparent)'
             : `color-mix(in srgb, ${color} 16%, var(--color-surface))`,
         }}
       >
         <Icon
           className="h-2 w-2 shrink-0 sm:h-2.5 sm:w-2.5"
           strokeWidth={2.2}
-          style={{ color: isCapital ? '#fff' : color }}
+          style={{ color: isCapital ? 'var(--color-surface)' : inkMix }}
         />
       </span>
       {t(place.name)}
@@ -397,6 +409,10 @@ export function KazakhstanMap({
         {(!activeEraKey || !territory) && sites.map((site) => {
           const Icon = SITE_ICONS[site.category]
           const color = siteColor(site.category)
+          // Same treatment as the era callouts above: fill with the hue mixed
+          // toward the ink and take the text from the surface, so the active
+          // marker is readable in both themes instead of only the light one.
+          const inkMix = `color-mix(in srgb, ${color} 62%, var(--color-ink))`
           const isActive = activeId === site.id
           const { left, top } = position(view, site.lon, site.lat)
           return (
@@ -417,12 +433,13 @@ export function KazakhstanMap({
                 'text-[9px] font-semibold whitespace-nowrap sm:text-[10.5px]',
                 'border transition-colors duration-200',
                 isWide && 'gap-0 p-0',
-                isActive ? 'text-white' : 'bg-surface text-ink',
+                isActive ? undefined : 'bg-surface text-ink',
               )}
               style={{
                 left,
                 top,
-                background: isActive ? color : undefined,
+                color: isActive ? 'var(--color-surface)' : undefined,
+                background: isActive ? inkMix : undefined,
                 borderColor: isActive
                   ? color
                   : `color-mix(in srgb, ${color} 28%, var(--color-line))`,
@@ -435,14 +452,14 @@ export function KazakhstanMap({
                 className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full sm:h-4 sm:w-4"
                 style={{
                   background: isActive
-                    ? 'rgba(255,255,255,0.24)'
+                    ? 'color-mix(in srgb, var(--color-surface) 24%, transparent)'
                     : `color-mix(in srgb, ${color} 16%, var(--color-surface))`,
                 }}
               >
                 <Icon
                   className="h-2 w-2 shrink-0 sm:h-2.5 sm:w-2.5"
                   strokeWidth={2.2}
-                  style={{ color: isActive ? '#fff' : color }}
+                  style={{ color: isActive ? 'var(--color-surface)' : inkMix }}
                 />
               </span>
               {/* zoomed out to continental scale the names collide — dots only */}
