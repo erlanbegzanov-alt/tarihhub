@@ -1320,8 +1320,13 @@ export function BattleDuel({
                     <li key={option.id}>
                       <motion.button
                         type="button"
-                        onClick={() => choose(optionIndex)}
-                        disabled={revealed}
+                        // Not `disabled`: a focused button that becomes disabled drops focus
+                        // to <body>, and answering with the keyboard then meant tabbing from
+                        // the top of the page again. The handler refuses a second answer.
+                        onClick={() => {
+                          if (!(revealed)) choose(optionIndex)
+                        }}
+                        aria-disabled={revealed}
                         whileHover={canHover && !revealed ? { y: -2 } : undefined}
                         whileTap={revealed ? undefined : { scale: 0.99 }}
                         transition={springSoft}
