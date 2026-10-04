@@ -45,10 +45,27 @@ describe('the theme', () => {
     // NOT follow our theme — recolouring it would misrepresent someone else's
     // mark — so it is listed here rather than the rule being softened.
     const brandMarks = new Set(['screens/SignIn.tsx'])
+    // The shimmer sweeping across a rank badge is a specular highlight. A
+    // reflection is white because of how light works, not because of which
+    // theme is on, so it is listed rather than the rule being softened.
+    const speculars = new Set(['components/RankBadge.tsx', 'components/battle.tsx'])
     const offenders: string[] = []
     for (const file of files) {
       if (brandMarks.has(file.path)) continue
       for (const match of file.text.matchAll(/#[0-9a-fA-F]{6}\b/g)) {
+        offenders.push(`${file.path}: ${match[0]}`)
+      }
+      // Two forms this rule used to miss, both found in the wild. The map drew
+      // its active marker and its capital pills with `#fff` text on the era
+      // hue and an `rgba(255,255,255,0.24)` badge veil; the dark theme
+      // deliberately lightens every era colour, so fifteen of the twenty
+      // era-by-theme cases came out under 4.5:1 and five under 3. White is the
+      // easiest literal to write and the hardest to notice, because in the
+      // light theme it is exactly `--color-surface` and looks correct.
+      if (speculars.has(file.path)) continue
+      for (const match of file.text.matchAll(
+        /#[0-9a-fA-F]{3}\b|rgba?\(\s*255[\s,]+255[\s,]+255/g,
+      )) {
         offenders.push(`${file.path}: ${match[0]}`)
       }
     }
