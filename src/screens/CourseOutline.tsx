@@ -60,6 +60,14 @@ export function CourseOutline() {
         {orderedUnits.map((unit) => {
           // The unit's own era, not its position in the list. See units.ts.
           const accent = eraColor(unit.eraKey)
+          // The raw hue is for the 4px border and the filled circle, where it
+          // is a large block of colour. Anything small and read — the unit
+          // number, the lesson glyph — takes it mixed toward the ink, the same
+          // treatment MapScreen already gives era labels. 62% is the largest
+          // share of the hue at which all ten eras clear 4.5:1 against the
+          // surface in both themes; golden is the binding one, at 4.79 light.
+          // Raw, five of the nine unit numbers failed, golden worst at 2.42.
+          const accentInk = `color-mix(in srgb, ${accent} 62%, var(--color-ink))`
           const lessons = lessonsOfUnit(unit.id)
           const unitPassed = lessons.filter((lesson) =>
             profile.completedLessons.includes(lesson.id),
@@ -76,7 +84,7 @@ export function CourseOutline() {
                   <div className="min-w-0">
                     <p
                       className="text-[12.5px] font-bold tracking-wide"
-                      style={{ color: accent }}
+                      style={{ color: accentInk }}
                     >
                       {t(s.course.unitBefore)}
                       {unit.order}
@@ -136,21 +144,22 @@ export function CourseOutline() {
                             >
                               {passed ? (
                                 <Check
-                                  className="h-[18px] w-[18px] text-white"
+                                  className="h-[18px] w-[18px]"
                                   strokeWidth={2.6}
+                                  style={{ color: 'var(--color-surface)' }}
                                 />
                               ) : started ? (
                                 <Play
                                   className="h-4 w-4 translate-x-px"
                                   strokeWidth={2.4}
-                                  style={{ color: accent }}
+                                  style={{ color: accentInk }}
                                   fill="currentColor"
                                 />
                               ) : (
                                 <Sparkles
                                   className="h-[18px] w-[18px]"
                                   strokeWidth={2}
-                                  style={{ color: accent }}
+                                  style={{ color: accentInk }}
                                 />
                               )}
                             </span>
