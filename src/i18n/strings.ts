@@ -347,6 +347,16 @@ export const s = {
     /** Short level chip, e.g. "Дең. 23" / "Ур. 23". */
     levelShort: { kz: 'Дең.', ru: 'Ур.' },
     question: { kz: 'Сұрақ', ru: 'Вопрос' },
+    /**
+     * The countdown is drawn as an emptying ring, which a reader who cannot see
+     * it gets nothing from — and reading the digit on every tick would be
+     * twelve announcements per question, which is worse than silence. This
+     * fires once, when the last seconds begin. The number is wrapped so both
+     * languages keep their word order: kz "4 секунд қалды",
+     * ru "Осталось 4 секунды".
+     */
+    timeLowBefore: { kz: '', ru: 'Осталось ' },
+    timeLowAfter: { kz: ' секунд қалды', ru: ' секунды' },
     /** Shown while this player has finished but the opponent hasn't. */
     waiting: { kz: 'Қарсылас аяқтағанша күтудеміз…', ru: 'Ждём, пока соперник закончит…' },
 
