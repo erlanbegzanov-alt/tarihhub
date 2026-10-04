@@ -3,7 +3,7 @@ import { Check, ChevronRight, Play, Sparkles } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ProgressBar } from '../components/ui'
-import { eras } from '../data/eras'
+import { eraColor } from '../data/eras'
 import { allLessons, lessonsOfUnit } from '../data/lessons'
 import { units } from '../data/units'
 import { s } from '../i18n/strings'
@@ -11,12 +11,6 @@ import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
 import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { useProfile } from '../lib/progress'
-
-/**
- * Accent colours borrowed from the era palette by unit position. Purely
- * decorative — a unit is not claimed to belong to the era it borrows from.
- */
-const ACCENTS = Object.values(eras).map((era) => era.color)
 
 export function CourseOutline() {
   const { t } = useLang()
@@ -64,7 +58,8 @@ export function CourseOutline() {
       {/* ---------- units ---------- */}
       <div className="mt-7 flex flex-col gap-7 lg:mx-auto lg:max-w-4xl">
         {orderedUnits.map((unit) => {
-          const accent = ACCENTS[unit.order % ACCENTS.length]
+          // The unit's own era, not its position in the list. See units.ts.
+          const accent = eraColor(unit.eraKey)
           const lessons = lessonsOfUnit(unit.id)
           const unitPassed = lessons.filter((lesson) =>
             profile.completedLessons.includes(lesson.id),
