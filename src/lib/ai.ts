@@ -114,16 +114,7 @@ async function scriptedAnswer(
  * token. Sign-in is mandatory app-wide, so `auth.currentUser` is only ever
  * absent when Firebase itself isn't configured.
  */
-async function callGeminiProxy(
-  body: Record<string, unknown>,
-  /**
-   * Called with the answer so far, every time more of it arrives. The whole
-   * reply takes the same time either way — what changes is that the reader
-   * sees it being written instead of watching three dots and deciding the
-   * chat is broken.
-   */
-  onDelta?: (soFar: string) => void,
-): Promise<string> {
+async function callGeminiProxy(body: Record<string, unknown>): Promise<string> {
   const token = await auth?.currentUser?.getIdToken()
   if (!token) throw new Error('not-signed-in')
 
@@ -137,48 +128,10 @@ async function callGeminiProxy(
     throw new Error(`Gemini proxy error ${response.status}`)
   }
 
-  // Both shapes have to work. The proxy streams when the upstream lets it and
-  // answers with one JSON body when it cannot, and a deploy can briefly leave
-  // one side older than the other — the chat must not break in that window.
-  const contentType = response.headers.get('content-type') ?? ''
-  if (!contentType.includes('text/event-stream') || !response.body) {
-    const data = (await response.json()) as { text?: string }
-    const text = typeof data.text === 'string' ? data.text.trim() : ''
-    if (!text) throw new Error('Empty response from Gemini proxy')
-    return text
-  }
-
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let carry = ''
-  let text = ''
-  for (;;) {
-    const { value, done } = await reader.read()
-    if (done) break
-    carry += decoder.decode(value, { stream: true })
-    const lines = carry.split('\n')
-    // A chunk boundary can land inside an event, so the unfinished tail waits
-    // for the next read rather than being parsed and thrown away.
-    carry = lines.pop() ?? ''
-    for (const line of lines) {
-      if (!line.startsWith('data:')) continue
-      const payload = line.slice(5).trim()
-      if (!payload || payload === '[DONE]') continue
-      try {
-        const piece = (JSON.parse(payload) as { t?: string }).t
-        if (typeof piece === 'string' && piece) {
-          text += piece
-          onDelta?.(text)
-        }
-      } catch {
-        // Not a complete event yet; ignore and let the carry handle it.
-      }
-    }
-  }
-
-  const trimmed = text.trim()
-  if (!trimmed) throw new Error('Empty response from Gemini proxy')
-  return trimmed
+  const data = (await response.json()) as { text?: string }
+  const text = typeof data.text === 'string' ? data.text.trim() : ''
+  if (!text) throw new Error('Empty response from Gemini proxy')
+  return text
 }
 
 async function callGemini(
@@ -186,18 +139,14 @@ async function callGemini(
   history: ChatTurn[],
   question: string,
   lang: Lang,
-  onDelta?: (soFar: string) => void,
 ): Promise<string> {
-  return callGeminiProxy(
-    {
-      mode: 'persona',
-      personaId: persona.id,
-      lang,
-      history: history.slice(-10),
-      question,
-    },
-    onDelta,
-  )
+  return callGeminiProxy({
+    mode: 'persona',
+    personaId: persona.id,
+    lang,
+    history: history.slice(-10),
+    question,
+  })
 }
 
 /* ------------------------------------------------------------------ *
@@ -218,11 +167,9 @@ export async function askPersona(
   conversationHistory: ChatTurn[],
   question: string,
   lang: Lang,
-  /** Optional: the answer so far, as it is written. See `callGeminiProxy`. */
-  onDelta?: (soFar: string) => void,
 ): Promise<PersonaAnswer> {
   try {
-    const text = await callGemini(persona, conversationHistory, question, lang, onDelta)
+    const text = await callGemini(persona, conversationHistory, question, lang)
     return { text, engine: 'live' }
   } catch (error) {
     console.warn('[TarihHub] Falling back to scripted answers:', error)

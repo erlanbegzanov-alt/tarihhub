@@ -193,9 +193,6 @@ export function AIChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
-  // The answer as it is being written. Held apart from `messages` so a reply
-  // that fails halfway never lands in the transcript as if it were finished.
-  const [streamed, setStreamed] = useState('')
   // Neutral until the first reply actually lands — never claims a live
   // connection before one has really happened.
   const [liveMode, setLiveMode] = useState(false)
@@ -219,15 +216,11 @@ export function AIChat() {
     setMessages([])
     setInput('')
     setThinking(false)
-    setStreamed('')
   }, [personId, lang])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-    // The streamed text is a dependency here so the view follows the answer
-    // while it is being written. Without it the reader watches the first two
-    // lines and has to scroll by hand for the rest.
-  }, [messages, thinking, streamed])
+  }, [messages, thinking])
 
   const history = useMemo<ChatTurn[]>(
     () => messages.map(({ role, content }) => ({ role, content })),
@@ -252,15 +245,9 @@ export function AIChat() {
     setMessages((prev) => [...prev, userMessage])
     setInput('')
     setThinking(true)
-    setStreamed('')
 
-    const answer = await askPersona(person, history, text, lang, (soFar) => {
-      // Guarded the same way the final write is: a reader who switched persona
-      // mid-answer must not watch the previous one keep talking.
-      if (conversation === conversationRef.current) setStreamed(soFar)
-    })
+    const answer = await askPersona(person, history, text, lang)
     if (conversation !== conversationRef.current) return
-    setStreamed('')
 
     counter.current += 1
     setMessages((prev) => [
@@ -387,27 +374,7 @@ export function AIChat() {
             ))}
           </AnimatePresence>
 
-          {/* The answer as it is being written. The dots only stand in until the
-              first words land — a bubble that fills itself is the difference
-              between a slow chat and a chat the reader thinks is broken. */}
-          {thinking && streamed !== '' && (
-            <motion.li
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex justify-start"
-            >
-              <div className="max-w-[85%] rounded-t-2xl rounded-br-2xl bg-cream px-4 py-3.5">
-                <p
-                  className="text-[14.5px] leading-relaxed whitespace-pre-wrap"
-                  aria-live="polite"
-                >
-                  {streamed}
-                </p>
-              </div>
-            </motion.li>
-          )}
-
-          {thinking && streamed === '' && (
+          {thinking && (
             <motion.li
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
