@@ -1,19 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Lang, LocalizedText } from '../data/types'
-import { LANG_STORAGE_KEY, LanguageContext } from './context'
-
-function readStoredLang(): Lang {
-  if (typeof window === 'undefined') return 'kz'
-  const stored = window.localStorage.getItem(LANG_STORAGE_KEY)
-  return stored === 'ru' || stored === 'kz' ? stored : 'kz'
-}
+import { LanguageContext, readStoredLang, writeStoredLang } from './context'
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(readStoredLang)
 
   useEffect(() => {
-    window.localStorage.setItem(LANG_STORAGE_KEY, lang)
+    writeStoredLang(lang)
     document.documentElement.lang = lang === 'kz' ? 'kk' : 'ru'
   }, [lang])
 

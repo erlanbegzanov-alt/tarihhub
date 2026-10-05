@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'framer-motion'
 import { lazy, Suspense, useEffect } from 'react'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
@@ -148,7 +149,14 @@ function AnimatedRoutes() {
             path={route.path}
             element={
               <Page>
-                <Suspense fallback={<RouteFallback />}>{route.element}</Suspense>
+                {/* One boundary per route, not just one at the root: every
+                    screen here is `lazy()`, so a single chunk that fails to
+                    arrive would otherwise blank the whole app instead of the
+                    one screen. `Routes` is keyed on the path, so navigating
+                    away remounts this and clears a failed screen. */}
+                <ErrorBoundary where={`route:${route.path}`}>
+                  <Suspense fallback={<RouteFallback />}>{route.element}</Suspense>
+                </ErrorBoundary>
               </Page>
             }
           />

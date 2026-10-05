@@ -1101,6 +1101,25 @@ export const s = {
   },
 
   /** Google sign-in screen and the account row in the profile. */
+  // What a reader sees when a screen throws instead of rendering. Short on
+  // purpose: the one useful action is a reload, and a reader being shown this
+  // is already having a bad time.
+  error: {
+    screenTitle: { kz: 'Бұл бет ашылмады', ru: 'Этот экран не открылся' },
+    appTitle: { kz: 'Қолданба ашылмады', ru: 'Приложение не открылось' },
+    body: {
+      kz: 'Бірдеңе дұрыс кетті. Бетті жаңартып көріңіз — әдетте осы жетеді.',
+      ru: 'Что-то сломалось. Попробуйте обновить страницу — обычно этого достаточно.',
+    },
+    staleTitle: { kz: 'Жаңа нұсқа шықты', ru: 'Вышла новая версия' },
+    staleBody: {
+      kz: 'Бет өзі жаңарады, бір сәт…',
+      ru: 'Страница обновится сама, секунду…',
+    },
+    reload: { kz: 'Жаңарту', ru: 'Обновить' },
+    home: { kz: 'Басты бетке', ru: 'На главную' },
+  },
+
   auth: {
     title: { kz: 'TarihHub-қа кіру', ru: 'Вход в TarihHub' },
     subtitle: {
