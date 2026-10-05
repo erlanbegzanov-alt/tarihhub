@@ -21,7 +21,9 @@ import {
   getDoc,
   getDocs,
   query,
+  serverTimestamp,
   setDoc,
+  Timestamp,
   updateDoc,
   where,
   writeBatch,
@@ -219,6 +221,39 @@ d('firestore.rules', () => {
   /* ------------------------ battlePlayers ------------------------ */
 
   describe('battlePlayers/{uid}', () => {
+    /**
+     * A scoring write exactly as the app makes it.
+     *
+     * `applyRankedResult` sends `serverTimestamp()` for `scoredAt`, because the
+     * rules require that field to equal `request.time` on any write that gains
+     * rating or weekly XP. The anchor of the throttle is therefore not anything
+     * the client chose — which is the whole substance of the fix these tests
+     * cover.
+     */
+    const scoringWrite = (over: Record<string, unknown> = {}) =>
+      validBattlePlayer({ scoredAt: serverTimestamp(), ...over })
+
+    /**
+     * A stored row with its throttle anchor placed `anchorAgeMs` in the past.
+     * Written with the rules off: in nearly every test below it is the *second*
+     * write that is under examination.
+     */
+    const seedMirror = async (
+      over: Record<string, unknown> = {},
+      anchorAgeMs = 0,
+      uid = 'alice',
+    ) => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(
+          doc(ctx.firestore(), 'battlePlayers', uid),
+          validBattlePlayer({
+            scoredAt: Timestamp.fromMillis(Date.now() - anchorAgeMs),
+            ...over,
+          }),
+        )
+      })
+    }
+
     it('rejects a create that front-loads weekXp', async () => {
       const db = env.authenticatedContext('alice').firestore()
       await assertFails(
@@ -278,26 +313,185 @@ d('firestore.rules', () => {
       await env.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(
           doc(ctx.firestore(), 'battlePlayers/alice'),
-          validBattlePlayer({ weekXp: 100, updatedAt: now - 5000 }),
+          validBattlePlayer({ weekXp: 100, scoredAt: Timestamp.fromMillis(now - 5000) }),
         )
       })
       const db = env.authenticatedContext('alice').firestore()
-      // Within 60s of the last write → a scoring change is refused.
+      // Within 60s of the last *scoring* write → a scoring change is refused.
       await assertFails(
-        setDoc(doc(db, 'battlePlayers/alice'), validBattlePlayer({ weekXp: 300, updatedAt: now })),
+        setDoc(doc(db, 'battlePlayers/alice'), scoringWrite({ weekXp: 300 })),
       )
       // A delta over the per-write cap is refused even with time on its side.
       await env.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(
           doc(ctx.firestore(), 'battlePlayers/alice'),
-          validBattlePlayer({ weekXp: 100, updatedAt: now - 120_000 }),
+          validBattlePlayer({ weekXp: 100, scoredAt: Timestamp.fromMillis(now - 120_000) }),
         )
       })
       await assertFails(
         setDoc(
           doc(db, 'battlePlayers/alice'),
-          validBattlePlayer({ weekXp: 100 + 5000, updatedAt: now }),
+          scoringWrite({ weekXp: 100 + 5000 }),
         ),
+      )
+    })
+
+    it('refuses a scoring write whose anchor the client made up', async () => {
+      // Not only a backdated one: an honest `Date.now()` is refused just as
+      // flatly, because a client that may name the anchor may name a time a
+      // minute ago and clear its own throttle. That is precisely what the
+      // ruleset used to permit, by anchoring on `updatedAt` instead.
+      await seedMirror({ weekXp: 100 }, 120_000)
+      const db = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        setDoc(
+          doc(db, 'battlePlayers/alice'),
+          validBattlePlayer({ weekXp: 400, scoredAt: Date.now() }),
+        ),
+      )
+      await assertSucceeds(
+        setDoc(doc(db, 'battlePlayers/alice'), scoringWrite({ weekXp: 400 })),
+      )
+    })
+
+    it('closes the backdated-clock exploit: no second duel without the minute', async () => {
+      // The exploit the audit landed on. `updatedAt` may legitimately sit five
+      // minutes in the past — a school phone off NTP is an honest player — and
+      // the throttle was anchored to it against a threshold of one minute.
+      // 300000 > 60000, so there was no interval at all: one backdated write
+      // opened the next, and eleven in a row took weekXp from 0 to 6600 and
+      // rating from 0 to 220 with no waiting whatsoever.
+      await seedMirror({ weekXp: 100, rating: 100 }, 5_000)
+      const db = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        setDoc(
+          doc(db, 'battlePlayers/alice'),
+          scoringWrite({ weekXp: 700, rating: 118, updatedAt: Date.now() - 300_000 }),
+        ),
+      )
+    })
+
+    it('an identity refresh neither clears the throttle nor moves the anchor', async () => {
+      await seedMirror({ weekXp: 100, rating: 100 }, 5_000)
+      const db = env.authenticatedContext('alice').firestore()
+      // `syncBattlePlayer`'s real write: identity fields only, and it never
+      // mentions the anchor. Allowed however recent the last duel was — the
+      // whole reason the throttle needs its own field instead of `updatedAt`.
+      await assertSucceeds(
+        updateDoc(doc(db, 'battlePlayers/alice'), { level: 9, updatedAt: Date.now() }),
+      )
+      // It must not carry the anchor forward with it, though, or the ping
+      // becomes the way to clear the wait.
+      await assertFails(
+        updateDoc(doc(db, 'battlePlayers/alice'), { level: 10, scoredAt: serverTimestamp() }),
+      )
+      // And the duel that follows still has to serve its minute.
+      await assertFails(
+        setDoc(
+          doc(db, 'battlePlayers/alice'),
+          scoringWrite({ weekXp: 400, rating: 118, level: 9 }),
+        ),
+      )
+    })
+
+    it('lets a Monday start the week over, and keeps the rating gain', async () => {
+      // Each of the two audits found one half of this. `normalizeBattlePlayer`
+      // reads a row from last week as zero XP, so the first duel of a new week
+      // legitimately writes a *smaller* `weekXp` than the one stored — and the
+      // monotonic rule refused that write, taking the rating gain down with it
+      // because both travel in the same `setDoc`. Every Monday, in silence.
+      await seedMirror({ weekXp: 2000, rating: 300, weekStart: '2026-02-23' }, 120_000)
+      const db = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(
+        setDoc(
+          doc(db, 'battlePlayers/alice'),
+          scoringWrite({ weekXp: 300, rating: 318, weekStart: '2026-03-02' }),
+        ),
+      )
+      // The reset is not a door for a large number: the first write of a new
+      // week is still worth at most one duel.
+      await seedMirror({ weekXp: 2000, rating: 300, weekStart: '2026-02-23' }, 120_000)
+      await assertFails(
+        setDoc(
+          doc(db, 'battlePlayers/alice'),
+          scoringWrite({ weekXp: 5000, rating: 318, weekStart: '2026-03-02' }),
+        ),
+      )
+    })
+
+    it('will not let one write wipe a rating built over months', async () => {
+      // What a *failed* read used to look like on the wire: the client read
+      // "could not read" as "no row yet", wrote a zeroed baseline, and a real
+      // ladder was gone. `readBattlePlayer` no longer does that, and the rules
+      // no longer allow it either — belt and braces, because only one of the
+      // two can be deployed at a time.
+      await seedMirror({ weekXp: 100, rating: 300 }, 120_000)
+      const db = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        setDoc(doc(db, 'battlePlayers/alice'), scoringWrite({ rating: 0, weekXp: 100 })),
+      )
+      // A loss is still a loss: `RATING_LOSS` is 9.
+      await assertSucceeds(
+        setDoc(doc(db, 'battlePlayers/alice'), scoringWrite({ rating: 291, weekXp: 130 })),
+      )
+    })
+
+    it('holds an absolute ceiling, not only a per-write one', async () => {
+      // A per-write cap bounds one write; it does not bound a patient script.
+      await seedMirror({ weekXp: 35_900, rating: 4_995 }, 120_000)
+      const db = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        setDoc(
+          doc(db, 'battlePlayers/alice'),
+          scoringWrite({ weekXp: 36_400, rating: 4_995 }),
+        ),
+      )
+      await assertFails(
+        setDoc(
+          doc(db, 'battlePlayers/alice'),
+          scoringWrite({ weekXp: 35_900, rating: 5_013 }),
+        ),
+      )
+    })
+
+    it('does not let a first row name its own anchor', async () => {
+      // The zeroed baseline `syncBattlePlayer` writes for a player seen for the
+      // first time.
+      await assertSucceeds(
+        setDoc(
+          doc(env.authenticatedContext('alice').firestore(), 'battlePlayers/alice'),
+          validBattlePlayer(),
+        ),
+      )
+      // A create free to choose its anchor would be born with the throttle
+      // already cleared.
+      await assertFails(
+        setDoc(
+          doc(env.authenticatedContext('bob').firestore(), 'battlePlayers/bob'),
+          validBattlePlayer({ scoredAt: Date.now() - 600_000 }),
+        ),
+      )
+      // A genuine first duel, server-stamped, is fine.
+      await assertSucceeds(
+        setDoc(
+          doc(env.authenticatedContext('carol').firestore(), 'battlePlayers/carol'),
+          validBattlePlayer({ scoredAt: serverTimestamp(), weekXp: 300, rating: 18 }),
+        ),
+      )
+    })
+
+    it('is readable by any signed-in player, and by nobody else', async () => {
+      // The one rule in this collection no test touched. It is deliberately
+      // open to every signed-in user: that is how the weekly board draws ten
+      // other people's names, and how a duel screen draws the face across the
+      // board. What it must not be is open to the world — these rows carry a
+      // child's display name and photo.
+      await seedMirror({ weekXp: 100 })
+      await assertSucceeds(
+        getDoc(doc(env.authenticatedContext('bob').firestore(), 'battlePlayers/alice')),
+      )
+      await assertFails(
+        getDoc(doc(env.unauthenticatedContext().firestore(), 'battlePlayers/alice')),
       )
     })
   })
@@ -315,8 +509,11 @@ d('firestore.rules', () => {
       questionIds: ['q1', 'q2'],
       createdAt: 1_700_000_000_000,
       status: 'active',
-      p1: { xp: 0, doneAt: null },
-      p2: { xp: 0, doneAt: null },
+      // The shape `emptySlot()` actually writes. The fixture used to carry only
+      // `xp` and `doneAt`, which is a document the client never creates — and a
+      // fixture that is not the real shape cannot test the rules that bound it.
+      p1: { answers: [null, null], xp: 0, doneAt: null, lastSeenAt: 1_700_000_000_000 },
+      p2: { answers: [null, null], xp: 0, doneAt: null, lastSeenAt: 1_700_000_000_000 },
       ...over,
     })
 
@@ -329,8 +526,14 @@ d('firestore.rules', () => {
     it('lets a player score their own slot within the honest ceiling', async () => {
       await seed()
       const db = env.authenticatedContext('alice').firestore()
+      // Field paths, which is how `pushSlot` writes: the rest of the slot
+      // survives the write. Replacing the whole map, as this test used to, is
+      // something no code in the app does.
       await assertSucceeds(
-        updateDoc(doc(db, 'battleMatches/m1'), { p1: { xp: 594, doneAt: 1_700_000_100_000 } }),
+        updateDoc(doc(db, 'battleMatches/m1'), {
+          'p1.xp': 594,
+          'p1.doneAt': 1_700_000_100_000,
+        }),
       )
     })
 
@@ -340,10 +543,24 @@ d('firestore.rules', () => {
       await seed()
       const db = env.authenticatedContext('alice').firestore()
       await assertFails(
-        updateDoc(doc(db, 'battleMatches/m1'), { p1: { xp: 99_999, doneAt: 1_700_000_100_000 } }),
+        updateDoc(doc(db, 'battleMatches/m1'), {
+          'p1.xp': 99_999,
+          'p1.doneAt': 1_700_000_100_000,
+        }),
       )
       await assertFails(
-        updateDoc(doc(db, 'battleMatches/m1'), { p1: { xp: -50, doneAt: 1_700_000_100_000 } }),
+        updateDoc(doc(db, 'battleMatches/m1'), {
+          'p1.xp': -50,
+          'p1.doneAt': 1_700_000_100_000,
+        }),
+      )
+      // And the answer list cannot be used as a sack to stuff the document
+      // with: both clients re-read this document on every write either of them
+      // makes, so the cost of bloat here is billed to the opponent too.
+      await assertFails(
+        updateDoc(doc(db, 'battleMatches/m1'), {
+          'p1.answers': Array.from({ length: 400 }, () => null),
+        }),
       )
     })
 
@@ -351,7 +568,7 @@ d('firestore.rules', () => {
       await seed()
       const db = env.authenticatedContext('alice').firestore()
       await assertFails(
-        updateDoc(doc(db, 'battleMatches/m1'), { p2: { xp: 0, doneAt: 1_700_000_100_000 } }),
+        updateDoc(doc(db, 'battleMatches/m1'), { 'p2.doneAt': 1_700_000_100_000 }),
       )
     })
 
@@ -359,7 +576,46 @@ d('firestore.rules', () => {
       await seed()
       const db = env.authenticatedContext('mallory').firestore()
       await assertFails(getDoc(doc(db, 'battleMatches/m1')))
-      await assertFails(updateDoc(doc(db, 'battleMatches/m1'), { p1: { xp: 10, doneAt: null } }))
+      await assertFails(updateDoc(doc(db, 'battleMatches/m1'), { 'p1.xp': 10 }))
+    })
+
+    it('checks the shape of a match on the way in', async () => {
+      // This create rule had no test at all, and almost no conditions: two
+      // players, a status, two empty slots. Its keys, its types and its age all
+      // went unchecked — and a match is something anyone may create naming
+      // anybody else, because that is what matchmaking is. The shape is all
+      // there is to check.
+      const alice = env.authenticatedContext('alice').firestore()
+      const fresh = (over: Record<string, unknown> = {}) =>
+        liveMatch({ createdAt: Date.now(), ...over })
+      await assertSucceeds(setDoc(doc(alice, 'battleMatches/ok1'), fresh()))
+      // An unknown field, a wrong mode, a question list that is not one.
+      await assertFails(setDoc(doc(alice, 'battleMatches/bad1'), fresh({ winner: 'alice' })))
+      await assertFails(setDoc(doc(alice, 'battleMatches/bad2'), fresh({ mode: 'tournament' })))
+      await assertFails(setDoc(doc(alice, 'battleMatches/bad3'), fresh({ questionIds: [] })))
+      await assertFails(
+        setDoc(
+          doc(alice, 'battleMatches/bad4'),
+          fresh({ questionIds: Array.from({ length: 50 }, (_, i) => 'q' + i) }),
+        ),
+      )
+      // A match that claims to be from last year. Nobody is about to play it —
+      // staleness is what a planted match needs in order to sit and wait for
+      // the person it names to walk into it.
+      await assertFails(setDoc(doc(alice, 'battleMatches/bad5'), liveMatch()))
+      await assertFails(
+        setDoc(doc(alice, 'battleMatches/bad6'), fresh({ createdAt: Date.now() + 86_400_000 })),
+      )
+      // A slot that arrives already filled, or missing half of itself.
+      await assertFails(
+        setDoc(
+          doc(alice, 'battleMatches/bad7'),
+          fresh({ p1: { answers: [null, null], xp: 500, doneAt: null, lastSeenAt: Date.now() } }),
+        ),
+      )
+      await assertFails(
+        setDoc(doc(alice, 'battleMatches/bad8'), fresh({ p1: { xp: 0, doneAt: null } })),
+      )
     })
   })
 
@@ -423,6 +679,55 @@ d('firestore.rules', () => {
           matchId: 'm1',
           createdAt: 1_700_000_000_000,
         }),
+      )
+    })
+
+    it('lets a searching player sweep the queue, but only clear their own slot', async () => {
+      // Both halves went untested. The sweep has to work — there is no
+      // server-side matchmaker, so every client looks for its own opponent —
+      // and the delete has to be narrow, because an open one let any signed-in
+      // user empty the whole queue, and nobody would ever learn why they were
+      // never matched.
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        for (const uid of ['alice', 'bob']) {
+          await setDoc(doc(ctx.firestore(), 'battleQueue', uid), {
+            uid,
+            mode: 'ranked',
+            joinedAt: 1_700_000_000_000,
+          })
+        }
+      })
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(
+        getDocs(query(collection(alice, 'battleQueue'), where('mode', '==', 'ranked'))),
+      )
+      await assertFails(deleteDoc(doc(alice, 'battleQueue/bob')))
+      await assertSucceeds(deleteDoc(doc(alice, 'battleQueue/alice')))
+      await assertFails(
+        getDocs(collection(env.unauthenticatedContext().firestore(), 'battleQueue')),
+      )
+    })
+
+    it('lets the claimed player read their claim and clear it, and nobody else', async () => {
+      // A claim is the claimed player's inbox: they read it to learn which
+      // match to open, and they clear it when they are done. The claimer must
+      // not be able to take it back — doing so mid-duel would leave the other
+      // side matched against a document nobody owns.
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'battleClaims/bob'), {
+          claimedBy: 'alice',
+          matchId: 'm1',
+          createdAt: 1_700_000_000_000,
+        })
+      })
+      await assertSucceeds(
+        getDoc(doc(env.authenticatedContext('bob').firestore(), 'battleClaims/bob')),
+      )
+      await assertFails(
+        deleteDoc(doc(env.authenticatedContext('alice').firestore(), 'battleClaims/bob')),
+      )
+      await assertSucceeds(
+        deleteDoc(doc(env.authenticatedContext('bob').firestore(), 'battleClaims/bob')),
       )
     })
   })
@@ -532,7 +837,7 @@ d('firestore.rules', () => {
   describe('kahootSessions/{code}/players/{uid}', () => {
     const CODE = 'XYZ789'
 
-    async function seedSession() {
+    async function seedSession(over: Record<string, unknown> = {}) {
       await env.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(doc(ctx.firestore(), 'kahootSessions', CODE), {
           hostUid: 'teacher',
@@ -541,6 +846,7 @@ d('firestore.rules', () => {
           questionIndex: 0,
           startedAt: null,
           createdAt: 1_700_000_000_000,
+          ...over,
         })
       })
     }
@@ -621,6 +927,47 @@ d('firestore.rules', () => {
       await assertSucceeds(updateDoc(ref, { joinedAt: Date.now() }))
     })
 
+    it('holds a running total to the questions the host has opened', async () => {
+      // The rule allowed +1200 per write against an honest maximum of 66 — and
+      // a per-write cap is only ever a cap on how often someone writes, so
+      // twenty writes took the top of the class whatever the number was.
+      //
+      // 66, not 90: `KahootJoin` calls `answerXp` without a clock argument, so
+      // the speed bonus is clamped at the duel's twelve seconds rather than
+      // stretched over the room's twenty. The audit report had this at 90.
+      await seedSession()
+      await seedPlayer()
+      const alice = env.authenticatedContext('alice').firestore()
+      const ref = doc(alice, 'kahootSessions', CODE, 'players', 'alice')
+      // One question open, so one question's worth is the whole ceiling.
+      await assertSucceeds(updateDoc(ref, { score: 66 }))
+      await assertFails(updateDoc(ref, { score: 1200 }))
+      await assertFails(updateDoc(ref, { score: 140 }))
+      // The host moves the game on, and the ceiling moves with it — it is the
+      // one count in a live room a student cannot touch.
+      await seedSession({ questionIndex: 2 })
+      await assertSucceeds(updateDoc(ref, { score: 132 }))
+      await assertFails(updateDoc(ref, { score: 211 }))
+    })
+
+    it('is readable by the class, and removable by its owner or the host', async () => {
+      // The lobby and the leaderboard are this subcollection, read by everyone
+      // in the room — so the read is open to any signed-in user and the row
+      // carries only what the class is meant to see. The delete is the host
+      // removing someone who should not be there, or a student leaving.
+      await seedSession()
+      await seedPlayer()
+      const bob = env.authenticatedContext('bob').firestore()
+      await assertSucceeds(getDocs(collection(bob, 'kahootSessions', CODE, 'players')))
+      // A classmate cannot throw another student out of the game.
+      await assertFails(deleteDoc(doc(bob, 'kahootSessions', CODE, 'players', 'alice')))
+      const teacher = env.authenticatedContext('teacher').firestore()
+      await assertSucceeds(deleteDoc(doc(teacher, 'kahootSessions', CODE, 'players', 'alice')))
+      await seedPlayer()
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertSucceeds(deleteDoc(doc(alice, 'kahootSessions', CODE, 'players', 'alice')))
+    })
+
     it('lets nobody write another student row', async () => {
       await seedSession()
       await seedPlayer()
@@ -628,6 +975,132 @@ d('firestore.rules', () => {
       await assertFails(
         setDoc(doc(bob, 'kahootSessions', CODE, 'players', 'alice'), player({ score: 5000 })),
       )
+    })
+  })
+
+  /*
+   * Neither of these two had a single test, and one of them is the answer key:
+   * `kahootGames` stores the correct option for every question in a quiz. The
+   * coverage report put both collections' rules among the 22% of conditions the
+   * 1425-line suite never evaluated once.
+   */
+  describe('kahootGames/{gameId}', () => {
+    const GAME = 'GAME01'
+
+    async function seedGame() {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'kahootGames', GAME), {
+          hostUid: 'teacher',
+          title: 'Сақтар',
+          questions: [{ prompt: 'q', options: ['a', 'b', 'c', 'd'], correctIndex: 2 }],
+        })
+      })
+    }
+
+    it('keeps the answer key away from the students playing it', async () => {
+      await seedGame()
+      // A student in the teacher's own room still cannot read the quiz: the
+      // correct option for every question is in this document, and the host
+      // publishes only each question's public half into the room as it opens.
+      await assertFails(
+        getDoc(doc(env.authenticatedContext('alice').firestore(), 'kahootGames', GAME)),
+      )
+      await assertSucceeds(
+        getDoc(doc(env.authenticatedContext('teacher').firestore(), 'kahootGames', GAME)),
+      )
+    })
+
+    it('lets a teacher list only their own games', async () => {
+      await seedGame()
+      const teacher = env.authenticatedContext('teacher').firestore()
+      await assertSucceeds(
+        getDocs(query(collection(teacher, 'kahootGames'), where('hostUid', '==', 'teacher'))),
+      )
+      // The query behind "my games" is what the read rule is shaped around; a
+      // list that is not filtered to the caller is refused.
+      await assertFails(getDocs(collection(teacher, 'kahootGames')))
+      await assertFails(
+        getDocs(query(collection(teacher, 'kahootGames'), where('hostUid', '==', 'someone-else'))),
+      )
+    })
+
+    it('lets nobody author or edit a quiz in somebody else’s name', async () => {
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        setDoc(doc(alice, 'kahootGames', 'forged'), {
+          hostUid: 'teacher',
+          title: 'x',
+          questions: [],
+        }),
+      )
+      await assertSucceeds(
+        setDoc(doc(alice, 'kahootGames', 'mine'), {
+          hostUid: 'alice',
+          title: 'x',
+          questions: [],
+        }),
+      )
+      await seedGame()
+      await assertFails(updateDoc(doc(alice, 'kahootGames', GAME), { title: 'changed' }))
+      await assertFails(deleteDoc(doc(alice, 'kahootGames', GAME)))
+    })
+  })
+
+  describe('kahootSessions/{code} — the room document', () => {
+    const ROOM = 'ROOM01'
+
+    async function seedRoom() {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'kahootSessions', ROOM), {
+          hostUid: 'teacher',
+          gameId: 'g1',
+          questionIndex: 0,
+          createdAt: 1_700_000_000_000,
+        })
+      })
+    }
+
+    it('hands out one room by its code, never the whole list of them', async () => {
+      await seedRoom()
+      const alice = env.authenticatedContext('alice').firestore()
+      // A student fetches the code they were told, which is what `get` is.
+      await assertSucceeds(getDoc(doc(alice, 'kahootSessions', ROOM)))
+      // `read` is get plus list, and a list hands back every live code in the
+      // school at once — after which the players subcollection gives up each
+      // room's names and scores. Nothing in the app queries this collection.
+      await assertFails(getDocs(collection(alice, 'kahootSessions')))
+    })
+
+    it('lets a teacher open a room in their own name only', async () => {
+      const teacher = env.authenticatedContext('teacher').firestore()
+      await assertSucceeds(
+        setDoc(doc(teacher, 'kahootSessions', 'ROOM02'), {
+          hostUid: 'teacher',
+          gameId: 'g1',
+          questionIndex: 0,
+          createdAt: Date.now(),
+        }),
+      )
+      // Opening a room in someone else's name would hand the attacker the host
+      // seat for a code the real teacher is about to read out to the class.
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertFails(
+        setDoc(doc(alice, 'kahootSessions', 'ROOM03'), {
+          hostUid: 'teacher',
+          gameId: 'g1',
+          questionIndex: 0,
+          createdAt: Date.now(),
+        }),
+      )
+    })
+
+    it('lets only the host drive the room', async () => {
+      await seedRoom()
+      const alice = env.authenticatedContext('alice').firestore()
+      await assertFails(updateDoc(doc(alice, 'kahootSessions', ROOM), { questionIndex: 5 }))
+      await assertFails(deleteDoc(doc(alice, 'kahootSessions', ROOM)))
+      const teacher = env.authenticatedContext('teacher').firestore()
+      await assertSucceeds(updateDoc(doc(teacher, 'kahootSessions', ROOM), { questionIndex: 1 }))
     })
   })
 
@@ -889,6 +1362,22 @@ d('firestore.rules', () => {
       await assertFails(setDoc(doc(db, 'parties', PARTY), party({ size: 9 })))
       await assertFails(setDoc(doc(db, 'parties', 'k7pmx2'), party()))
       await assertFails(setDoc(doc(db, 'parties', PARTY), party({ status: 'queued' })))
+    })
+
+    it('is readable by a friend holding the code, but not by the world', async () => {
+      // An invited friend has to look the room up before they are in it, so
+      // this `get` is open to any signed-in user — and it is a `get`, not a
+      // `read`, so nobody can list every open room in the school.
+      await seedParty()
+      await assertSucceeds(
+        getDoc(doc(env.authenticatedContext('bob').firestore(), 'parties', PARTY)),
+      )
+      await assertFails(
+        getDocs(collection(env.authenticatedContext('bob').firestore(), 'parties')),
+      )
+      await assertFails(
+        getDoc(doc(env.unauthenticatedContext().firestore(), 'parties', PARTY)),
+      )
     })
 
     it('a friend with the code joins by appending only themselves', async () => {
@@ -1163,9 +1652,38 @@ d('firestore.rules', () => {
         await assertFails(
           setDoc(doc(bob, 'teamMatches', PARTY, 'players', 'alice'), run({ score: 90 })),
         )
+        // One answer's worth, for one answer. A run opening with points it has
+        // not answered for is the hole the invariant below closes, not the
+        // shape of an honest first write.
         await assertSucceeds(
-          setDoc(doc(bob, 'teamMatches', PARTY, 'players', 'bob'), run({ side: 'b', score: 90 })),
+          setDoc(
+            doc(bob, 'teamMatches', PARTY, 'players', 'bob'),
+            run({ side: 'b', score: 70, answered: 1 }),
+          ),
         )
+      })
+
+      it('cannot open a run on points it has not answered for', async () => {
+        // `validRun` bounded a score only against the *whole match* — 80 x the
+        // question count — and the per-write cap lives on the update branch
+        // alone. So both paths that may write a run from nothing, the first
+        // create and the reset into a newer match, could open with the maximum
+        // and take the game for their side in one write. The comment above the
+        // update rule asserted this was impossible.
+        await seedRoom()
+        await seedMatch()
+        const alice = env.authenticatedContext('alice').firestore()
+        const ref = doc(alice, 'teamMatches', PARTY, 'players', 'alice')
+        await assertFails(setDoc(ref, run({ score: 240, answered: 0 })))
+        await assertFails(setDoc(ref, run({ score: 160, answered: 1 })))
+        // The honest shapes: seated with nothing, or one answer paid for.
+        await assertSucceeds(setDoc(ref, run({ score: 0, answered: 0 })))
+        await assertSucceeds(setDoc(ref, run({ score: 75, answered: 1 })))
+        // And the same holds on the reset into a later match in the room.
+        const AGAIN = MATCH_AT + 60_000
+        await seedMatch({ startedAt: AGAIN })
+        await assertFails(setDoc(ref, run({ score: 240, answered: 0, startedAt: AGAIN })))
+        await assertSucceeds(setDoc(ref, run({ score: 0, answered: 0, startedAt: AGAIN })))
       })
 
       it('a score never goes down, and a finished run never un-finishes', async () => {
@@ -1287,7 +1805,7 @@ d('firestore.rules', () => {
         await env.withSecurityRulesDisabled(async (ctx) => {
           await setDoc(
             doc(ctx.firestore(), 'teamMatches', PARTY, 'players', 'alice'),
-            run({ score: 100, answered: 1 }),
+            run({ score: 0, answered: 2 }),
           )
         })
         const alice = env.authenticatedContext('alice').firestore()
@@ -1298,11 +1816,12 @@ d('firestore.rules', () => {
         // leave 240 only 60 above the new base and the test would pass on a
         // rule that was never checked.
         //
-        // 240 is inside the total ceiling, so only the per-write cap can
-        // refuse it — which is the point of having both.
-        await assertFails(at({ score: 240, answered: 2 }))
+        // 160 is inside both the total ceiling and the answers-paid-for
+        // invariant (three answers would allow 240), so the only rule left that
+        // can refuse it is the per-write cap — which is the point of this test.
+        await assertFails(at({ score: 160, answered: 3 }))
         // One more question's worth: the only write `recordMatchAnswer` makes.
-        await assertSucceeds(at({ score: 180, answered: 2 }))
+        await assertSucceeds(at({ score: 70, answered: 3 }))
       })
 
       it('a run cannot be deleted, and a stranger cannot read one', async () => {

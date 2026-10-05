@@ -615,20 +615,51 @@ export interface KahootJoinMeta {
   titleTierIndex: number
 }
 
-/** Writes this student's own row into the room. Returns success. */
+/**
+ * Writes this student's own row into the room. Returns success.
+ *
+ * On a row that already exists this touches only the identity fields and the
+ * join stamp, never `score` — the same shape `syncBattlePlayer` uses, and for
+ * the same reason. This also runs when a student *reloads* mid-game, and a full
+ * overwrite put `score: 0` back on the wire: the rules refuse a score that goes
+ * down, so the write was denied, the function returned false, and a student
+ * whose phone reloaded could not get back into the room they were already
+ * winning. The failure was a `console.warn` nobody would ever see.
+ */
 export async function joinSession(
   code: string,
   uid: string,
   meta: KahootJoinMeta,
 ): Promise<boolean> {
   if (!db) return false
+  const database = db
+  const displayName = meta.displayName.slice(0, 40)
+  const photoURL = safePhotoURL(meta.photoURL)
+  const ref = doc(database, 'kahootSessions', code, 'players', uid)
   try {
-    await setDoc(doc(db, 'kahootSessions', code, 'players', uid), {
+    const existing = await getDoc(ref)
+    if (existing.exists()) {
+      await updateDoc(ref, {
+        displayName,
+        photoURL,
+        joinedAt: Date.now(),
+        avatarGender: meta.avatarGender,
+        avatarTierIndex: meta.avatarTierIndex,
+        titleTierIndex: meta.titleTierIndex,
+      })
+      return true
+    }
+  } catch (error) {
+    console.warn('[tarihhub] Could not rejoin the kahoot room.', error)
+    return false
+  }
+  try {
+    await setDoc(ref, {
       uid,
       // This row renders to the whole class; cap the name (rules match this at
       // <= 40) and allow-list the photo the same way the battle mirror does.
-      displayName: meta.displayName.slice(0, 40),
-      photoURL: safePhotoURL(meta.photoURL),
+      displayName,
+      photoURL,
       score: 0,
       lastAnswerIndex: null,
       lastAnswerAt: null,

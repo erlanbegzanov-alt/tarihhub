@@ -33,6 +33,7 @@ import {
   orderBy,
   query,
   runTransaction,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -375,17 +376,40 @@ export interface BattlePlayerMeta {
   titleTierIndex: number
 }
 
-/** Reads one player's public mirror, or `null` when there isn't one yet. */
-export async function fetchBattlePlayer(uid: string): Promise<BattlePlayer | null> {
-  if (!db) return null
+/**
+ * One player's mirror, with the two failures kept apart: `player: null` is a
+ * player who has never had a row, `ok: false` is a read that did not happen.
+ *
+ * They are not the same thing, and treating them as one did real damage. The
+ * row carries a rating built over months, and the only way to add to it is to
+ * read it, add, and write the whole document back. So a read that *failed*,
+ * reported as "no row yet", became a zeroed baseline written over a real
+ * rating — a ladder gone, in one write, from a dropped connection.
+ */
+async function readBattlePlayer(
+  uid: string,
+): Promise<{ ok: true; player: BattlePlayer | null } | { ok: false }> {
+  if (!db) return { ok: false }
   try {
     const snapshot = await getDoc(doc(db, 'battlePlayers', uid))
-    if (!snapshot.exists()) return null
-    return normalizeBattlePlayer(uid, snapshot.data())
+    if (!snapshot.exists()) return { ok: true, player: null }
+    return { ok: true, player: normalizeBattlePlayer(uid, snapshot.data()) }
   } catch (error) {
     console.warn('[tarihhub] Could not read a battle player.', error)
-    return null
+    return { ok: false }
   }
+}
+
+/**
+ * Reads one player's public mirror, or `null` when there isn't one yet.
+ *
+ * For the screens that only *show* a rating, where a failed read and a missing
+ * row both mean "nothing to draw". Anything that intends to write the row back
+ * must use `readBattlePlayer` and respect its `ok`.
+ */
+export async function fetchBattlePlayer(uid: string): Promise<BattlePlayer | null> {
+  const read = await readBattlePlayer(uid)
+  return read.ok ? read.player : null
 }
 
 /**
@@ -495,8 +519,15 @@ export async function applyRankedResult(
   won: boolean,
 ): Promise<RatingChange | null> {
   if (!db) return null
-  const current = await fetchBattlePlayer(uid)
-  const next: BattlePlayer = {
+  const read = await readBattlePlayer(uid)
+  // A read that failed is not a player without a rating. Writing anyway is what
+  // put a zeroed baseline over a real ladder; there is nothing to add to if the
+  // number to add to never arrived, so this duel's result is dropped instead —
+  // visibly, since the result screen then shows no rating change rather than a
+  // wrong one.
+  if (!read.ok) return null
+  const current = read.player
+  const next = {
     uid,
     // Matches the `displayName.size() <= 40` cap in firestore.rules.
     displayName: meta.displayName.slice(0, 40),
@@ -507,11 +538,22 @@ export async function applyRankedResult(
     weekXp: (current?.weekXp ?? 0) + Math.max(0, Math.round(xpEarned)),
     weekStart: isoWeekStart(),
     updatedAt: Date.now(),
-    // Only a write that actually changes the score above touches this — see
-    // the field's own doc comment. `firestore.rules` throttles how often it
-    // may advance, which is what keeps this write worth at most one real
-    // duel's outcome per minute of real time, instead of an unlimited rate.
-    scoredAt: Date.now(),
+    // The server's stamp, not ours, and that is the entire point.
+    //
+    // `firestore.rules` requires this field to equal `request.time` on any
+    // write that gains rating or weekly XP, and then refuses the next such
+    // write until a minute of *real* time has passed. A client that could name
+    // this number could name one a minute in the past and clear its own
+    // throttle — which is exactly what used to be possible, because the rule
+    // anchored on `updatedAt` (a client clock, allowed five minutes of slack)
+    // and never read this field at all.
+    //
+    // A server stamp is also the one anchor a drifting phone clock cannot
+    // break, so the throttle does not need the generous window `updatedAt`
+    // needs. Nothing reads the value back — see `BattlePlayer.scoredAt` — so
+    // the sentinel written here never has to agree with the number that
+    // interface declares.
+    scoredAt: serverTimestamp(),
     avatarGender: meta.avatarGender,
     avatarTierIndex: meta.avatarTierIndex,
     titleTierIndex: meta.titleTierIndex,
