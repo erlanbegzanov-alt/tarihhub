@@ -81,7 +81,7 @@ export class ErrorBoundary extends Component<Props, State> {
       // served `must-revalidate`, so the fresh load asks for the current file
       // names. If a reload has already been tried in this tab, fall through to
       // the message rather than loop.
-      if (!reloadOnceForChunkError()) this.setState({ reloading: false })
+      if (!reloadOnceForChunkError(error)) this.setState({ reloading: false })
     }
   }
 

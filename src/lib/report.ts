@@ -62,7 +62,11 @@ function messageOf(error: unknown): string {
   if (error instanceof Error) return error.message
   if (typeof error === 'string') return error
   try {
-    return JSON.stringify(error)
+    // `JSON.stringify(undefined)` returns `undefined`, not a string — and
+    // `undefined` is exactly what `window.onerror` and a bare `reject()` hand
+    // over. Everything below this point treats the result as a string, and the
+    // callers are error handlers, which is the worst place in the app to throw.
+    return JSON.stringify(error) ?? String(error)
   } catch {
     return String(error)
   }
@@ -128,6 +132,18 @@ export function isChunkLoadError(error: unknown): boolean {
 const RELOADED_KEY = 'tarihhub_chunk_reload'
 
 /**
+ * The file name out of a chunk-load message, when the browser named one.
+ *
+ * Chrome and Firefox both put the full URL in the message; Safari does not.
+ * Exported only so a test can hold this regex to the real messages — nothing
+ * else should need it.
+ */
+export function failedUrlFrom(error: unknown): string | null {
+  const match = /https?:\/\/[^\s'")]+|\/assets\/[^\s'")]+/.exec(messageOf(error))
+  return match ? match[0] : null
+}
+
+/**
  * Reloads the page once after a missing-chunk failure, and only once.
  *
  * A reload is the actual cure: `index.html` is served with
@@ -140,7 +156,7 @@ const RELOADED_KEY = 'tarihhub_chunk_reload'
  * Returns true when a reload has been scheduled, so the caller can keep its
  * fallback UI quiet rather than flashing an error the reader will never read.
  */
-export function reloadOnceForChunkError(): boolean {
+export function reloadOnceForChunkError(error?: unknown): boolean {
   try {
     if (window.sessionStorage.getItem(RELOADED_KEY) === '1') return false
     window.sessionStorage.setItem(RELOADED_KEY, '1')
@@ -149,7 +165,41 @@ export function reloadOnceForChunkError(): boolean {
     // so the fallback UI (which offers a manual reload) is the better answer.
     return false
   }
-  window.location.reload()
+
+  const url = failedUrlFrom(error)
+  if (!url) {
+    window.location.reload()
+    return true
+  }
+
+  // One fetch of the file that failed, with the HTTP cache bypassed, before
+  // reloading.
+  //
+  // Vercel stamps everything under `/assets/` `immutable, max-age=31536000`,
+  // and that header lands on the 404 for a deleted file too — so a browser
+  // remembers "this file does not exist" for a year. Normally that is
+  // harmless, because the names in the next `index.html` are different ones.
+  // It stops being harmless on a revert: reverting the code reverts the
+  // content, the content hash comes back with it, and the file exists again at
+  // a name this browser has cached a 404 for. Without this, that reader would
+  // see the same unfixable white screen, now for the opposite reason.
+  //
+  // `cache: 'reload'` both bypasses the cache and *replaces* the stored entry
+  // with the fresh answer, which is what makes it the fix rather than a probe.
+  let reloaded = false
+  const go = () => {
+    if (reloaded) return
+    reloaded = true
+    window.location.reload()
+  }
+  // The reload must not depend on that request finishing: a hung connection
+  // would otherwise leave the reader on a dead screen for ever.
+  window.setTimeout(go, 1500)
+  void fetch(url, { cache: 'reload' })
+    .catch(() => {
+      /* 404 again, or offline — the eviction was the point, not the body */
+    })
+    .finally(go)
   return true
 }
 
