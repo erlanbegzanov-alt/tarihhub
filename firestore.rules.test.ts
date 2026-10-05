@@ -1132,6 +1132,22 @@ d('firestore.rules', () => {
       await assertSucceeds(updateDoc(doc(db, path('_shared')), { count: 2 }))
       await assertFails(updateDoc(doc(db, path('_shared')), { count: 999 }))
     })
+
+    it('spreads the shared ceiling over ten shards, and only those', async () => {
+      // The single shared document was the one place ordinary requests collided,
+      // and the limiter now refuses a request it cannot count rather than waving
+      // it through — so the contention had to go. `GLOBAL_SHARDS` in
+      // api/gemini.ts picks one of these ten at random per request.
+      const db = env.authenticatedContext('someone').firestore()
+      await assertSucceeds(setDoc(doc(db, path('_shared_7')), { count: 1, day: '2026-03-01' }))
+      await assertSucceeds(updateDoc(doc(db, path('_shared_7')), { count: 2 }))
+      await assertFails(updateDoc(doc(db, path('_shared_7')), { count: 40 }))
+      // Not a licence for any name starting with an underscore: everything
+      // outside the per-user and shard shapes is still nobody's to write.
+      await assertFails(setDoc(doc(db, path('_shared_x')), { count: 1, day: '2026-03-01' }))
+      await assertFails(setDoc(doc(db, path('_shared_12')), { count: 1, day: '2026-03-01' }))
+      await assertFails(setDoc(doc(db, path('_global')), { count: 1, day: '2026-03-01' }))
+    })
   })
 
   /* --------------------------- friends --------------------------- */

@@ -974,17 +974,27 @@ service cloud.firestore {
         && request.resource.data.count == resource.data.count + 1
         && request.resource.data.day == resource.data.day;
 
-      // Global circuit-breaker (`bucket == '_shared'`): any signed-in caller
-      // may push it up by one; nobody can pull it down. Worst case a malicious
-      // client inflates it and trips the day's global ceiling early — a mild
-      // griefing trade for metering a shared API key with no service account
-      // at all.
-      allow read: if request.auth != null && bucket == '_shared';
-      allow create: if request.auth != null && bucket == '_shared'
+      // Global circuit-breaker: any signed-in caller may push it up by one;
+      // nobody can pull it down. Worst case a malicious client inflates it and
+      // trips the day's global ceiling early — a mild griefing trade for
+      // metering a shared API key with no service account at all.
+      //
+      // Spread over ten documents (`_shared_0` … `_shared_9`, see
+      // `GLOBAL_SHARDS` in api/gemini.ts) because one document was the only
+      // place in the system where ordinary requests genuinely collided, and the
+      // limiter now refuses a request it cannot count instead of waving it
+      // through. The bare `_shared` stays allowed so the order of the two
+      // deploys cannot matter: whichever of the rules and the function lands
+      // first, the other name still works.
+      function isGlobalBucket() {
+        return bucket == '_shared' || bucket.matches('_shared_[0-9]');
+      }
+      allow read: if request.auth != null && isGlobalBucket();
+      allow create: if request.auth != null && isGlobalBucket()
         && request.resource.data.keys().hasOnly(['count', 'day'])
         && request.resource.data.count == 1
         && request.resource.data.day == day;
-      allow update: if request.auth != null && bucket == '_shared'
+      allow update: if request.auth != null && isGlobalBucket()
         && request.resource.data.keys().hasOnly(['count', 'day'])
         && request.resource.data.count == resource.data.count + 1
         && request.resource.data.day == resource.data.day;

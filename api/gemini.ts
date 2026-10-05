@@ -130,6 +130,35 @@ const DAILY_AI_LIMIT = 50
 /** Circuit breaker independent of any one user's cap — see `checkGlobalLimit`. */
 const GLOBAL_DAILY_LIMIT = 2000
 
+/**
+ * How many documents the day's shared ceiling is spread over.
+ *
+ * It used to be one. Every request in the system incremented that single
+ * document, and the metering below is read-then-write under an optimistic
+ * precondition — so the shared counter was the one place where requests
+ * genuinely collided, and the more the site is used the more they collide. That
+ * mattered little while a lost race ended in "allow anyway", because the cost
+ * was only an uncounted request; it matters a great deal now that a lost race
+ * ends in a refusal, which is the only honest answer when metering fails.
+ *
+ * Ten shards, a tenth of the ceiling each, chosen at random per request:
+ * collisions drop by the same factor, and the day's total stays 2000. The cost
+ * is that the ceiling is no longer exact — a reader can be refused while
+ * another shard still has room. At 2000 a day against real use of a few dozen,
+ * that ceiling is an abuse brake and never a routine limit, so inexactness
+ * there is free and the contention it removes is not.
+ */
+const GLOBAL_SHARDS = 10
+
+/** Each shard's own share of the day. */
+const GLOBAL_SHARD_LIMIT = Math.ceil(GLOBAL_DAILY_LIMIT / GLOBAL_SHARDS)
+
+/** One of `_shared_0` … `_shared_9`. Cannot collide with a uid: those are
+ *  28 alphanumeric characters and never begin with an underscore. */
+function globalShard(): string {
+  return `_shared_${Math.floor(Math.random() * GLOBAL_SHARDS)}`
+}
+
 let adminAppPromise: Promise<import('firebase-admin/app').App | null> | null = null
 
 function getAdminApp(): Promise<import('firebase-admin/app').App | null> {
@@ -147,7 +176,16 @@ function getAdminApp(): Promise<import('firebase-admin/app').App | null> {
       const serviceAccount = JSON.parse(raw)
       return getApps()[0] ?? initializeApp({ credential: cert(serviceAccount) })
     } catch (error) {
-      console.warn('[api/gemini] Could not initialise firebase-admin from FIREBASE_SERVICE_ACCOUNT_KEY.', error)
+      // The error itself is deliberately not logged, only its class. A
+      // `JSON.parse` failure quotes the text around the offending character in
+      // its own message — and that text is the private key. These logs are
+      // readable in the Vercel dashboard, and a malformed paste of this exact
+      // variable is how the key got into them once already.
+      console.warn(
+        '[api/gemini] Could not initialise firebase-admin from FIREBASE_SERVICE_ACCOUNT_KEY' +
+          ` (${error instanceof Error ? error.name : typeof error}).` +
+          ' Per-user limiting falls back to the REST path.',
+      )
       return null
     }
   })()
@@ -185,6 +223,17 @@ function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+/** Attempts before a refusal. Each one is a read and a write, so the wait a
+ *  reader can be made to sit through is bounded by this, not only the retries. */
+const MAX_METER_ATTEMPTS = 5
+
+/** 50ms, 100, 200, 400 — each with up to its own width of jitter on top, so two
+ *  requests that collided do not wake together and collide again. */
+function backOff(attempt: number): Promise<void> {
+  const base = 50 * 2 ** (attempt - 1)
+  return new Promise((resolve) => setTimeout(resolve, base + Math.random() * base))
+}
+
 /**
  * Reads `aiUsage/<bucket>/days/<today>` and, if still under `limit`, writes it
  * back one higher under an optimistic-concurrency precondition (retrying on a
@@ -192,7 +241,7 @@ function today(): string {
  * tell from here" — no project id, no token, or the REST call itself failed —
  * which the caller resolves against `ALLOW_UNMETERED_AI`, then fails closed.
  */
-async function restCheckAndIncrement(
+export async function restCheckAndIncrement(
   bucket: string,
   idToken: string,
   limit: number,
@@ -202,7 +251,12 @@ async function restCheckAndIncrement(
   const url = `${FIRESTORE_DOCS_BASE}/aiUsage/${encodeURIComponent(bucket)}/days/${day}`
   const auth = { authorization: `Bearer ${idToken}` }
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < MAX_METER_ATTEMPTS; attempt++) {
+    // Not an immediate retry. Two requests that collide once will collide again
+    // at once, and a tight loop between them is how a small burst becomes a
+    // storm: each party re-reads the value the other is about to overwrite. A
+    // short randomised wait is what lets them land one after the other.
+    if (attempt > 0) await backOff(attempt)
     let count = 0
     let updateTime: string | null = null
     try {
@@ -259,9 +313,19 @@ async function restCheckAndIncrement(
       return null
     }
   }
-  // Lost the race three times running: allow this one rather than 500 the
-  // feature — the same transient-failure trade the admin path makes.
-  return true
+  // Out of attempts. This now refuses.
+  //
+  // It used to allow, "rather than 500 the feature", and that reasoning holds
+  // for *one* request — it does not hold for the shape that actually occurs. A
+  // burst of concurrent requests makes every one of them lose its race, so a
+  // burst was precisely the case in which the cap stopped applying at all: the
+  // counter moved by a handful while the number of answered requests moved by
+  // the size of the burst. The one thing this limiter exists to prevent.
+  //
+  // So: degrade, do not disable. The caller sees a 429 and can try again in a
+  // moment — a worse minute for one reader, and a far better day for a shared
+  // paid key than an unmetered burst.
+  return false
 }
 
 /**
@@ -289,8 +353,21 @@ async function checkDailyLimit(uid: string, idToken: string): Promise<boolean> {
       return true
     })
   } catch (error) {
-    console.warn('[api/gemini] Rate-limit check failed; allowing the request.', error)
-    return true
+    // Not "allow". This is the exact shape of the outage of 2026-10-01: the
+    // service-account key was present but no longer working, every transaction
+    // threw, and this line waved through every request to a shared paid key
+    // without counting one of them.
+    //
+    // There are two independent ways to reach the counter — the admin SDK over
+    // gRPC with a service account, and plain REST with the caller's own ID
+    // token. They fail for different reasons, so the right answer when one
+    // throws is the other, exactly as when the key is missing entirely.
+    console.warn(
+      '[api/gemini] The admin rate-limit check failed; falling back to the REST limiter.',
+      error,
+    )
+    const viaRest = await restCheckAndIncrement(uid, idToken, DAILY_AI_LIMIT)
+    return viaRest ?? process.env.ALLOW_UNMETERED_AI === '1'
   }
 }
 
@@ -305,7 +382,7 @@ async function checkDailyLimit(uid: string, idToken: string): Promise<boolean> {
 async function checkGlobalLimit(idToken: string): Promise<boolean> {
   const app = await getAdminApp()
   if (!app) {
-    const viaRest = await restCheckAndIncrement('_shared', idToken, GLOBAL_DAILY_LIMIT)
+    const viaRest = await restCheckAndIncrement(globalShard(), idToken, GLOBAL_SHARD_LIMIT)
     return viaRest ?? process.env.ALLOW_UNMETERED_AI === '1'
   }
   try {
@@ -321,8 +398,13 @@ async function checkGlobalLimit(idToken: string): Promise<boolean> {
       return true
     })
   } catch (error) {
-    console.warn('[api/gemini] Global rate-limit check failed; allowing the request.', error)
-    return true
+    // Same as the per-user path above: the other ladder, not an open door.
+    console.warn(
+      '[api/gemini] The admin global check failed; falling back to the REST limiter.',
+      error,
+    )
+    const viaRest = await restCheckAndIncrement(globalShard(), idToken, GLOBAL_SHARD_LIMIT)
+    return viaRest ?? process.env.ALLOW_UNMETERED_AI === '1'
   }
 }
 
