@@ -44,7 +44,11 @@ import { people } from '../src/data/people.js'
 import type { Lang, Person } from '../src/data/types.js'
 
 const MODEL = 'gemini-3.5-flash-lite'
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
+// `streamGenerateContent`, not `generateContent`. The whole answer took the
+// same time either way, but the student watched three dots for all of it and
+// reported the chat as broken rather than slow. `alt=sse` asks Google for
+// server-sent events instead of one buffered JSON body.
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse`
 
 const MAX_HISTORY = 12
 const MAX_TEXT_LENGTH = 4000
@@ -637,29 +641,104 @@ export default {
         return new Response('Upstream error', { status: 502 })
       }
 
-      const data = (await geminiResponse.json()) as GeminiResponse
-      const text = (data.candidates?.[0]?.content?.parts ?? [])
-        .map((part) => part.text)
-        .filter((part): part is string => Boolean(part))
-        .join('\n')
-        .trim()
+      const reader = geminiResponse.body?.getReader()
+      if (!reader) {
+        console.warn(`[api/gemini] upstream gave no body (${body.mode})`)
+        return new Response('Upstream error', { status: 502 })
+      }
 
-      if (!text) {
-        // A 200 with no usable text is almost always a safety block or a
-        // truncated-at-zero candidate. Return it as the failure it is (the
-        // client falls back either way) and log the reason so a recurring
-        // block is visible rather than silent.
-        const reason =
-          data.candidates?.[0]?.finishReason ??
-          data.promptFeedback?.blockReason ??
-          'no candidates'
-        console.warn(`[api/gemini] empty completion (${body.mode}), reason: ${reason}`)
+      const decoder = new TextDecoder()
+      let carry = ''
+      let blockReason = ''
+
+      /**
+       * Read one network chunk and return every complete text piece in it.
+       *
+       * Google's SSE is one `data: {json}` per line with blank lines between
+       * events, and a chunk boundary can land anywhere — including inside a
+       * JSON object — so the unfinished tail is carried to the next read
+       * rather than parsed and dropped.
+       */
+      const pump = async (): Promise<{ pieces: string[]; done: boolean }> => {
+        const { value, done } = await reader.read()
+        if (done) return { pieces: [], done: true }
+        carry += decoder.decode(value, { stream: true })
+        const lines = carry.split('\n')
+        carry = lines.pop() ?? ''
+        const pieces: string[] = []
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          if (!payload || payload === '[DONE]') continue
+          try {
+            const parsed = JSON.parse(payload) as GeminiResponse
+            blockReason =
+              parsed.candidates?.[0]?.finishReason ??
+              parsed.promptFeedback?.blockReason ??
+              blockReason
+            for (const part of parsed.candidates?.[0]?.content?.parts ?? []) {
+              if (typeof part.text === 'string' && part.text) pieces.push(part.text)
+            }
+          } catch {
+            // A half-written event. The carry picks it up on the next read.
+          }
+        }
+        return { pieces, done: false }
+      }
+
+      // Nothing is sent to the client until the first real text arrives. That
+      // is what keeps the old contract intact: a safety block or an empty
+      // candidate is still an honest non-200, so `src/lib/ai.ts` falls back to
+      // the scripted answer exactly as before. Once a status is written it can
+      // never be taken back, which is the trap in streaming an upstream that
+      // may yet refuse.
+      const first: string[] = []
+      let upstreamDone = false
+      while (first.length === 0 && !upstreamDone) {
+        const step = await pump()
+        first.push(...step.pieces)
+        upstreamDone = step.done
+      }
+
+      if (first.length === 0) {
+        console.warn(
+          `[api/gemini] empty completion (${body.mode}), reason: ${blockReason || 'no candidates'}`,
+        )
         return new Response('Empty completion', { status: 502 })
       }
 
-      return new Response(JSON.stringify({ text }), {
+      const encoder = new TextEncoder()
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          const send = (piece: string) =>
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: piece })}\n\n`))
+          try {
+            for (const piece of first) send(piece)
+            while (!upstreamDone) {
+              const step = await pump()
+              for (const piece of step.pieces) send(piece)
+              upstreamDone = step.done
+            }
+          } catch (error) {
+            // The answer is already part-written on screen, so there is no
+            // status left to change — close cleanly and let the client keep
+            // what it has rather than blanking it.
+            console.warn(`[api/gemini] stream broke mid-answer (${body.mode}):`, error)
+          } finally {
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+            controller.close()
+          }
+        },
+      })
+
+      return new Response(stream, {
         status: 200,
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          'content-type': 'text/event-stream; charset=utf-8',
+          // no-transform matters: a proxy that buffers to "optimise" would
+          // undo the whole point and hand the student one lump at the end.
+          'cache-control': 'no-cache, no-transform',
+        },
       })
     } catch (error) {
       console.warn(`[api/gemini] upstream call failed (${body.mode}):`, error)
