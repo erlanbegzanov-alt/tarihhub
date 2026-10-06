@@ -121,6 +121,28 @@ export interface KahootLiveQuestion {
   options: string[]
 }
 
+/**
+ * One line of the board as the host publishes it.
+ *
+ * Deliberately narrower than `KahootPlayer`: exactly the six fields the two
+ * row components draw, and nothing a student has no business reading. Every
+ * student's client re-reads the room document on every move the host makes, so
+ * what lives here costs no extra reads — which is the entire point of putting
+ * it here (see `board` below).
+ */
+export interface KahootBoardRow {
+  uid: string
+  displayName: string
+  photoURL: string
+  score: number
+  avatarGender: AvatarGender | null
+  avatarTierIndex: number
+}
+
+/** Enough for any class, and a bound so the room document cannot grow without
+ *  one. A room with more players than this shows the top `MAX_BOARD_ROWS`. */
+export const MAX_BOARD_ROWS = 60
+
 export interface KahootSession {
   /** Doc id — the join code itself. */
   code: string
@@ -133,6 +155,25 @@ export interface KahootSession {
   /** Set by the host only on the way into `reveal`; `null` at every other time. */
   revealedCorrectIndex: number | null
   totalQuestions: number
+  /**
+   * The scoreboard, written by the host into this one document.
+   *
+   * It exists for a quota reason, not a product one. Every student used to
+   * hold an `onSnapshot` over the whole `players` subcollection, and in a
+   * class of thirty each student writes twice per question — so one question
+   * cost roughly 60 writes x 31 listeners = 1,860 reads, and a ten-question
+   * game around 18,000. The free tier is 50,000 reads a day *for the whole
+   * project*, so two or three lessons took the entire site down until
+   * midnight: no duels, no progress saving, nothing, for everyone.
+   *
+   * Written on the way into each question and at the end, never on the reveal
+   * itself — at reveal the students have not pushed their new scores yet, so a
+   * board published there would be a question stale in a way nobody could see.
+   * Published one move later it is simply a question behind for *other*
+   * people's rows, while the reader's own score is their own local number and
+   * always current.
+   */
+  board: KahootBoardRow[]
   createdAt: number
   /**
    * Stamped by the host the instant it opens a question, so every client
@@ -307,6 +348,50 @@ function normalizeLiveQuestion(value: unknown): KahootLiveQuestion | null {
   }
 }
 
+/**
+ * Coerces the published board. Hostile input is not the worry here — only the
+ * host may write the room document — but a client on an older bundle, a room
+ * from before this field existed, and a half-written array all are.
+ */
+function normalizeBoard(value: unknown): KahootBoardRow[] {
+  if (!Array.isArray(value)) return []
+  return value.slice(0, MAX_BOARD_ROWS).map((entry) => {
+    const row = (entry ?? {}) as Record<string, unknown>
+    return {
+      uid: stringOr(row.uid, ''),
+      displayName: stringOr(row.displayName, '').slice(0, 40),
+      photoURL: stringOr(row.photoURL, ''),
+      score: Math.max(0, Math.round(numberOr(row.score, 0))),
+      avatarGender:
+        row.avatarGender === 'm' || row.avatarGender === 'f' ? row.avatarGender : null,
+      // Upper-bounded, not merely floored: an index past the end of the rank
+      // art is what used to crash a board for everyone looking at it.
+      avatarTierIndex: Math.max(
+        0,
+        Math.min(OWNER_TIER_INDEX, Math.round(numberOr(row.avatarTierIndex, 0))),
+      ),
+    }
+  })
+}
+
+/**
+ * The board as the host publishes it: ranked, bounded, and projected down to
+ * the six fields the rows draw.
+ */
+export function boardFrom(players: KahootPlayer[]): KahootBoardRow[] {
+  return [...players]
+    .sort(byScore)
+    .slice(0, MAX_BOARD_ROWS)
+    .map((player) => ({
+      uid: player.uid,
+      displayName: player.displayName,
+      photoURL: player.photoURL,
+      score: player.score,
+      avatarGender: player.avatarGender,
+      avatarTierIndex: player.avatarTierIndex,
+    }))
+}
+
 function normalizeSession(code: string, value: unknown): KahootSession | null {
   const data = (value ?? {}) as Record<string, unknown>
   const hostUid = stringOr(data.hostUid, '')
@@ -322,6 +407,7 @@ function normalizeSession(code: string, value: unknown): KahootSession | null {
     currentQuestion: normalizeLiveQuestion(data.currentQuestion),
     revealedCorrectIndex: nullableNumber(data.revealedCorrectIndex),
     totalQuestions: Math.max(0, Math.round(numberOr(data.totalQuestions, 0))),
+    board: normalizeBoard(data.board),
     createdAt: numberOr(data.createdAt, 0),
     questionStartedAt: nullableNumber(data.questionStartedAt),
   }
@@ -480,15 +566,29 @@ export async function createSession(game: KahootGame): Promise<string | null> {
   return null
 }
 
-export async function fetchSession(code: string): Promise<KahootSession | null> {
-  if (!db) return null
+/**
+ * The answer to "is there a room on this code", with the two failures kept
+ * apart: `session: null` is no such room, `ok: false` is a read that did not
+ * happen.
+ *
+ * All three callers used to receive `null` for both, and all three said
+ * something untrue because of it. A student on bad wifi was told the code was
+ * wrong and retyped a correct one. And the teacher's own screen, on a reload,
+ * read "no room" as "my room is gone", forgot the code and opened a **second**
+ * room — leaving the whole class sitting in the first one, which nobody was
+ * driving any more. One transient read split the lesson in half.
+ */
+export type SessionRead = { ok: true; session: KahootSession | null } | { ok: false }
+
+export async function fetchSession(code: string): Promise<SessionRead> {
+  if (!db) return { ok: false }
   try {
     const snapshot = await getDoc(doc(db, 'kahootSessions', code))
-    if (!snapshot.exists()) return null
-    return normalizeSession(snapshot.id, snapshot.data())
+    if (!snapshot.exists()) return { ok: true, session: null }
+    return { ok: true, session: normalizeSession(snapshot.id, snapshot.data()) }
   } catch (error) {
     console.warn('[tarihhub] Could not read the kahoot room.', error)
-    return null
+    return { ok: false }
   }
 }
 
@@ -540,12 +640,17 @@ export async function openQuestion(
   code: string,
   question: KahootQuestion,
   index: number,
+  players: KahootPlayer[],
 ): Promise<void> {
   if (!db) return
   try {
     await updateDoc(doc(db, 'kahootSessions', code), {
       status: 'question',
       questionIndex: index,
+      // Rides on a write the students already read. By now everyone has pushed
+      // their score for the question that just closed, which is why the board
+      // travels with the *next* question rather than with the reveal.
+      board: boardFrom(players),
       currentQuestion: {
         text: question.text,
         photoURL: question.photoURL,
@@ -574,12 +679,15 @@ export async function revealAnswer(code: string, correctIndex: number): Promise<
 }
 
 /** Ends the game. The players subcollection stays, so the board is still there. */
-export async function finishSession(code: string): Promise<void> {
+export async function finishSession(code: string, players: KahootPlayer[]): Promise<void> {
   if (!db) return
   try {
     await updateDoc(doc(db, 'kahootSessions', code), {
       status: 'done',
       currentQuestion: null,
+      // The final board, and the one that matters: the teacher presses on
+      // after the last reveal, so every score has landed by now.
+      board: boardFrom(players),
     })
   } catch (error) {
     console.warn('[tarihhub] Could not finish the kahoot game.', error)

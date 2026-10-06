@@ -40,8 +40,14 @@ export function KahootStudent() {
     }
     setChecking(true)
     setJoinError(null)
-    const room = await fetchSession(code)
+    const read = await fetchSession(code)
     setChecking(false)
+    if (!read.ok) {
+      // "Try again", not "no such game" — the code may well be correct.
+      setJoinError(t(s.kahoot.joinFailed))
+      return
+    }
+    const room = read.session
     if (!room) {
       setJoinError(t(s.kahoot.joinNotFound))
       return

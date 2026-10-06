@@ -95,7 +95,16 @@ export function KahootJoin() {
     if (!uid || !user || !code || joinedRef.current) return
     joinedRef.current = true
     void (async () => {
-      const target = await fetchSession(code)
+      const read = await fetchSession(code)
+      if (!read.ok) {
+        // Not "wrong code": the room could not be read at all. Saying so is
+        // the difference between a student retrying and a student retyping a
+        // code that was right the first time.
+        joinedRef.current = false
+        setBlocked('failed')
+        return
+      }
+      const target = read.session
       if (!target) {
         setBlocked('notFound')
         return
@@ -128,12 +137,29 @@ export function KahootJoin() {
       // failed — say so plainly instead of showing an empty screen.
       if (!next) setBlocked('gone')
     })
-    const stopPlayers = watchPlayers(code, setPlayers)
-    return () => {
-      stopRoom()
-      stopPlayers()
-    }
+    return stopRoom
   }, [code, joined])
+
+  /**
+   * The roster, and only in the lobby.
+   *
+   * This listener used to run for the whole game, on every student's phone, over
+   * the *entire* players collection — and each student writes twice per
+   * question. Thirty students made one question cost about 1,860 reads and a
+   * ten-question game about 18,000, against a free tier of 50,000 a day for the
+   * whole project: two or three lessons and the site stopped saving anything
+   * for anybody until midnight.
+   *
+   * In the lobby it is bounded — one write per student, once — and it is what
+   * makes the room fill up in front of you, so it stays. The moment the teacher
+   * starts the game it detaches, and everything after that is drawn from the
+   * board the host publishes into the room document (`KahootSession.board`),
+   * which this screen is already reading on every move.
+   */
+  useEffect(() => {
+    if (!code || !joined || room?.status !== 'lobby') return
+    return watchPlayers(code, setPlayers)
+  }, [code, joined, room?.status])
 
   /* ------------------------------- playing ------------------------------- */
 
@@ -207,8 +233,12 @@ export function KahootJoin() {
 
   /* ------------------------------- render ------------------------------- */
 
-  const me = players.find((player) => player.uid === uid) ?? null
-  const place = me ? players.indexOf(me) + 1 : 0
+  // Ranked by the host, in the room document. A reader's own score is their
+  // own local number and always current; only everyone else's row — and so the
+  // place — is a question behind, which is the trade that keeps a classroom
+  // inside the day's free reads.
+  const board = room?.board ?? []
+  const place = board.findIndex((row) => row.uid === uid) + 1
   const question = room?.currentQuestion ?? null
   const ready = isFirebaseReady && Boolean(uid)
 
@@ -426,9 +456,9 @@ export function KahootJoin() {
                 </div>
               </div>
 
-              {players.length > 0 && (
+              {board.length > 0 && (
                 <div className="mt-4">
-                  <PlayerBoard players={players} myUid={uid} />
+                  <PlayerBoard players={board} myUid={uid} />
                 </div>
               )}
 
