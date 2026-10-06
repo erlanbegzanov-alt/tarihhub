@@ -10,7 +10,7 @@ import type { AvatarGender } from '../data/ranks'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { cn } from '../lib/cn'
-import type { KahootPlayer } from '../lib/kahoot'
+import type { KahootBoardRow, KahootPlayer } from '../lib/kahoot'
 import { canHover, springSoft, staggerItem } from '../lib/motion'
 import { rankTitleText } from '../lib/rankIdentity'
 import { RankBadge } from './RankBadge'
@@ -191,7 +191,10 @@ export function PlayerBoard({
   players,
   myUid,
 }: {
-  players: KahootPlayer[]
+  // The six fields a row draws, so this renders both a live `KahootPlayer[]`
+  // (the host, which holds the whole collection) and the board the host
+  // publishes for the students (see `KahootBoardRow`).
+  players: KahootBoardRow[]
   myUid: string | null
 }) {
   const { t } = useLang()

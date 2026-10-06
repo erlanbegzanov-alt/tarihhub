@@ -143,7 +143,17 @@ export function KahootHost() {
     void (async () => {
       const remembered = recallCode(game.id)
       if (remembered) {
-        const existing = await fetchSession(remembered)
+        const read = await fetchSession(remembered)
+        // A read that failed is not a room that is gone. Opening a second room
+        // here is how a class gets left behind in the first one, with nobody
+        // advancing the questions and no way for anyone to tell why — so a
+        // failed read stops the screen instead, and the teacher's retry finds
+        // the same room still waiting.
+        if (!read.ok) {
+          setFailed(true)
+          return
+        }
+        const existing = read.session
         if (existing && existing.hostUid === uid && existing.status !== 'done') {
           setCode(remembered)
           return
@@ -187,11 +197,13 @@ export function KahootHost() {
   const advance = () => {
     if (!game || !room || !code) return
     const next = room.questionIndex + 1
+    // The host's own listener over the players collection is the only one left
+    // in the room, and it is what feeds the published board.
     if (next >= game.questions.length) {
-      void finishSession(code)
+      void finishSession(code, players)
       return
     }
-    void openQuestion(code, game.questions[next], next)
+    void openQuestion(code, game.questions[next], next, players)
   }
 
   const close = () => {
@@ -274,7 +286,7 @@ export function KahootHost() {
               </p>
 
               <HostButton label={t(s.kahoot.start)} onClick={() => {
-                if (game) void openQuestion(code, game.questions[0], 0)
+                if (game) void openQuestion(code, game.questions[0], 0, players)
               }} />
             </div>
           )}
