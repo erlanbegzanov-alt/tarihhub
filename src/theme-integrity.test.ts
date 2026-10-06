@@ -100,7 +100,37 @@ describe('the theme', () => {
     expect(offenders).toEqual([])
   })
 
-  // A fourth rule belongs here — "every colour token declared in the light
+  it('asks framer-motion to honour the reader before anything renders', () => {
+    // This rule is text matching, and it can only prove the declaration is
+    // present — not that it works. It is here because the thing it guards is
+    // one line in one file that nothing else would miss if it were deleted,
+    // and because the stylesheet looks like it already covers the case: the
+    // `prefers-reduced-motion` block overrides CSS animation and transition
+    // durations, while framer-motion writes `transform` into the inline style
+    // from JS, which that block cannot touch. The next person to read
+    // index.css will reasonably conclude the app is already covered.
+    const root = files.find((file) => file.path === 'App.tsx')
+    expect(root, 'App.tsx is where the provider belongs').toBeDefined()
+    expect(root?.text).toContain('<MotionConfig reducedMotion="user">')
+  })
+
+  it('never takes focus away from a reader who has just answered', () => {
+    // Five screens disabled every answer button the moment one was picked.
+    // A focused element that becomes disabled drops focus to <body>, so the
+    // next Tab starts at the top of the document — in the duel that happened
+    // under a twelve-second clock, which makes it a lock-out rather than an
+    // inconvenience. `aria-disabled` is the replacement: still announced,
+    // still focusable, and every one of those handlers already refuses a
+    // second answer.
+    const offenders = files
+      // The lookbehind matters: without it this also matches `aria-disabled`,
+      // so the rule would flag the very fix it exists to protect.
+      .filter((file) => /(?<!aria-)disabled=\{(revealed|picked)/.test(file.text))
+      .map((file) => file.path)
+    expect(offenders).toEqual([])
+  })
+
+  // A sixth rule belongs here — "every colour token declared in the light
   // block has a counterpart in `.dark`, except the scrim" — and it is not
   // written, deliberately. This suite runs under vitest's node environment,
   // where a CSS import resolves to an empty string, so the check would pass

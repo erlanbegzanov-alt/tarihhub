@@ -53,39 +53,69 @@ const REVEAL_MS = 1400
 /** `picked` when the clock ran out rather than the player choosing. */
 const TIMED_OUT = -1
 
+/**
+ * When the ring turns red. Four seconds, the same absolute figure the duel
+ * uses, rather than a share of the fifteen — a player who plays both modes
+ * learns one thing, not two.
+ */
+const TEAM_URGENT_SECONDS = 4
+
 /** The per-question countdown, drawn as a ring that empties as it runs. */
 function TimerRing({ seconds }: { seconds: number }) {
+  const { t } = useLang()
   const radius = 14
   const circumference = 2 * Math.PI * radius
   const left = Math.max(0, Math.min(TEAM_QUESTION_SECONDS, seconds))
+  // Gold reads 2.03:1 against its own track and never changed, so the arc
+  // said nothing and carried nothing — the same defect the duel's ring had
+  // and fixed. Brand reaches 3.61 on that track and wrong 4.17, and the
+  // switch between them at four seconds is the urgency signal this ring was
+  // missing entirely.
+  const urgent = left <= TEAM_URGENT_SECONDS
+  const stroke = urgent ? 'var(--color-wrong)' : 'var(--color-brand)'
   return (
-    <div className="relative h-[34px] w-[34px]" aria-hidden>
-      <svg width="34" height="34" className="-rotate-90">
-        <circle
-          cx="17"
-          cy="17"
-          r={radius}
-          fill="none"
-          strokeWidth="4"
-          stroke="var(--color-line-soft)"
-        />
-        <circle
-          cx="17"
-          cy="17"
-          r={radius}
-          fill="none"
-          strokeWidth="4"
-          strokeLinecap="round"
-          stroke="var(--color-gold)"
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * (1 - left / TEAM_QUESTION_SECONDS)}
-          style={{ transition: 'stroke-dashoffset 1s linear' }}
-        />
-      </svg>
-      <span className="absolute inset-0 grid place-items-center text-[12px] font-bold tabular-nums text-ink">
-        {left}
-      </span>
-    </div>
+    <>
+      <div className="relative h-[34px] w-[34px]" aria-hidden>
+        <svg width="34" height="34" className="-rotate-90">
+          <circle
+            cx="17"
+            cy="17"
+            r={radius}
+            fill="none"
+            strokeWidth="4"
+            stroke="var(--color-line-soft)"
+          />
+          <circle
+            cx="17"
+            cy="17"
+            r={radius}
+            fill="none"
+            strokeWidth="4"
+            strokeLinecap="round"
+            stroke={stroke}
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - left / TEAM_QUESTION_SECONDS)}
+            style={{ transition: 'stroke-dashoffset 1s linear' }}
+          />
+        </svg>
+        <span
+          className={cn(
+            'absolute inset-0 grid place-items-center text-[12px] font-bold tabular-nums',
+            urgent ? 'text-wrong' : 'text-ink',
+          )}
+        >
+          {left}
+        </span>
+      </div>
+      {/* Same reasoning as the duel's ring: the arc is a visual signal, so it
+          stays hidden, and one fixed sentence is announced as the last seconds
+          begin rather than a digit on every tick. */}
+      <p className="sr-only" aria-live="polite">
+        {urgent
+          ? `${t(s.battle.timeLowBefore)}${TEAM_URGENT_SECONDS}${t(s.battle.timeLowAfter)}`
+          : ''}
+      </p>
+    </>
   )
 }
 
@@ -376,8 +406,13 @@ export function TeamMatchBoard({
                 <li key={option.id}>
                   <motion.button
                     type="button"
-                    onClick={() => choose(optionIndex)}
-                    disabled={revealed}
+                    // Not `disabled`: a focused button that becomes disabled drops focus
+                    // to <body>, and answering with the keyboard then meant tabbing from
+                    // the top of the page again. The handler refuses a second answer.
+                    onClick={() => {
+                      if (!(revealed)) choose(optionIndex)
+                    }}
+                    aria-disabled={revealed}
                     whileHover={canHover && !revealed ? { y: -2 } : undefined}
                     whileTap={revealed ? undefined : { scale: 0.99 }}
                     transition={springSoft}

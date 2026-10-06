@@ -20,6 +20,7 @@ import {
 import { useSyncExternalStore } from 'react'
 import { auth, isFirebaseReady } from './firebase'
 import { startProfileSync, stopProfileSync } from './profileSync'
+import { report } from './report'
 
 const ONBOARDED_KEY = 'tarihhub_onboarded'
 
@@ -117,6 +118,15 @@ if (auth) {
       stopProfileSync()
       set({ authResolved: true, user: null })
     }
+  }, (error) => {
+    // The listener's own error callback, which was missing. Without it a failed
+    // subscription left `authResolved` false for ever, and `sessionGate` reads
+    // that as 'loading' — so the app sat on the splash spinner with no way out
+    // and nothing in the console. Landing on the sign-in screen is both honest
+    // and recoverable: signing in is what the reader would have to do anyway.
+    report('auth.onAuthStateChanged', error)
+    stopProfileSync()
+    set({ authResolved: true, user: null })
   })
 }
 

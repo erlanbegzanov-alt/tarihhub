@@ -143,8 +143,13 @@ export function SectionCheck({
                   <li key={option.id}>
                     <button
                       type="button"
-                      onClick={() => choose(option.id)}
-                      disabled={revealed}
+                      // Not `disabled`: a focused button that becomes disabled drops focus
+                      // to <body>, and answering with the keyboard then meant tabbing from
+                      // the top of the page again. The handler refuses a second answer.
+                      onClick={() => {
+                        if (!(revealed)) choose(option.id)
+                      }}
+                      aria-disabled={revealed}
                       className={cn(
                         'focus-ring flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left',
                         'ring-1 transition-colors duration-200',

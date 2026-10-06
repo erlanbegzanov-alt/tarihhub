@@ -312,6 +312,7 @@ function Fighter({
 
 /** The per-question countdown, drawn as a ring that empties as it runs. */
 function TimerRing({ seconds }: { seconds: number }) {
+  const { t } = useLang()
   const radius = 18
   const circumference = 2 * Math.PI * radius
   const left = Math.max(0, Math.min(QUESTION_SECONDS, seconds))
@@ -322,38 +323,55 @@ function TimerRing({ seconds }: { seconds: number }) {
   const urgent = left <= URGENT_SECONDS
   const stroke = urgent ? 'var(--color-wrong)' : 'var(--color-brand)'
   return (
-    <div className="relative h-[44px] w-[44px]" aria-hidden>
-      <svg width="44" height="44" className="-rotate-90">
-        <circle
-          cx="22"
-          cy="22"
-          r={radius}
-          fill="none"
-          strokeWidth="4"
-          stroke="var(--color-line-soft)"
-        />
-        <circle
-          cx="22"
-          cy="22"
-          r={radius}
-          fill="none"
-          strokeWidth="4"
-          strokeLinecap="round"
-          stroke={stroke}
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * (1 - left / QUESTION_SECONDS)}
-          style={{ transition: 'stroke-dashoffset 1s linear' }}
-        />
-      </svg>
-      <span
-        className={cn(
-          'absolute inset-0 grid place-items-center text-[15px] font-bold tabular-nums',
-          urgent ? 'text-wrong' : 'text-ink',
-        )}
-      >
-        {left}
-      </span>
-    </div>
+    <>
+      <div className="relative h-[44px] w-[44px]" aria-hidden>
+        <svg width="44" height="44" className="-rotate-90">
+          <circle
+            cx="22"
+            cy="22"
+            r={radius}
+            fill="none"
+            strokeWidth="4"
+            stroke="var(--color-line-soft)"
+          />
+          <circle
+            cx="22"
+            cy="22"
+            r={radius}
+            fill="none"
+            strokeWidth="4"
+            strokeLinecap="round"
+            stroke={stroke}
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - left / QUESTION_SECONDS)}
+            style={{ transition: 'stroke-dashoffset 1s linear' }}
+          />
+        </svg>
+        <span
+          className={cn(
+            'absolute inset-0 grid place-items-center text-[15px] font-bold tabular-nums',
+            urgent ? 'text-wrong' : 'text-ink',
+          )}
+        >
+          {left}
+        </span>
+      </div>
+      {/*
+        The ring stays `aria-hidden` on purpose: an arc is a visual signal, and
+        a digit that changes every second, spoken, would bury the question it
+        is counting down. This region is in the DOM from the first render,
+        because a live region inserted together with its text is not reliably
+        announced, and it carries a fixed sentence rather than the counter — so
+        the reader hears it once as the last seconds begin, not four times
+        while they run out. `sr-only` is absolutely positioned, so it adds
+        nothing to the flex row it sits in.
+      */}
+      <p className="sr-only" aria-live="polite">
+        {urgent
+          ? `${t(s.battle.timeLowBefore)}${URGENT_SECONDS}${t(s.battle.timeLowAfter)}`
+          : ''}
+      </p>
+    </>
   )
 }
 
@@ -1320,8 +1338,13 @@ export function BattleDuel({
                     <li key={option.id}>
                       <motion.button
                         type="button"
-                        onClick={() => choose(optionIndex)}
-                        disabled={revealed}
+                        // Not `disabled`: a focused button that becomes disabled drops focus
+                        // to <body>, and answering with the keyboard then meant tabbing from
+                        // the top of the page again. The handler refuses a second answer.
+                        onClick={() => {
+                          if (!(revealed)) choose(optionIndex)
+                        }}
+                        aria-disabled={revealed}
                         whileHover={canHover && !revealed ? { y: -2 } : undefined}
                         whileTap={revealed ? undefined : { scale: 0.99 }}
                         transition={springSoft}

@@ -1,5 +1,6 @@
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'framer-motion'
 import { lazy, Suspense, useEffect } from 'react'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
@@ -148,7 +149,14 @@ function AnimatedRoutes() {
             path={route.path}
             element={
               <Page>
-                <Suspense fallback={<RouteFallback />}>{route.element}</Suspense>
+                {/* One boundary per route, not just one at the root: every
+                    screen here is `lazy()`, so a single chunk that fails to
+                    arrive would otherwise blank the whole app instead of the
+                    one screen. `Routes` is keyed on the path, so navigating
+                    away remounts this and clears a failed screen. */}
+                <ErrorBoundary where={`route:${route.path}`}>
+                  <Suspense fallback={<RouteFallback />}>{route.element}</Suspense>
+                </ErrorBoundary>
               </Page>
             }
           />
@@ -222,12 +230,25 @@ function Gate() {
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <Gate />
-      {/* Outside the gate so it also shows on onboarding and sign-in — the
-          sign-in screen is exactly where it matters which database you are
-          about to enter. */}
-      <TestModeBadge />
-    </LanguageProvider>
+    // The stylesheet's `prefers-reduced-motion` block cannot reach any of
+    // this. It overrides `animation-duration` and `transition-duration`,
+    // while framer-motion animates by writing `transform` into the inline
+    // style on every frame from JS — neither a CSS animation nor a CSS
+    // transition, so the block never applies to it. Nine components ask
+    // `useReducedMotion()` themselves; everything that does not — page
+    // transitions, the stagger every screen mounts with, every press and
+    // hover — played in full for a reader who had asked the operating system
+    // for less. `reducedMotion="user"` makes that the default for the whole
+    // tree: transform and layout animations are dropped, opacity is kept, so
+    // nothing vanishes, it just stops moving.
+    <MotionConfig reducedMotion="user">
+      <LanguageProvider>
+        <Gate />
+        {/* Outside the gate so it also shows on onboarding and sign-in — the
+            sign-in screen is exactly where it matters which database you are
+            about to enter. */}
+        <TestModeBadge />
+      </LanguageProvider>
+    </MotionConfig>
   )
 }

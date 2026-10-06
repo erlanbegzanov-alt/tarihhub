@@ -347,6 +347,16 @@ export const s = {
     /** Short level chip, e.g. "Дең. 23" / "Ур. 23". */
     levelShort: { kz: 'Дең.', ru: 'Ур.' },
     question: { kz: 'Сұрақ', ru: 'Вопрос' },
+    /**
+     * The countdown is drawn as an emptying ring, which a reader who cannot see
+     * it gets nothing from — and reading the digit on every tick would be
+     * twelve announcements per question, which is worse than silence. This
+     * fires once, when the last seconds begin. The number is wrapped so both
+     * languages keep their word order: kz "4 секунд қалды",
+     * ru "Осталось 4 секунды".
+     */
+    timeLowBefore: { kz: '', ru: 'Осталось ' },
+    timeLowAfter: { kz: ' секунд қалды', ru: ' секунды' },
     /** Shown while this player has finished but the opponent hasn't. */
     waiting: { kz: 'Қарсылас аяқтағанша күтудеміз…', ru: 'Ждём, пока соперник закончит…' },
 
@@ -1091,6 +1101,25 @@ export const s = {
   },
 
   /** Google sign-in screen and the account row in the profile. */
+  // What a reader sees when a screen throws instead of rendering. Short on
+  // purpose: the one useful action is a reload, and a reader being shown this
+  // is already having a bad time.
+  error: {
+    screenTitle: { kz: 'Бұл бет ашылмады', ru: 'Этот экран не открылся' },
+    appTitle: { kz: 'Қолданба ашылмады', ru: 'Приложение не открылось' },
+    body: {
+      kz: 'Бірдеңе дұрыс кетті. Бетті жаңартып көріңіз — әдетте осы жетеді.',
+      ru: 'Что-то сломалось. Попробуйте обновить страницу — обычно этого достаточно.',
+    },
+    staleTitle: { kz: 'Жаңа нұсқа шықты', ru: 'Вышла новая версия' },
+    staleBody: {
+      kz: 'Бет өзі жаңарады, бір сәт…',
+      ru: 'Страница обновится сама, секунду…',
+    },
+    reload: { kz: 'Жаңарту', ru: 'Обновить' },
+    home: { kz: 'Басты бетке', ru: 'На главную' },
+  },
+
   auth: {
     title: { kz: 'TarihHub-қа кіру', ru: 'Вход в TarihHub' },
     subtitle: {

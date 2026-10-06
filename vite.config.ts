@@ -80,6 +80,11 @@ export default defineConfig(({ mode }) => {
       react(),
       VitePWA({
         registerType: 'autoUpdate',
+        // src/main.tsx registers the worker itself, so that it can poll for an
+        // update once a minute — the piece `autoUpdate` needs in a tab that
+        // stays open for days and never navigates. Leaving this at 'auto' would
+        // inject a second registration script alongside ours.
+        injectRegister: null,
         includeAssets: ['favicon.svg', 'icons/apple-touch-icon.png'],
         manifest: {
           name: 'TarihHub',

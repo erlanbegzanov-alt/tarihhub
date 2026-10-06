@@ -317,8 +317,13 @@ export function KahootJoin() {
                     <li key={index}>
                       <motion.button
                         type="button"
-                        onClick={() => choose(index)}
-                        disabled={picked !== null || revealed}
+                        // Not `disabled`: a focused button that becomes disabled drops focus
+                        // to <body>, and answering with the keyboard then meant tabbing from
+                        // the top of the page again. The handler refuses a second answer.
+                        onClick={() => {
+                          if (!(picked !== null || revealed)) choose(index)
+                        }}
+                        aria-disabled={picked !== null || revealed}
                         whileHover={canHover && picked === null ? { y: -2 } : undefined}
                         whileTap={picked !== null ? undefined : { scale: 0.99 }}
                         transition={springSoft}
