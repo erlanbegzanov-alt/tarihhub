@@ -10,13 +10,30 @@ import type { Person, PersonCategory } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { askPersona } from '../lib/ai'
-import type { ChatTurn } from '../lib/ai'
+import type { AiFailure, ChatTurn } from '../lib/ai'
 import { cn } from '../lib/cn'
 import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { unlockBadge } from '../lib/progress'
 
 interface Message extends ChatTurn {
   id: string
+}
+
+/**
+ * The header line for each way a live answer can fail to arrive.
+ *
+ * Exhaustive by type, not by `if`: adding a reason to `AiFailure` without a
+ * line here stops the build, which is the point — a new failure mode quietly
+ * rendering as the old catch-all is how this became hard to diagnose in the
+ * first place.
+ */
+const failureLines: Record<AiFailure, typeof s.ai.offlineMode> = {
+  'signed-out': s.ai.failSignedOut,
+  limit: s.ai.failLimit,
+  unconfigured: s.ai.failUnconfigured,
+  upstream: s.ai.failUpstream,
+  timeout: s.ai.failTimeout,
+  network: s.ai.failNetwork,
 }
 
 /* ------------------------- persona picker ------------------------- */
@@ -199,6 +216,9 @@ export function AIChat() {
   // Neutral until the first reply actually lands — never claims a live
   // connection before one has really happened.
   const [liveMode, setLiveMode] = useState(false)
+  // Distinct from `!liveMode`: that is also the state before the first
+  // question, when nothing has failed and there is nothing to explain.
+  const [failure, setFailure] = useState<AiFailure | null>(null)
 
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const counter = useRef(0)
@@ -268,10 +288,12 @@ export function AIChat() {
       { id: `a${counter.current}`, role: 'assistant', content: answer.text },
     ])
     setThinking(false)
-    // A stored key that fails (invalid, expired, offline) silently falls back to
-    // scripted answers — reflect that in the badge instead of still claiming
-    // Gemini is connected.
+    // A live call that failed must never read as a working connection — and
+    // now it also says which failure it was, because «Демо-режим» was the
+    // same word for "come back tomorrow", "nothing is wrong on your side"
+    // and "this was deployed without a key".
     setLiveMode(answer.engine === 'live')
+    setFailure(answer.failure ?? null)
 
     if (person.id === 'abylai') unlockBadge('diplomat')
   }
@@ -308,7 +330,11 @@ export function AIChat() {
           <p className="truncate text-[12.5px] text-ink-faint">
             {t(person.role)} ·{' '}
             <span className={liveMode ? 'text-brand' : undefined}>
-              {liveMode ? t(s.ai.liveMode) : t(s.ai.offlineMode)}
+              {liveMode
+                ? t(s.ai.liveMode)
+                : failure
+                  ? t(failureLines[failure])
+                  : t(s.ai.offlineMode)}
             </span>
           </p>
         </div>
