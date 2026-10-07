@@ -65,9 +65,16 @@ export function reasonFromStatus(status: number): AiFailure {
   return 'upstream'
 }
 
-/** How long to wait for the answer to *start*. The model runs with thinking
- *  off and first bytes land in a second or two, so this is a wide margin. */
-const FIRST_BYTE_TIMEOUT_MS = 20_000
+/**
+ * How long to wait for the answer to *start*.
+ *
+ * Must stay above the proxy's own first-token budget (FIRST_PIECE_BUDGET_MS
+ * in api/gemini.ts), or this deadline fires first and the server's log never
+ * gets to record how long the model actually took — which is the measurement
+ * currently missing. Wide and temporary for the same reason it is wide there;
+ * it comes down with it.
+ */
+const FIRST_BYTE_TIMEOUT_MS = 50_000
 /** How long a silence *inside* an answer may last before the stream counts as
  *  dead. Reset by every chunk, so a long reply is never cut off. */
 const STREAM_GAP_TIMEOUT_MS = 15_000

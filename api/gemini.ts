@@ -50,6 +50,40 @@ const MODEL = 'gemini-3.5-flash-lite'
 // server-sent events instead of one buffered JSON body.
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse`
 
+/**
+ * Vercel's own wall, raised deliberately above both budgets below.
+ *
+ * A platform kill logs nothing, and "nothing in the log" is the entire reason
+ * this fault came back every few days. Keeping our deadlines strictly inside
+ * the platform's means every timeout from here on is ours, and ours print
+ * numbers.
+ */
+export const maxDuration = 60
+
+/**
+ * How long Google may take to return *headers*.
+ *
+ * Every refusal it has — a dead key, an unknown model, an exhausted quota —
+ * comes back in well under a second with a status attached. So this budget
+ * only ever catches a connection that was never going to happen, and it can
+ * be short.
+ */
+const HEADER_BUDGET_MS = 15_000
+
+/**
+ * How long the model may then take to emit its *first* token.
+ *
+ * Wide on purpose, and temporary on purpose. The old code put one flat 25s
+ * wall across both phases, so when answers began failing there was no way to
+ * tell a connection that never happened from a model that thought for longer
+ * than we were willing to wait — and the second is exactly what happens when
+ * a model that ships with thinking *off* is retired and its name starts
+ * resolving to one that thinks (the 20-40s measured for 3.6, see the header
+ * of this file). The log below now prints both numbers; once we have seen the
+ * real one this comes back down to something a student should actually wait.
+ */
+const FIRST_PIECE_BUDGET_MS = 45_000
+
 const MAX_HISTORY = 12
 const MAX_TEXT_LENGTH = 4000
 
@@ -596,13 +630,21 @@ export default {
       temperature = Math.min(Math.max(body.config?.temperature ?? 0.5, 0), 1)
     }
 
+    // The two numbers this block exists to produce. -1 means that phase
+    // never completed, which is itself the answer.
+    const startedAt = Date.now()
+    let headersMs = -1
+    let firstPieceMs = -1
+    const upstream = new AbortController()
+    let deadline = setTimeout(() => upstream.abort(), HEADER_BUDGET_MS)
+
     try {
       const geminiResponse = await fetch(GEMINI_ENDPOINT, {
         method: 'POST',
-        // Cap a hung upstream instead of holding the function open until
-        // Vercel's own wall — the client's fallback (scripted answer /
-        // "couldn't simplify") is better than a 60s spinner.
-        signal: AbortSignal.timeout(25_000),
+        // One controller across both phases, because the signal governs the
+        // body read as well as the request — which is precisely why a single
+        // flat timeout could never say which phase had failed.
+        signal: upstream.signal,
         headers: { 'content-type': 'application/json', 'x-goog-api-key': geminiKey },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -630,6 +672,12 @@ export default {
           ],
         }),
       })
+
+      headersMs = Date.now() - startedAt
+      // Headers are in. What remains is the model composing, which is a
+      // different thing on a different scale, so it gets its own budget.
+      clearTimeout(deadline)
+      deadline = setTimeout(() => upstream.abort(), FIRST_PIECE_BUDGET_MS)
 
       if (!geminiResponse.ok) {
         // Surface *why* upstream refused — status plus a short body slice —
@@ -700,9 +748,16 @@ export default {
         upstreamDone = step.done
       }
 
+      firstPieceMs = Date.now() - startedAt
+      // The model has started speaking. From here an abort would only truncate
+      // an answer already on its way, and the client has its own deadline on
+      // silence between chunks, so this one stands down.
+      clearTimeout(deadline)
+
       if (first.length === 0) {
         console.warn(
-          `[api/gemini] empty completion (${body.mode}), reason: ${blockReason || 'no candidates'}`,
+          `[api/gemini] empty completion (${body.mode}) after ${firstPieceMs}ms,` +
+            ` reason: ${blockReason || 'no candidates'}`,
         )
         return new Response('Empty completion', { status: 502 })
       }
@@ -741,7 +796,16 @@ export default {
         },
       })
     } catch (error) {
-      console.warn(`[api/gemini] upstream call failed (${body.mode}):`, error)
+      clearTimeout(deadline)
+      // The line that ends the guessing. "headers -1" means Google never
+      // answered at all; "headers 400ms, first piece -1" means it answered at
+      // once and the model then said nothing for the whole budget — which is a
+      // model problem, not a network one, and the two need different fixes.
+      console.warn(
+        `[api/gemini] upstream call failed (${body.mode}) after ${Date.now() - startedAt}ms` +
+          ` (headers ${headersMs}ms, first piece ${firstPieceMs}ms):`,
+        error,
+      )
       return new Response('Upstream error', { status: 502 })
     }
   },
