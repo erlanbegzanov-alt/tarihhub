@@ -10,13 +10,30 @@ import type { Person, PersonCategory } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { askPersona } from '../lib/ai'
-import type { ChatTurn } from '../lib/ai'
+import type { AiFailure, ChatTurn } from '../lib/ai'
 import { cn } from '../lib/cn'
 import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { unlockBadge } from '../lib/progress'
 
 interface Message extends ChatTurn {
   id: string
+}
+
+/**
+ * The header line for each way a live answer can fail to arrive.
+ *
+ * Exhaustive by type, not by `if`: adding a reason to `AiFailure` without a
+ * line here stops the build, which is the point — a new failure mode quietly
+ * rendering as the old catch-all is how this became hard to diagnose in the
+ * first place.
+ */
+const failureLines: Record<AiFailure, typeof s.ai.offlineMode> = {
+  'signed-out': s.ai.failSignedOut,
+  limit: s.ai.failLimit,
+  unconfigured: s.ai.failUnconfigured,
+  upstream: s.ai.failUpstream,
+  timeout: s.ai.failTimeout,
+  network: s.ai.failNetwork,
 }
 
 /* ------------------------- persona picker ------------------------- */
@@ -193,9 +210,15 @@ export function AIChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
+  // The answer as it is being written. Held apart from `messages` so a reply
+  // that fails halfway never lands in the transcript as if it were finished.
+  const [streamed, setStreamed] = useState('')
   // Neutral until the first reply actually lands — never claims a live
   // connection before one has really happened.
   const [liveMode, setLiveMode] = useState(false)
+  // Distinct from `!liveMode`: that is also the state before the first
+  // question, when nothing has failed and there is nothing to explain.
+  const [failure, setFailure] = useState<AiFailure | null>(null)
 
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const counter = useRef(0)
@@ -216,11 +239,15 @@ export function AIChat() {
     setMessages([])
     setInput('')
     setThinking(false)
+    setStreamed('')
   }, [personId, lang])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages, thinking])
+    // The streamed text is a dependency here so the view follows the answer
+    // while it is being written. Without it the reader watches the first two
+    // lines and has to scroll by hand for the rest.
+  }, [messages, thinking, streamed])
 
   const history = useMemo<ChatTurn[]>(
     () => messages.map(({ role, content }) => ({ role, content })),
@@ -245,9 +272,15 @@ export function AIChat() {
     setMessages((prev) => [...prev, userMessage])
     setInput('')
     setThinking(true)
+    setStreamed('')
 
-    const answer = await askPersona(person, history, text, lang)
+    const answer = await askPersona(person, history, text, lang, (soFar) => {
+      // Guarded the same way the final write is: a reader who switched persona
+      // mid-answer must not watch the previous one keep talking.
+      if (conversation === conversationRef.current) setStreamed(soFar)
+    })
     if (conversation !== conversationRef.current) return
+    setStreamed('')
 
     counter.current += 1
     setMessages((prev) => [
@@ -255,10 +288,12 @@ export function AIChat() {
       { id: `a${counter.current}`, role: 'assistant', content: answer.text },
     ])
     setThinking(false)
-    // A stored key that fails (invalid, expired, offline) silently falls back to
-    // scripted answers — reflect that in the badge instead of still claiming
-    // Gemini is connected.
+    // A live call that failed must never read as a working connection — and
+    // now it also says which failure it was, because «Демо-режим» was the
+    // same word for "come back tomorrow", "nothing is wrong on your side"
+    // and "this was deployed without a key".
     setLiveMode(answer.engine === 'live')
+    setFailure(answer.failure ?? null)
 
     if (person.id === 'abylai') unlockBadge('diplomat')
   }
@@ -295,7 +330,11 @@ export function AIChat() {
           <p className="truncate text-[12.5px] text-ink-faint">
             {t(person.role)} ·{' '}
             <span className={liveMode ? 'text-brand' : undefined}>
-              {liveMode ? t(s.ai.liveMode) : t(s.ai.offlineMode)}
+              {liveMode
+                ? t(s.ai.liveMode)
+                : failure
+                  ? t(failureLines[failure])
+                  : t(s.ai.offlineMode)}
             </span>
           </p>
         </div>
@@ -374,7 +413,27 @@ export function AIChat() {
             ))}
           </AnimatePresence>
 
-          {thinking && (
+          {/* The answer as it is being written. The dots only stand in until the
+              first words land — a bubble that fills itself is the difference
+              between a slow chat and a chat the reader thinks is broken. */}
+          {thinking && streamed !== '' && (
+            <motion.li
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex justify-start"
+            >
+              <div className="max-w-[85%] rounded-t-2xl rounded-br-2xl bg-cream px-4 py-3.5">
+                <p
+                  className="text-[14.5px] leading-relaxed whitespace-pre-wrap"
+                  aria-live="polite"
+                >
+                  {streamed}
+                </p>
+              </div>
+            </motion.li>
+          )}
+
+          {thinking && streamed === '' && (
             <motion.li
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}

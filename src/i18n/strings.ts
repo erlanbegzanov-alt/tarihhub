@@ -965,6 +965,15 @@ export const s = {
     changePersona: { kz: 'Тұлғаны ауыстыру', ru: 'Сменить личность' },
     offlineMode: { kz: 'Демо режим', ru: 'Демо-режим' },
     liveMode: { kz: 'Gemini қосулы', ru: 'Gemini подключён' },
+    // Each of these used to show as plain «Демо-режим», which is true and
+    // useless: it tells the reader the answer is canned, but not that they
+    // can simply come back tomorrow, or that nothing is wrong on their side.
+    failLimit: { kz: 'Бүгінгі сұрақ шегі бітті', ru: 'Лимит вопросов на сегодня исчерпан' },
+    failUnconfigured: { kz: 'Gemini серверде бапталмаған', ru: 'Gemini не настроен на сервере' },
+    failUpstream: { kz: 'Gemini жауап бермейді', ru: 'Gemini не отвечает' },
+    failTimeout: { kz: 'Жауап үзіліп қалды', ru: 'Ответ прервался' },
+    failNetwork: { kz: 'Байланыс жоқ', ru: 'Нет связи' },
+    failSignedOut: { kz: 'Қайта кіру қажет', ru: 'Нужно войти снова' },
     suggestions: [
       { kz: 'Өміріңіз туралы айтып беріңіз', ru: 'Расскажите о своей жизни' },
       { kz: 'Қандай қиындықтар болды?', ru: 'Какие были трудности?' },
