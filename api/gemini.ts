@@ -68,21 +68,25 @@ export const maxDuration = 60
  * only ever catches a connection that was never going to happen, and it can
  * be short.
  */
-const HEADER_BUDGET_MS = 15_000
+const HEADER_BUDGET_MS = 10_000
 
 /**
  * How long the model may then take to emit its *first* token.
  *
- * Wide on purpose, and temporary on purpose. The old code put one flat 25s
- * wall across both phases, so when answers began failing there was no way to
- * tell a connection that never happened from a model that thought for longer
- * than we were willing to wait — and the second is exactly what happens when
- * a model that ships with thinking *off* is retired and its name starts
- * resolving to one that thinks (the 20-40s measured for 3.6, see the header
- * of this file). The log below now prints both numbers; once we have seen the
- * real one this comes back down to something a student should actually wait.
+ * Measured, not guessed: with `streamGenerateContent` the first token lands
+ * in about a second, so fifteen is already a wide margin — and the call can
+ * no longer die of an answer merely being *long*.
+ *
+ * That distinction is the whole bug this file carried for weeks. The old code
+ * called Google's buffered `:generateContent`, which returns nothing until
+ * the full answer is composed, behind one flat 25s wall across both phases —
+ * so a short reply landed and a long one timed out, and as the chat history
+ * grew the answers grew with it until every one of them lost. It presented as
+ * "the AI broke again, days after you fixed it"; it was one fault sliding
+ * from sometimes to always, and no log could say so, because a single timeout
+ * covered both the connection and the composing.
  */
-const FIRST_PIECE_BUDGET_MS = 45_000
+const FIRST_PIECE_BUDGET_MS = 15_000
 
 const MAX_HISTORY = 12
 const MAX_TEXT_LENGTH = 4000
