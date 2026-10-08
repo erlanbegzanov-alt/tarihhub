@@ -68,13 +68,12 @@ export function reasonFromStatus(status: number): AiFailure {
 /**
  * How long to wait for the answer to *start*.
  *
- * Must stay above the proxy's own first-token budget (FIRST_PIECE_BUDGET_MS
- * in api/gemini.ts), or this deadline fires first and the server's log never
- * gets to record how long the model actually took — which is the measurement
- * currently missing. Wide and temporary for the same reason it is wide there;
- * it comes down with it.
+ * Must stay above the proxy's own worst case — HEADER_BUDGET_MS plus
+ * FIRST_PIECE_BUDGET_MS in api/gemini.ts, currently 10s + 15s — so that when
+ * a call does fail, the reason comes from the server, which knows which phase
+ * failed, rather than from this deadline, which cannot tell.
  */
-const FIRST_BYTE_TIMEOUT_MS = 50_000
+const FIRST_BYTE_TIMEOUT_MS = 30_000
 /** How long a silence *inside* an answer may last before the stream counts as
  *  dead. Reset by every chunk, so a long reply is never cut off. */
 const STREAM_GAP_TIMEOUT_MS = 15_000
