@@ -4,15 +4,15 @@ import type { EraKey, LocalizedText } from './types'
  * Lightweight per-lesson summary — id, unit, order, title and era only,
  * no section content. Exists so screens that only need "which lessons
  * exist and what are they called" (Home's course-progress card and
- * continue-learning list) never have to pull in the full ~3.9MB
- * `lessons.ts` — which is ~62 lessons' complete bilingual reading
+ * continue-learning list) never have to pull in the full ~4MB
+ * `lessons.ts` — which is all 64 lessons' complete bilingual reading
  * content and stays behind the already-lazy lesson/quiz/course routes.
  *
  * Generated from `lessons.ts` (id/unitId/order/title/eraKey fields of
  * every `allLessons` entry, in the same order). If a lesson is added,
- * removed, or renamed in `lessons.ts`, regenerate this file to match —
- * a stale entry here would just make Home's course count wrong, it
- * can't affect the actual lesson content.
+ * removed, renamed or reordered in `lessons.ts`, regenerate this file to
+ * match — a stale entry here makes Home's course count disagree with
+ * CourseOutline's and can keep progress from ever reaching 100%.
  */
 export interface LessonMeta {
   id: string
@@ -61,7 +61,7 @@ export const lessonsMeta: LessonMeta[] = [
   {
     id: 'abai-words',
     unitId: 'unit-5',
-    order: 7,
+    order: 8,
     title: { kz: 'Абайдың қара сөздері', ru: 'Слова назидания Абая' },
     eraKey: 'modern',
   },
@@ -108,23 +108,30 @@ export const lessonsMeta: LessonMeta[] = [
     eraKey: 'goldenHorde',
   },
   {
-    id: 'kenesary-uprising',
+    id: 'isatay-makhambet-uprising',
     unitId: 'unit-5',
     order: 4,
+    title: { kz: 'Исатай Тайманұлы мен Махамбет Өтемісұлы бастаған көтеріліс', ru: 'Восстание Исатая Тайманулы и Махамбета Утемисулы' },
+    eraKey: 'modern',
+  },
+  {
+    id: 'kenesary-uprising',
+    unitId: 'unit-5',
+    order: 5,
     title: { kz: 'Кенесары Қасымұлы көтерілісі', ru: 'Восстание Кенесары Касымова' },
     eraKey: 'modern',
   },
   {
     id: 'admin-reforms-1867',
     unitId: 'unit-5',
-    order: 5,
+    order: 6,
     title: { kz: '1867–1868 жж. әкімшілік реформалар', ru: 'Административные реформы 1867–1868 гг.' },
     eraKey: 'modern',
   },
   {
     id: 'colonization-land',
     unitId: 'unit-5',
-    order: 6,
+    order: 7,
     title: { kz: 'Отарлау саясаты мен жер мәселесі', ru: 'Колониальная политика и земельный вопрос' },
     eraKey: 'modern',
   },
@@ -222,14 +229,14 @@ export const lessonsMeta: LessonMeta[] = [
   {
     id: 'orkhon-inscriptions',
     unitId: 'unit-2',
-    order: 4,
+    order: 5,
     title: { kz: 'Орхон ескерткіштері — Күлтегін, Тоныкөк', ru: 'Орхонские памятники — Культегин, Тоньюкук' },
     eraKey: 'turkic',
   },
   {
     id: 'turgesh-karluk-kimak-oguz',
     unitId: 'unit-2',
-    order: 5,
+    order: 6,
     title: { kz: 'Түргеш, Қарлұқ, Қимақ, Оғыз мемлекеттері', ru: 'Тюргешское, Карлукское, Кимакское и Огузское государства' },
     eraKey: 'turkic',
   },
@@ -332,16 +339,23 @@ export const lessonsMeta: LessonMeta[] = [
     eraKey: 'turkic',
   },
   {
-    id: 'turkic-khaganate-founding',
+    id: 'usun-kangly',
     unitId: 'unit-2',
     order: 2,
+    title: { kz: 'Үйсіндер мен қаңлылар', ru: 'Усуни и канглы' },
+    eraKey: 'turkic',
+  },
+  {
+    id: 'turkic-khaganate-founding',
+    unitId: 'unit-2',
+    order: 3,
     title: { kz: 'Түрік қағанатының құрылуы', ru: 'Основание Тюркского каганата' },
     eraKey: 'turkic',
   },
   {
     id: 'east-west-khaganate-split',
     unitId: 'unit-2',
-    order: 3,
+    order: 4,
     title: { kz: 'Батыс және Шығыс қағанаттар', ru: 'Западный и Восточный каганаты' },
     eraKey: 'turkic',
   },
