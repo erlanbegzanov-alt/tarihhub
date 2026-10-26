@@ -5,7 +5,7 @@ import type { EraKey, LocalizedText } from './types'
  * no section content. Exists so screens that only need "which lessons
  * exist and what are they called" (Home's course-progress card and
  * continue-learning list) never have to pull in the full ~4MB
- * `lessons.ts` — which is all 64 lessons' complete bilingual reading
+ * `lessons.ts` — which is all 70 lessons' complete bilingual reading
  * content and stays behind the already-lazy lesson/quiz/course routes.
  *
  * Generated from `lessons.ts` (id/unitId/order/title/eraKey fields of
@@ -61,7 +61,7 @@ export const lessonsMeta: LessonMeta[] = [
   {
     id: 'abai-words',
     unitId: 'unit-5',
-    order: 8,
+    order: 10,
     title: { kz: 'Абайдың қара сөздері', ru: 'Слова назидания Абая' },
     eraKey: 'modern',
   },
@@ -122,44 +122,72 @@ export const lessonsMeta: LessonMeta[] = [
     eraKey: 'modern',
   },
   {
-    id: 'admin-reforms-1867',
+    id: 'zar-zaman',
     unitId: 'unit-5',
     order: 6,
+    title: { kz: 'Зар заман ақындары', ru: 'Поэты эпохи «Зар заман»' },
+    eraKey: 'modern',
+  },
+  {
+    id: 'admin-reforms-1867',
+    unitId: 'unit-5',
+    order: 7,
     title: { kz: '1867–1868 жж. әкімшілік реформалар', ru: 'Административные реформы 1867–1868 гг.' },
+    eraKey: 'modern',
+  },
+  {
+    id: 'trade-fairs',
+    unitId: 'unit-5',
+    order: 8,
+    title: { kz: 'XIX ғасырдағы сауда мен жәрмеңкелер', ru: 'Торговля и ярмарки в XIX веке' },
     eraKey: 'modern',
   },
   {
     id: 'colonization-land',
     unitId: 'unit-5',
-    order: 7,
+    order: 9,
     title: { kz: 'Отарлау саясаты мен жер мәселесі', ru: 'Колониальная политика и земельный вопрос' },
     eraKey: 'modern',
   },
   {
-    id: '1916-uprising',
+    id: 'kazakhs-state-duma',
     unitId: 'unit-6',
     order: 1,
+    title: { kz: 'Қазақтар Ресей Мемлекеттік Думасында', ru: 'Казахи в Государственной думе Российской империи' },
+    eraKey: 'alash',
+  },
+  {
+    id: 'foreign-capital-early-20c',
+    unitId: 'unit-6',
+    order: 2,
+    title: { kz: 'ХХ ғасыр басындағы экономика және шетел капиталы', ru: 'Экономика начала XX века и иностранный капитал' },
+    eraKey: 'alash',
+  },
+  {
+    id: '1916-uprising',
+    unitId: 'unit-6',
+    order: 3,
     title: { kz: '1916 жылғы ұлт-азаттық көтеріліс', ru: 'Национально-освободительное восстание 1916 года' },
     eraKey: 'alash',
   },
   {
     id: 'alash-party',
     unitId: 'unit-6',
-    order: 2,
+    order: 4,
     title: { kz: 'Алаш партиясы', ru: 'Партия «Алаш»' },
     eraKey: 'alash',
   },
   {
     id: 'alashorda-government',
     unitId: 'unit-6',
-    order: 3,
+    order: 5,
     title: { kz: 'Алашорда үкіметі (1917–1920)', ru: 'Правительство Алашорды (1917–1920)' },
     eraKey: 'alash',
   },
   {
     id: 'alash-leaders',
     unitId: 'unit-6',
-    order: 4,
+    order: 6,
     title: { kz: 'Әлихан Бөкейхан, Ахмет Байтұрсынұлы, Міржақып Дулатов', ru: 'Алихан Букейханов, Ахмет Байтурсынов, Миржакып Дулатов' },
     eraKey: 'alash',
   },
@@ -264,7 +292,7 @@ export const lessonsMeta: LessonMeta[] = [
   {
     id: 'zheltoksan-1986',
     unitId: 'unit-7',
-    order: 9,
+    order: 10,
     title: { kz: 'Желтоқсан көтерілісі (1986)', ru: 'Декабрьское восстание (1986)' },
     eraKey: 'soviet',
   },
@@ -297,16 +325,23 @@ export const lessonsMeta: LessonMeta[] = [
     eraKey: 'independence',
   },
   {
-    id: 'development-strategies',
+    id: 'kandas-repatriation',
     unitId: 'unit-8',
     order: 6,
+    title: { kz: 'Қандастар: шетелдегі қазақтардың атажұртқа оралуы', ru: 'Кандасы: возвращение зарубежных казахов на родину' },
+    eraKey: 'independence',
+  },
+  {
+    id: 'development-strategies',
+    unitId: 'unit-8',
+    order: 7,
     title: { kz: 'Даму стратегиялары', ru: 'Стратегии развития' },
     eraKey: 'independence',
   },
   {
     id: 'modern-kazakhstan',
     unitId: 'unit-8',
-    order: 7,
+    order: 8,
     title: { kz: 'Қазіргі Қазақстан', ru: 'Современный Казахстан' },
     eraKey: 'independence',
   },
@@ -465,9 +500,16 @@ export const lessonsMeta: LessonMeta[] = [
     eraKey: 'soviet',
   },
   {
-    id: 'semipalatinsk-testsite',
+    id: 'zhumabek-tashenov',
     unitId: 'unit-7',
     order: 8,
+    title: { kz: 'Жұмабек Тәшенов және қазақ жерінің тұтастығы', ru: 'Жумабек Ташенов и территориальная целостность Казахстана' },
+    eraKey: 'soviet',
+  },
+  {
+    id: 'semipalatinsk-testsite',
+    unitId: 'unit-7',
+    order: 9,
     title: { kz: 'Семей ядролық полигоны', ru: 'Семипалатинский ядерный полигон' },
     eraKey: 'soviet',
   },
