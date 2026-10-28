@@ -5,7 +5,7 @@ import type { EraKey, LocalizedText } from './types'
  * no section content. Exists so screens that only need "which lessons
  * exist and what are they called" (Home's course-progress card and
  * continue-learning list) never have to pull in the full ~4MB
- * `lessons.ts` — which is all 76 lessons' complete bilingual reading
+ * `lessons.ts` — which is all 77 lessons' complete bilingual reading
  * content and stays behind the already-lazy lesson/quiz/course routes.
  *
  * Generated from `lessons.ts` (id/unitId/order/title/eraKey fields of
@@ -61,7 +61,7 @@ export const lessonsMeta: LessonMeta[] = [
   {
     id: 'abai-words',
     unitId: 'unit-5',
-    order: 14,
+    order: 15,
     title: { kz: 'Абайдың қара сөздері', ru: 'Слова назидания Абая' },
     eraKey: 'modern',
   },
@@ -143,37 +143,44 @@ export const lessonsMeta: LessonMeta[] = [
     eraKey: 'modern',
   },
   {
-    id: 'admin-reforms-1867',
+    id: 'kuy-akyns-19c',
     unitId: 'unit-5',
     order: 9,
+    title: { kz: 'XIX ғасырдың күйшілері мен ақындары', ru: 'Кюйши и акыны XIX века' },
+    eraKey: 'modern',
+  },
+  {
+    id: 'admin-reforms-1867',
+    unitId: 'unit-5',
+    order: 10,
     title: { kz: '1867–1868 жж. әкімшілік реформалар', ru: 'Административные реформы 1867–1868 гг.' },
     eraKey: 'modern',
   },
   {
     id: 'trade-fairs',
     unitId: 'unit-5',
-    order: 10,
+    order: 11,
     title: { kz: 'XIX ғасырдағы сауда мен жәрмеңкелер', ru: 'Торговля и ярмарки в XIX веке' },
     eraKey: 'modern',
   },
   {
     id: 'colonization-land',
     unitId: 'unit-5',
-    order: 11,
+    order: 12,
     title: { kz: 'Отарлау саясаты мен жер мәселесі', ru: 'Колониальная политика и земельный вопрос' },
     eraKey: 'modern',
   },
   {
     id: 'shokan-ualikhanov',
     unitId: 'unit-5',
-    order: 12,
+    order: 13,
     title: { kz: 'Шоқан Уәлиханов (1835–1865)', ru: 'Шокан Уалиханов (1835–1865)' },
     eraKey: 'modern',
   },
   {
     id: 'ybyrai-altynsarin',
     unitId: 'unit-5',
-    order: 13,
+    order: 14,
     title: { kz: 'Ыбырай Алтынсарин және зайырлы білім', ru: 'Ыбырай Алтынсарин и светское образование' },
     eraKey: 'modern',
   },
