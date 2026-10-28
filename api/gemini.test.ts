@@ -11,7 +11,7 @@
  * exercise is the ladder of answers (allowed, refused, cannot tell), and that
  * is decided entirely by the status codes Firestore returns.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const PROJECT = 'tarihhub-test'
 const DOC = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/aiUsage/alice/days/`
@@ -60,6 +60,15 @@ async function limiter() {
 }
 
 describe('restCheckAndIncrement', () => {
+  // The first import transforms `gemini.ts` and everything it pulls in, and in
+  // a full parallel run that alone once took longer than a test's 5 s budget —
+  // a timeout that said nothing about the limiter. Paying it here, under its own
+  // budget, leaves each test only the re-evaluation that `resetModules` forces.
+  beforeAll(async () => {
+    process.env.VITE_FIREBASE_PROJECT_ID = PROJECT
+    await import('./gemini.js')
+  }, 60_000)
+
   beforeEach(() => {
     vi.resetModules()
   })
