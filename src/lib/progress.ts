@@ -485,6 +485,11 @@ function write(next: ProfileState) {
   emit()
 }
 
+/** The account local reads/writes currently point at, or `null` signed out. */
+export function profileUid(): string | null {
+  return currentUid
+}
+
 /** Current profile, for non-React callers (the cloud sync layer). */
 export function getProfile(): ProfileState {
   return state

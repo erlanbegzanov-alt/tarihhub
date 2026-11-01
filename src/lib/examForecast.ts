@@ -1,0 +1,143 @@
+import { EXAM_TOTAL } from './exam'
+import { localDateString, profileUid } from './progress'
+
+/**
+ * "If you keep going at this pace" — the idea carried over from Nysana
+ * (`C:\Users\erlan\nysana`), rebuilt on the one measurement TarihHub actually
+ * has: finished ҰБТ mocks. A mock is the same twenty tasks as the history
+ * part of the real paper, so its score is the most direct reading there is;
+ * the forecast is a straight line through those readings.
+ *
+ * Kept on the device, per account, the way Nysana kept its whole state — not
+ * in the synced profile, whose Firestore rules list every key and would reject
+ * the whole profile write over one unknown field.
+ */
+
+export interface ExamAttempt {
+  /** Local `YYYY-MM-DD` the mock was finished on. */
+  day: string
+  correct: number
+  total: number
+}
+
+export interface ExamForecast {
+  /** Distinct days with a finished mock. */
+  days: number
+  /** Days still needed before a pace exists. 0 once `ahead` can be computed. */
+  daysNeeded: number
+  /** Current level out of `EXAM_TOTAL`, or `null` with no mock at all. */
+  now: number | null
+  /** Where the line lands `HORIZON_DAYS` from the latest mock; `null` until enough days. */
+  ahead: { score: number; low: number; high: number } | null
+  /** True when the band is too wide to say anything — mocks too close together or too uneven. */
+  unclear: boolean
+}
+
+/** A pace needs a line, and a line through two points has no error to show. */
+export const FORECAST_MIN_DAYS = 3
+/** Fixed and named in the UI — no exam date is assumed anywhere. */
+export const HORIZON_DAYS = 30
+/** Wider than this (in tasks) and the band says nothing a student can use. */
+const MAX_USEFUL_BAND = 8
+/** Only the recent pace matters; a September score says little about November. */
+const MAX_POINTS = 10
+const MAX_STORED = 60
+const STORAGE_KEY_BASE = 'tarihhub_exam_attempts_v1'
+
+const dayNumber = (day: string) => {
+  const [y, m, d] = day.split('-').map(Number)
+  return Date.UTC(y, m - 1, d) / 86_400_000
+}
+
+const clamp = (v: number) => Math.max(0, Math.min(EXAM_TOTAL, v))
+
+export function forecastExam(attempts: ExamAttempt[], horizon = HORIZON_DAYS): ExamForecast {
+  // One point per day: three mocks in one evening are one reading, not a trend.
+  const byDay = new Map<string, number[]>()
+  for (const a of attempts) {
+    if (a.total <= 0) continue
+    const list = byDay.get(a.day) ?? []
+    list.push((a.correct / a.total) * EXAM_TOTAL)
+    byDay.set(a.day, list)
+  }
+  const points = [...byDay.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .slice(-MAX_POINTS)
+    .map(([day, scores]) => ({
+      x: dayNumber(day),
+      y: scores.reduce((s, v) => s + v, 0) / scores.length,
+      n: scores.length,
+    }))
+
+  const n = points.length
+  const empty = { days: n, ahead: null, unclear: false }
+  if (n === 0) return { ...empty, daysNeeded: FORECAST_MIN_DAYS, now: null }
+  if (n < FORECAST_MIN_DAYS) {
+    const mean = points.reduce((s, p) => s + p.y, 0) / n
+    return { ...empty, daysNeeded: FORECAST_MIN_DAYS - n, now: clamp(mean) }
+  }
+
+  const xBar = points.reduce((s, p) => s + p.x, 0) / n
+  const yBar = points.reduce((s, p) => s + p.y, 0) / n
+  const sxx = points.reduce((s, p) => s + (p.x - xBar) ** 2, 0)
+  const slope = points.reduce((s, p) => s + (p.x - xBar) * (p.y - yBar), 0) / sxx
+  const at = (x: number) => yBar + slope * (x - xBar)
+
+  // A day's score is never exact: one twenty-task paper alone swings by
+  // binomial noise. So the scatter around the line is floored at that noise —
+  // three points that happen to sit on a line do not make a certain forecast.
+  const residual = points.reduce((s, p) => s + (p.y - at(p.x)) ** 2, 0) / (n - 2)
+  const paperNoise =
+    points.reduce((s, p) => {
+      const q = clamp(p.y) / EXAM_TOTAL
+      return s + (EXAM_TOTAL * q * (1 - q)) / p.n
+    }, 0) / n
+  const scatter = Math.max(residual, paperNoise)
+
+  const last = points[n - 1].x
+  const target = last + horizon
+  const score = clamp(at(target))
+  const q = score / EXAM_TOTAL
+  // Uncertainty of the line at the target plus the noise of the one paper sat there.
+  const sd = Math.sqrt(scatter * (1 / n + (target - xBar) ** 2 / sxx) + EXAM_TOTAL * q * (1 - q))
+  const low = clamp(score - 1.28 * sd)
+  const high = clamp(score + 1.28 * sd)
+
+  return {
+    days: n,
+    daysNeeded: 0,
+    now: clamp(at(last)),
+    ahead: { score: Math.round(score), low: Math.round(low), high: Math.round(high) },
+    unclear: high - low > MAX_USEFUL_BAND,
+  }
+}
+
+const storageKey = () => {
+  const uid = profileUid()
+  return uid ? `${STORAGE_KEY_BASE}_${uid}` : STORAGE_KEY_BASE
+}
+
+export function readExamAttempts(): ExamAttempt[] {
+  try {
+    const raw = window.localStorage.getItem(storageKey())
+    const list: unknown = raw ? JSON.parse(raw) : []
+    if (!Array.isArray(list)) return []
+    return list.filter(
+      (a): a is ExamAttempt =>
+        typeof a?.day === 'string' && typeof a?.correct === 'number' && typeof a?.total === 'number',
+    )
+  } catch {
+    return []
+  }
+}
+
+/** Appends one finished mock and returns the history including it. */
+export function recordExamAttempt(correct: number, total: number): ExamAttempt[] {
+  const next = [...readExamAttempts(), { day: localDateString(), correct, total }].slice(-MAX_STORED)
+  try {
+    window.localStorage.setItem(storageKey(), JSON.stringify(next))
+  } catch {
+    /* storage unavailable — the forecast still shows this session's history */
+  }
+  return next
+}
