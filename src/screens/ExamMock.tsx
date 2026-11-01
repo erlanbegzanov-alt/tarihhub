@@ -12,7 +12,7 @@ import {
   Target,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconButton, ProgressBar, SectionHeading } from '../components/ui'
 import { levelLabels, topicLabel } from '../data/codifier'
@@ -29,6 +29,8 @@ import {
   scoreExam,
 } from '../lib/exam'
 import type { BreakdownRow, ExamAnswers } from '../lib/exam'
+import { forecastExam, readExamAttempts, recordExamAttempt } from '../lib/examForecast'
+import type { ExamAttempt } from '../lib/examForecast'
 import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 
 /**
@@ -113,6 +115,9 @@ export function ExamMock() {
   /** Wall-clock end of our 40-minute budget, set when the attempt starts. */
   const [deadline, setDeadline] = useState<number | null>(null)
   const [msLeft, setMsLeft] = useState(EXAM_TIME_BUDGET_MS)
+  /** Finished mocks including this one, set once the result is recorded. */
+  const [attempts, setAttempts] = useState<ExamAttempt[] | null>(null)
+  const recordedRound = useRef<number | null>(null)
 
   const item = variant.items[index]
   const isLast = index === variant.items.length - 1
@@ -135,6 +140,17 @@ export function ExamMock() {
     return () => window.clearInterval(id)
   }, [phase, deadline])
 
+  /* Record each finished mock exactly once — the forecast's only input. An
+     attempt with nothing answered (opened, then the clock ran out) is not a
+     reading of anything and would drag the line down. */
+  useEffect(() => {
+    if (phase !== 'result' || recordedRound.current === round) return
+    recordedRound.current = round
+    const answeredAny = variant.items.some((i) => answers[i.question.id])
+    const { correct, total } = scoreExam(variant, answers)
+    setAttempts(answeredAny ? recordExamAttempt(correct, total) : readExamAttempts())
+  }, [phase, round, variant, answers])
+
   const begin = () => {
     setDeadline(Date.now() + EXAM_TIME_BUDGET_MS)
     setMsLeft(EXAM_TIME_BUDGET_MS)
@@ -148,6 +164,7 @@ export function ExamMock() {
     setWarnBlank(false)
     setRanOutOfTime(false)
     setPassageOpen(true)
+    setAttempts(null)
     setPhase('brief')
   }
 
@@ -247,6 +264,7 @@ export function ExamMock() {
 
   if (phase === 'result') {
     const result = scoreExam(variant, answers)
+    const forecast = attempts ? forecastExam(attempts) : null
 
     return (
       <motion.div
@@ -303,6 +321,56 @@ export function ExamMock() {
             </p>
           )}
         </motion.section>
+
+        {/* Where the line through the student's mocks lands in a month. */}
+        {forecast && forecast.now !== null && (
+          <motion.section
+            variants={staggerItem}
+            className="mt-3 rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60"
+          >
+            <h2 className="text-[13px] font-semibold tracking-wide text-ink-faint uppercase">
+              {t(s.exam.forecastTitle)}
+            </h2>
+            <div className="mt-3 grid grid-cols-2 gap-2.5">
+              <div className="rounded-card bg-cream px-3 py-2.5">
+                <p className="text-[11.5px] font-semibold text-ink-faint">{t(s.exam.forecastNow)}</p>
+                <p className="mt-1 text-[22px] font-bold text-ink tabular-nums">
+                  ≈ {Math.round(forecast.now)}
+                  <span className="text-[13px] font-semibold text-ink-faint">/{result.total}</span>
+                </p>
+              </div>
+              <div className="rounded-card bg-cream px-3 py-2.5">
+                <p className="text-[11.5px] font-semibold text-ink-faint">
+                  {t(s.exam.forecastAhead)}
+                </p>
+                {forecast.ahead && !forecast.unclear ? (
+                  <>
+                    <p className="mt-1 text-[22px] font-bold text-brand tabular-nums">
+                      ≈ {forecast.ahead.score}
+                      <span className="text-[13px] font-semibold text-ink-faint">/{result.total}</span>
+                    </p>
+                    <p className="text-[12px] text-ink-faint tabular-nums">
+                      {t(s.exam.forecastRange)} {forecast.ahead.low}–{forecast.ahead.high}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-1 text-[22px] font-bold text-ink-faint">—</p>
+                )}
+              </div>
+            </div>
+            {!forecast.ahead && (
+              <p className="mt-2.5 text-[13px] leading-relaxed text-ink-soft">
+                {t(s.exam.forecastNeed)} <span className="font-bold">{forecast.daysNeeded}</span>
+              </p>
+            )}
+            {forecast.ahead && forecast.unclear && (
+              <p className="mt-2.5 text-[13px] leading-relaxed text-ink-soft">
+                {t(s.exam.forecastUnclear)}
+              </p>
+            )}
+            <p className="mt-2 text-[12px] leading-relaxed text-ink-faint">{t(s.exam.forecastNote)}</p>
+          </motion.section>
+        )}
 
         {/* This variant's difficulty mix against the specification's. */}
         <motion.section
