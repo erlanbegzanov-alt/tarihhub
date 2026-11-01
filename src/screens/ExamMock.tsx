@@ -24,13 +24,15 @@ import { cn } from '../lib/cn'
 import {
   EXAM_STANDALONE_COUNT,
   EXAM_TIME_BUDGET_MS,
+  EXAM_TOTAL,
   buildExamVariant,
   formatCountdown,
   scoreExam,
 } from '../lib/exam'
 import type { BreakdownRow, ExamAnswers } from '../lib/exam'
 import { forecastExam, readExamAttempts, recordExamAttempt } from '../lib/examForecast'
-import type { ExamAttempt } from '../lib/examForecast'
+import type { ExamAttempt, ExamForecast } from '../lib/examForecast'
+import { useProfile } from '../lib/progress'
 import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 
 /**
@@ -97,9 +99,70 @@ function BreakdownList<K>({
   )
 }
 
+/**
+ * The Nysana forecast. Shown on the start screen as well as the result, and
+ * shown with no mocks yet too — a card that only appears after a finished,
+ * answered mock was invisible to anyone opening the page to look for it.
+ */
+function ForecastCard({ forecast, total }: { forecast: ExamForecast; total: number }) {
+  const { t } = useLang()
+  return (
+    <motion.section
+      variants={staggerItem}
+      className="mt-3 rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60"
+    >
+      <h2 className="text-[13px] font-semibold tracking-wide text-ink-faint uppercase">
+        {t(s.exam.forecastTitle)}
+      </h2>
+      <div className="mt-3 grid grid-cols-2 gap-2.5">
+        <div className="rounded-card bg-cream px-3 py-2.5">
+          <p className="text-[11.5px] font-semibold text-ink-faint">{t(s.exam.forecastNow)}</p>
+          {forecast.now !== null ? (
+            <p className="mt-1 text-[22px] font-bold text-ink tabular-nums">
+              ≈ {Math.round(forecast.now)}
+              <span className="text-[13px] font-semibold text-ink-faint">/{total}</span>
+            </p>
+          ) : (
+            <p className="mt-1 text-[22px] font-bold text-ink-faint">—</p>
+          )}
+        </div>
+        <div className="rounded-card bg-cream px-3 py-2.5">
+          <p className="text-[11.5px] font-semibold text-ink-faint">{t(s.exam.forecastAhead)}</p>
+          {forecast.ahead && !forecast.unclear ? (
+            <>
+              <p className="mt-1 text-[22px] font-bold text-brand tabular-nums">
+                ≈ {forecast.ahead.score}
+                <span className="text-[13px] font-semibold text-ink-faint">/{total}</span>
+              </p>
+              <p className="text-[12px] text-ink-faint tabular-nums">
+                {t(s.exam.forecastRange)} {forecast.ahead.low}–{forecast.ahead.high}
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-[22px] font-bold text-ink-faint">—</p>
+          )}
+        </div>
+      </div>
+      {!forecast.ahead && (
+        <p className="mt-2.5 text-[13px] leading-relaxed text-ink-soft">
+          {t(s.exam.forecastNeed)} <span className="font-bold">{forecast.daysNeeded}</span>
+        </p>
+      )}
+      {forecast.ahead && forecast.unclear && (
+        <p className="mt-2.5 text-[13px] leading-relaxed text-ink-soft">
+          {t(s.exam.forecastUnclear)}
+        </p>
+      )}
+      <p className="mt-2 text-[12px] leading-relaxed text-ink-faint">{t(s.exam.forecastNote)}</p>
+    </motion.section>
+  )
+}
+
 export function ExamMock() {
   const navigate = useNavigate()
   const { t, lang } = useLang()
+  // Re-render when the account resolves: the stored mocks are keyed per uid.
+  useProfile()
 
   const [phase, setPhase] = useState<Phase>('brief')
   /** Bumped to draw a fresh variant — `buildExamVariant` re-runs on change. */
@@ -256,6 +319,8 @@ export function ExamMock() {
             {t(s.exam.start)}
           </motion.button>
         </motion.section>
+
+        <ForecastCard forecast={forecastExam(readExamAttempts())} total={EXAM_TOTAL} />
       </motion.div>
     )
   }
@@ -323,54 +388,7 @@ export function ExamMock() {
         </motion.section>
 
         {/* Where the line through the student's mocks lands in a month. */}
-        {forecast && forecast.now !== null && (
-          <motion.section
-            variants={staggerItem}
-            className="mt-3 rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60"
-          >
-            <h2 className="text-[13px] font-semibold tracking-wide text-ink-faint uppercase">
-              {t(s.exam.forecastTitle)}
-            </h2>
-            <div className="mt-3 grid grid-cols-2 gap-2.5">
-              <div className="rounded-card bg-cream px-3 py-2.5">
-                <p className="text-[11.5px] font-semibold text-ink-faint">{t(s.exam.forecastNow)}</p>
-                <p className="mt-1 text-[22px] font-bold text-ink tabular-nums">
-                  ≈ {Math.round(forecast.now)}
-                  <span className="text-[13px] font-semibold text-ink-faint">/{result.total}</span>
-                </p>
-              </div>
-              <div className="rounded-card bg-cream px-3 py-2.5">
-                <p className="text-[11.5px] font-semibold text-ink-faint">
-                  {t(s.exam.forecastAhead)}
-                </p>
-                {forecast.ahead && !forecast.unclear ? (
-                  <>
-                    <p className="mt-1 text-[22px] font-bold text-brand tabular-nums">
-                      ≈ {forecast.ahead.score}
-                      <span className="text-[13px] font-semibold text-ink-faint">/{result.total}</span>
-                    </p>
-                    <p className="text-[12px] text-ink-faint tabular-nums">
-                      {t(s.exam.forecastRange)} {forecast.ahead.low}–{forecast.ahead.high}
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-1 text-[22px] font-bold text-ink-faint">—</p>
-                )}
-              </div>
-            </div>
-            {!forecast.ahead && (
-              <p className="mt-2.5 text-[13px] leading-relaxed text-ink-soft">
-                {t(s.exam.forecastNeed)} <span className="font-bold">{forecast.daysNeeded}</span>
-              </p>
-            )}
-            {forecast.ahead && forecast.unclear && (
-              <p className="mt-2.5 text-[13px] leading-relaxed text-ink-soft">
-                {t(s.exam.forecastUnclear)}
-              </p>
-            )}
-            <p className="mt-2 text-[12px] leading-relaxed text-ink-faint">{t(s.exam.forecastNote)}</p>
-          </motion.section>
-        )}
+        {forecast && <ForecastCard forecast={forecast} total={result.total} />}
 
         {/* This variant's difficulty mix against the specification's. */}
         <motion.section
