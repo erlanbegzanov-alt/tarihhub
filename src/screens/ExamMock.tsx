@@ -15,7 +15,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconButton, ProgressBar, SectionHeading } from '../components/ui'
-import { levelLabels, patternLabels, topicLabel } from '../data/codifier'
+import { levelLabels, topicLabel } from '../data/codifier'
 import type { ExamLevel } from '../data/types'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
@@ -341,20 +341,6 @@ export function ExamMock() {
           <BreakdownList rows={result.byTopic} label={(id) => topicLabel(id, lang)} />
         </motion.div>
 
-        <motion.div variants={staggerItem} className="mt-6">
-          <SectionHeading title={t(s.exam.byPattern)} />
-        </motion.div>
-        <motion.div variants={staggerItem}>
-          <BreakdownList rows={result.byPattern} label={(p) => t(patternLabels[p])} />
-        </motion.div>
-
-        <motion.div variants={staggerItem} className="mt-6">
-          <SectionHeading title={t(s.exam.byLevel)} />
-        </motion.div>
-        <motion.div variants={staggerItem}>
-          <BreakdownList rows={result.byLevel} label={(l) => t(levelLabels[l])} />
-        </motion.div>
-
         {/* Task-by-task review — the explanations withheld during the attempt. */}
         <motion.div variants={staggerItem} className="mt-6">
           <SectionHeading title={t(s.exam.reviewTitle)} />
@@ -416,25 +402,18 @@ export function ExamMock() {
           })}
         </motion.ul>
 
-        <motion.div variants={staggerItem} className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+        {/* The mock is its own nav section now, so the only action left here
+            is another variant; the old «back to Battle» button is gone. */}
+        <motion.div variants={staggerItem} className="mt-6">
           <motion.button
             type="button"
             onClick={restart}
             whileTap={{ scale: 0.97 }}
             transition={springSoft}
-            className="focus-ring flex flex-1 items-center justify-center gap-2 rounded-full bg-brand px-5 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"
+            className="focus-ring flex w-full items-center justify-center gap-2 rounded-full bg-brand px-5 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"
           >
             <RotateCcw className="h-[18px] w-[18px]" strokeWidth={2.2} />
             {t(s.exam.retry)}
-          </motion.button>
-          <motion.button
-            type="button"
-            onClick={() => navigate('/')}
-            whileTap={{ scale: 0.97 }}
-            transition={springSoft}
-            className="focus-ring flex-1 rounded-full bg-surface px-5 py-3.5 text-[15px] font-semibold text-brand ring-[1.5px] ring-brand/45 hover:bg-brand-tint"
-          >
-            {t(s.exam.toBattle)}
           </motion.button>
         </motion.div>
       </motion.div>
