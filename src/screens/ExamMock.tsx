@@ -15,8 +15,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconButton, ProgressBar, SectionHeading } from '../components/ui'
-import { levelLabels, topicLabel } from '../data/codifier'
-import type { ExamLevel } from '../data/types'
+import { topicLabel } from '../data/codifier'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { ExamMapStimulus } from '../components/ExamMapStimulus'
@@ -153,7 +152,6 @@ function ForecastCard({ forecast, total }: { forecast: ExamForecast; total: numb
           {t(s.exam.forecastUnclear)}
         </p>
       )}
-      <p className="mt-2 text-[12px] leading-relaxed text-ink-faint">{t(s.exam.forecastNote)}</p>
     </motion.section>
   )
 }
@@ -389,36 +387,6 @@ export function ExamMock() {
 
         {/* Where the line through the student's mocks lands in a month. */}
         {forecast && <ForecastCard forecast={forecast} total={result.total} />}
-
-        {/* This variant's difficulty mix against the specification's. */}
-        <motion.section
-          variants={staggerItem}
-          className="mt-3 rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60"
-        >
-          <h2 className="text-[13px] font-semibold tracking-wide text-ink-faint uppercase">
-            {t(s.exam.mixTitle)}
-          </h2>
-          <div className="mt-3 grid grid-cols-3 gap-2.5">
-            {(['A', 'B', 'C'] as ExamLevel[]).map((level) => (
-              <div key={level} className="rounded-card bg-cream px-3 py-2.5 text-center">
-                <p className="text-[11.5px] font-semibold text-ink-faint">
-                  {t(levelLabels[level])}
-                </p>
-                <p className="mt-1 text-[17px] font-bold text-ink tabular-nums">
-                  {variant.levels[level]}
-                  <span className="text-[12px] font-semibold text-ink-faint">
-                    {' '}
-                    / {variant.levelTarget[level]}
-                  </span>
-                </p>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2.5 text-[12px] leading-relaxed text-ink-faint">
-            {t(s.exam.mixThis)} · {t(s.exam.mixTarget)}
-            {Object.keys(variant.shortfall).length > 0 && <> — {t(s.exam.mixHonest)}</>}
-          </p>
-        </motion.section>
 
         <motion.div variants={staggerItem} className="mt-6">
           <SectionHeading title={t(s.exam.byTopic)} />
