@@ -1,16 +1,17 @@
 /**
  * The Батл entry point (`/battle`).
  *
- * It was a flat list of five identical rows — same shape, same weight, one
- * coloured circle each — so nothing on the screen said what to do first. It is
- * now a standing first and a picker second: the league card carries the one
- * primary action (play a ranked duel), and everything else sits below it as
- * tiles, which are read at a glance rather than one line at a time.
+ * A standing first and a picker second: the league card carries the one
+ * primary action (play a ranked duel), and the modes sit below it.
  *
- * The hierarchy is the design, not the paint: every colour here comes from the
- * theme tokens, so the same screen holds up in light and dark. Erlan picked the
- * layout from a dark mock; hard-coding those darks would have broken the screen
- * for everyone on the light theme.
+ * Drawn in the «Ойын» direction Erlan picked off the design canvas: solid
+ * colour blocks with a ledge under them, each carrying an era illustration from
+ * the course, and Unbounded for the names. The modes are deliberately not four
+ * equal tiles — Қарапайым, the one most people open, is the big one — because
+ * a grid of identical boxes was what read as boring.
+ *
+ * The blocks keep fixed colours in both themes (`src/data/battlePaint.ts`); the ground, the
+ * header and the section heading around them still follow the theme tokens.
  *
  * The ҰБТ mock used to head the list. It lives at `/exam` now (see
  * `navItems.ts`): it is what the course prepares for, and standing it beside
@@ -22,84 +23,93 @@ import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KahootHeader } from '../components/kahoot'
-import { FormDots, LeagueCrest } from '../components/battle'
+import { FormDots, ratingTierIcon } from '../components/battle'
 import { SectionHeading } from '../components/ui'
+import { ALERT_RED, LEAGUE_PAINT, MODE_PAINT } from '../data/battlePaint'
+import type { Paint } from '../data/battlePaint'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { useAlerts } from '../lib/alerts'
 import { fetchBattlePlayer, ratingTierFor } from '../lib/battle'
+import { cn } from '../lib/cn'
 import { FEATURE_TEAM_BATTLE } from '../lib/environment'
 import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { useProfile } from '../lib/progress'
 import { useSession } from '../lib/session'
 
 /**
- * One mode, as a tile.
- *
- * Module-level so the subtree survives a re-render, and a flex column so a tile
- * with a stat line does not pull its neighbour out of line — the grid stretches
- * both to the taller of the row either way. No subtitle: Erlan had the one-line
- * descriptions taken off, the name and icon say enough.
+ * The block colour fading out over its picture, towards `direction`. `solid`
+ * is where the fade starts, in %: on the league card it must reach past the
+ * picture's left edge (42% across on a wide screen), or that edge shows as a
+ * hard line through the colour.
  */
-function ModeTile({
+const veil = (bg: string, direction: 'top' | 'right', solid = 30) =>
+  `linear-gradient(to ${direction}, ${bg} ${solid}%, color-mix(in srgb, ${bg} 60%, transparent) ${solid + 25}%, color-mix(in srgb, ${bg} 5%, transparent) 100%)`
+
+/**
+ * One mode, as an illustrated block.
+ *
+ * No subtitle: Erlan had the one-line descriptions taken off, the name, icon
+ * and picture say enough. Pressing it sinks it onto its ledge.
+ */
+function ModeBlock({
+  paint,
   icon: Icon,
-  accent,
   title,
   stat,
   alert = false,
   onClick,
+  className,
 }: {
+  paint: Paint
   icon: LucideIcon
-  accent: string
   title: string
   /** One line of this mode's own record, or `null` when there is none yet. */
   stat?: string | null
   /**
    * The stat is something waiting on the reader, not a record — a room
-   * invitation, a friend request. It turns red and the icon gets a dot, because
-   * a count in the same faint grey as "Дуэлей: 7" reads as trivia, and Erlan's
-   * point was that these have to be impossible to walk past.
+   * invitation, a friend request. It becomes a red badge in the corner, because
+   * Erlan's point was that these have to be impossible to walk past.
    */
   alert?: boolean
   onClick: () => void
+  className?: string
 }) {
   return (
     <motion.button
       type="button"
       onClick={onClick}
       whileHover={canHover ? { y: -2 } : undefined}
-      whileTap={{ scale: 0.99 }}
+      whileTap={{ y: 3 }}
       transition={springSoft}
-      className="focus-ring flex flex-col rounded-card bg-surface p-4 text-left shadow-soft ring-1 ring-line/60 transition-colors duration-200"
+      className={cn('focus-ring relative overflow-hidden rounded-[24px] text-left', className)}
+      style={{ background: paint.bg, boxShadow: `0 5px 0 0 ${paint.ledge}` }}
     >
-      <span className="relative">
+      <img
+        src={paint.image}
+        alt=""
+        aria-hidden
+        decoding="async"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <span aria-hidden className="absolute inset-0" style={{ background: veil(paint.bg, 'top') }} />
+      {stat && alert && (
         <span
-          className="grid h-10 w-10 place-items-center rounded-xl"
-          style={{
-            background: `color-mix(in srgb, ${accent} 14%, var(--color-surface))`,
-            color: accent,
-          }}
+          className="absolute top-3 right-3 rounded-full px-2.5 py-1 text-[12px] font-bold text-white tabular-nums"
+          style={{ background: ALERT_RED }}
         >
-          <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
+          {stat}
         </span>
-        {alert && (
-          <span
-            aria-hidden
-            className="absolute -top-1 -right-1 h-[11px] w-[11px] rounded-full bg-wrong ring-2 ring-surface"
-          />
+      )}
+      <span className="absolute inset-x-4 bottom-4 flex flex-col gap-2 lg:inset-x-5 lg:bottom-5">
+        <Icon className="h-[22px] w-[22px] text-white" strokeWidth={2} aria-hidden />
+        <span className="font-display text-[16px] leading-tight font-bold text-white lg:text-[20px]">
+          {title}
+        </span>
+        {stat && !alert && (
+          <span className="text-[12.5px] font-semibold text-white/90 tabular-nums">{stat}</span>
         )}
       </span>
-      <span className="mt-3 text-[15.5px] font-bold text-ink">{title}</span>
-      {stat &&
-        (alert ? (
-          <span className="mt-2 self-start rounded-full bg-wrong px-2 py-0.5 text-[11px] font-bold text-white tabular-nums">
-            {stat}
-          </span>
-        ) : (
-          <span className="mt-1.5 text-[11.5px] font-semibold text-ink-faint tabular-nums">
-            {stat}
-          </span>
-        ))}
     </motion.button>
   )
 }
@@ -128,10 +138,12 @@ export function Battle() {
   // What is waiting on the reader — a room invitation, a friend request. Both
   // arrive from other people and neither used to be visible until you went
   // looking, so the same counts drive the dot on the nav rail (see
-  // `src/lib/alerts.ts`) and the numbers on the tiles below.
+  // `src/lib/alerts.ts`) and the badges on the blocks below.
   const alerts = useAlerts()
 
   const tier = ratingTierFor(rating ?? 0)
+  const league = LEAGUE_PAINT[Math.min(tier.index, LEAGUE_PAINT.length - 1)]
+  const TierIcon = ratingTierIcon(tier.index)
 
   // The card is about the ranked ladder specifically — its crest, its rating,
   // its button — so the record beside it counts ranked duels only. Mixing the
@@ -143,25 +155,22 @@ export function Battle() {
   /** How many points short of the next league, or `null` at the top. */
   const toNext = tier.next ? Math.max(0, tier.next.min - (rating ?? 0)) : null
 
-  /**
-   * "Дуэлей: 7 · 57% побед" — or nothing at all.
-   *
-   * It used to fall back to «ещё не играли», which put a third small grey line
-   * on a tile that had nothing to report. Erlan's complaint about too many tiny
-   * fonts is mostly made of lines like that one, and an absent record already
-   * says "ещё не играли" by being absent.
-   */
+  /** "Дуэлей: 7 · 57% побед" — or nothing at all, which already says "not yet". */
   const modeRecord = (duels: number, wins: number): string | null =>
     duels > 0
       ? `${t(s.battle.hubDuelsLabel)}: ${duels} · ${Math.round((wins / duels) * 100)}% ${t(s.battle.hubWinsLabel)}`
       : null
+
+  // Team battle and Достар are test-site only. Without them the two remaining
+  // modes share the row evenly instead of leaving holes in the mosaic.
+  const teamOn = FEATURE_TEAM_BATTLE
 
   return (
     <motion.div
       variants={staggerContainer}
       initial="initial"
       animate="animate"
-      className="mx-auto max-w-2xl lg:max-w-3xl"
+      className="mx-auto max-w-2xl pb-4 lg:max-w-5xl"
     >
       <KahootHeader
         icon={<Flame className="h-5 w-5" strokeWidth={2} />}
@@ -173,113 +182,136 @@ export function Battle() {
       {/* Standing, and the one thing worth doing about it. */}
       <motion.section
         variants={staggerItem}
-        className="mt-5 overflow-hidden rounded-card bg-surface shadow-soft ring-1 ring-line/60"
+        className="relative mt-5 overflow-hidden rounded-[26px] lg:h-[220px]"
+        style={{ background: league.bg, boxShadow: `0 6px 0 0 ${league.ledge}` }}
       >
-        <div className="p-5">
-          <div className="flex items-center gap-4">
-            <LeagueCrest tierIndex={tier.index} size={54} />
+        <img
+          src={league.image}
+          alt=""
+          aria-hidden
+          decoding="async"
+          className="absolute inset-y-0 right-0 h-full w-[62%] object-cover lg:w-[58%]"
+        />
+        <span aria-hidden className="absolute inset-0" style={{ background: veil(league.bg, 'right', 46) }} />
+
+        <div className="relative flex flex-col gap-5 p-5 lg:h-full lg:justify-between lg:p-7">
+          <div className="flex items-center gap-3.5 lg:gap-4">
+            <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-2xl bg-white/20 lg:h-16 lg:w-16">
+              <TierIcon className="h-7 w-7 text-white lg:h-8 lg:w-8" strokeWidth={2} aria-hidden />
+            </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[11.5px] font-bold tracking-wide text-ink-faint uppercase">
-                {t(s.battle.leagueLabel)}
-              </p>
-              <p className="truncate text-[19px] leading-tight font-bold text-ink">
+              <p className="font-display truncate text-[22px] leading-tight font-bold text-white lg:text-[30px]">
                 {t(tier.tier.name)}
               </p>
-              <p className="text-[12.5px] font-semibold tabular-nums text-ink-soft">
+              <p className="text-[14px] font-semibold text-white/90 tabular-nums">
                 {rating ?? 0} {t(s.battle.ratingPoints)}
               </p>
             </div>
             {/* A bare "0 / 0%" would read as a scoreboard for a ladder never
                 climbed, so the record only appears once there is one. */}
             {playedRanked && (
-              <div className="shrink-0 text-right">
-                <p className="text-[22px] leading-none font-bold tabular-nums text-ink">
+              <div className="shrink-0 text-right text-white">
+                <p className="font-display text-[22px] leading-none font-bold tabular-nums lg:text-[26px]">
                   {rankedRate}
-                  <span className="text-[13px] text-ink-faint">%</span>
+                  <span className="text-[13px] text-white/85">%</span>
                 </p>
-                <p className="mt-1 text-[11px] text-ink-faint tabular-nums">
+                <p className="mt-1 text-[12px] text-white/90 tabular-nums">
                   {profile.rankedWins} / {profile.rankedDuels}
                 </p>
               </div>
             )}
           </div>
 
-          {/* Only while there is a league above: at the top the bar would sit
-              full with nothing left to say. */}
-          {toNext !== null && (
-            <div className="mt-4">
-              <div className="h-1.5 overflow-hidden rounded-full bg-cream-deep">
-                <div
-                  className="h-1.5 rounded-full bg-brand"
-                  style={{ width: `${Math.max(2, tier.progress)}%` }}
-                />
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
+            {/* Only while there is a league above: at the top the bar would sit
+                full with nothing left to say. */}
+            {tier.next && toNext !== null && (
+              <div className="max-w-[320px] lg:max-w-[440px] lg:flex-1">
+                <div className="h-2 overflow-hidden rounded-full bg-white/25">
+                  <div
+                    className="h-2 rounded-full bg-white"
+                    style={{ width: `${Math.max(2, tier.progress)}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 flex justify-between gap-3 text-[13px] font-semibold text-white/90 tabular-nums">
+                  <span>
+                    {t(s.battle.nextTier)} — {toNext} {t(s.battle.ratingPoints)}
+                  </span>
+                  <span className="shrink-0 text-white">{t(tier.next.name)}</span>
+                </p>
               </div>
-              <p className="mt-2 text-[11.5px] font-semibold tabular-nums text-ink-faint">
-                {t(s.battle.nextTier)} — {toNext} {t(s.battle.ratingPoints)}
-              </p>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => navigate('/battle/ranked')}
-            className="focus-ring mt-4 flex w-full items-center justify-center gap-2 rounded-tile bg-brand px-5 py-3.5 text-[15px] font-bold text-white transition-colors duration-200 hover:bg-brand-dark"
-          >
-            <Trophy className="h-[18px] w-[18px]" strokeWidth={2.2} aria-hidden />
-            {t(s.battle.hubPlayRanked)}
-          </button>
-        </div>
-
-        {playedRanked && (
-          <div className="flex items-center justify-between gap-3 border-t border-line-soft bg-cream/50 px-5 py-3">
-            <span className="text-[11.5px] font-semibold tracking-wide text-ink-faint uppercase">
-              {t(s.battle.formTitle)}
-            </span>
-            <FormDots results={profile.recentRankedDuels.map((duel) => duel.won)} />
+            )}
+            <motion.button
+              type="button"
+              onClick={() => navigate('/battle/ranked')}
+              whileTap={{ y: 3 }}
+              transition={springSoft}
+              className="focus-ring flex items-center gap-2 self-start rounded-full bg-white px-5 py-3 text-[15px] font-bold lg:self-auto lg:px-6 lg:py-3.5 lg:text-[16px]"
+              style={{ color: league.ledge, boxShadow: `0 4px 0 0 ${league.ledge}` }}
+            >
+              <Trophy className="h-[18px] w-[18px]" strokeWidth={2.2} aria-hidden />
+              {t(s.battle.hubPlayRanked)}
+            </motion.button>
           </div>
-        )}
+        </div>
       </motion.section>
+
+      {playedRanked && (
+        <motion.div
+          variants={staggerItem}
+          className="mt-4 flex items-center justify-between gap-3 px-1"
+        >
+          <span className="text-[12.5px] font-semibold text-ink-soft">{t(s.battle.formTitle)}</span>
+          <FormDots results={profile.recentRankedDuels.map((duel) => duel.won)} />
+        </motion.div>
+      )}
 
       <motion.div variants={staggerItem} className="mt-7">
         <SectionHeading title={t(s.battle.hubModes)} />
       </motion.div>
 
-      <motion.div variants={staggerItem} className="grid grid-cols-2 gap-2.5">
-        <ModeTile
+      {/* A mosaic, not four equal tiles. Phone: Қарапайым across the top, the
+          two group modes side by side, Достар across the bottom. Desktop:
+          Қарапайым tall on the left, the rest to its right. */}
+      <motion.div
+        variants={staggerItem}
+        className={cn(
+          'grid grid-cols-2 gap-3 lg:gap-[18px]',
+          teamOn ? 'lg:grid-cols-[10fr_7fr_7fr] lg:grid-rows-[150px_150px]' : 'lg:h-[230px]',
+        )}
+      >
+        <ModeBlock
+          paint={MODE_PAINT.casual}
           icon={Zap}
-          accent="var(--color-brand)"
           title={t(s.battle.modeCasual)}
           stat={modeRecord(profile.casualDuels, profile.casualWins)}
           onClick={() => navigate('/battle/casual')}
+          className={cn('col-span-2 h-[112px] lg:col-span-1 lg:h-auto', teamOn && 'lg:row-span-2')}
         />
-        {/* Unfinished — test site only until team battle ships. Crossed swords
-            rather than the group-of-people glyph it shared with Кахут: it is the
-            one mode where two sides face each other, and the icon was doing
-            nothing to say so. */}
-        {FEATURE_TEAM_BATTLE && (
-          <ModeTile
+        {teamOn && (
+          <ModeBlock
+            paint={MODE_PAINT.team}
             icon={Swords}
-            accent="var(--color-era-saka)"
             title={t(s.team.title)}
             stat={
-              alerts.partyInvites > 0
-                ? `${alerts.partyInvites} ${t(s.team.inviteWaiting)}`
-                : null
+              alerts.partyInvites > 0 ? `${alerts.partyInvites} ${t(s.team.inviteWaiting)}` : null
             }
             alert={alerts.partyInvites > 0}
             onClick={() => navigate('/battle/team')}
+            className="h-[150px] lg:col-span-2 lg:h-auto"
           />
         )}
-        <ModeTile
+        <ModeBlock
+          paint={MODE_PAINT.kahoot}
           icon={Users}
-          accent="var(--color-era-modern)"
           title={t(s.battle.modeKahoot)}
           onClick={() => navigate('/battle/kahoot')}
+          className={teamOn ? 'h-[150px] lg:h-auto' : 'col-span-2 h-[112px] lg:col-span-1 lg:h-auto'}
         />
-        {FEATURE_TEAM_BATTLE && (
-          <ModeTile
+        {teamOn && (
+          <ModeBlock
+            paint={MODE_PAINT.friends}
             icon={UserPlus}
-            accent="var(--color-era-turkic)"
             title={t(s.friends.title)}
             stat={
               alerts.friendRequests > 0
@@ -288,6 +320,7 @@ export function Battle() {
             }
             alert={alerts.friendRequests > 0}
             onClick={() => navigate('/battle/friends')}
+            className="col-span-2 h-[96px] lg:col-span-1 lg:h-auto"
           />
         )}
       </motion.div>

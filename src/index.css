@@ -78,6 +78,8 @@
   /* ---- Type ---- */
   --font-sans: "Inter", "Segoe UI", ui-sans-serif, system-ui, -apple-system,
     "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+  /* The «Ойын» headings, Батл section only so far (index.html loads it). */
+  --font-display: "Unbounded", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
 
   /* ---- Rank badge (src/components/RankBadge.tsx) ---- */
   /* The shimmer curve is the `easeOut` token from src/lib/motion.ts. The glow

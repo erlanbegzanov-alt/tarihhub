@@ -94,6 +94,10 @@ const TIER_COLORS = [
   'var(--tier-6)',
 ]
 
+export function ratingTierIcon(index: number): LucideIcon {
+  return TIER_ICONS[Math.max(0, Math.min(TIER_ICONS.length - 1, index))]
+}
+
 export function ratingTierColor(index: number): string {
   return TIER_COLORS[Math.max(0, Math.min(TIER_COLORS.length - 1, index))]
 }
