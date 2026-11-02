@@ -37,14 +37,14 @@ import { useSession } from '../lib/session'
  * One mode, as a tile.
  *
  * Module-level so the subtree survives a re-render, and a flex column so a tile
- * whose subtitle wraps to two lines does not pull its neighbour out of line —
- * the grid stretches both to the taller of the row either way.
+ * with a stat line does not pull its neighbour out of line — the grid stretches
+ * both to the taller of the row either way. No subtitle: Erlan had the one-line
+ * descriptions taken off, the name and icon say enough.
  */
 function ModeTile({
   icon: Icon,
   accent,
   title,
-  subtitle,
   stat,
   alert = false,
   onClick,
@@ -52,7 +52,6 @@ function ModeTile({
   icon: LucideIcon
   accent: string
   title: string
-  subtitle: string
   /** One line of this mode's own record, or `null` when there is none yet. */
   stat?: string | null
   /**
@@ -91,7 +90,6 @@ function ModeTile({
         )}
       </span>
       <span className="mt-3 text-[15.5px] font-bold text-ink">{title}</span>
-      <span className="mt-1 text-[12px] leading-snug text-ink-soft">{subtitle}</span>
       {stat &&
         (alert ? (
           <span className="mt-2 self-start rounded-full bg-wrong px-2 py-0.5 text-[11px] font-bold text-white tabular-nums">
@@ -258,7 +256,6 @@ export function Battle() {
           icon={Zap}
           accent="var(--color-brand)"
           title={t(s.battle.modeCasual)}
-          subtitle={t(s.battle.modeCasualSub)}
           stat={modeRecord(profile.casualDuels, profile.casualWins)}
           onClick={() => navigate('/battle/casual')}
         />
@@ -271,7 +268,6 @@ export function Battle() {
             icon={Swords}
             accent="var(--color-era-saka)"
             title={t(s.team.title)}
-            subtitle={t(s.team.hubSub)}
             stat={
               alerts.partyInvites > 0
                 ? `${alerts.partyInvites} ${t(s.team.inviteWaiting)}`
@@ -285,7 +281,6 @@ export function Battle() {
           icon={Users}
           accent="var(--color-era-modern)"
           title={t(s.battle.modeKahoot)}
-          subtitle={t(s.battle.modeKahootSub)}
           onClick={() => navigate('/battle/kahoot')}
         />
         {FEATURE_TEAM_BATTLE && (
@@ -293,7 +288,6 @@ export function Battle() {
             icon={UserPlus}
             accent="var(--color-era-turkic)"
             title={t(s.friends.title)}
-            subtitle={t(s.friends.hubSub)}
             stat={
               alerts.friendRequests > 0
                 ? `${alerts.friendRequests} ${t(s.friends.requestsWaiting)}`

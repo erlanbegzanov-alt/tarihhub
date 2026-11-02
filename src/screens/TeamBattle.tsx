@@ -673,9 +673,6 @@ export function TeamBattle() {
             >
               {t(s.team.createButton)}
             </button>
-            <p className="mt-2.5 text-[12.5px] leading-relaxed text-ink-soft">
-              {t(s.team.createHint)}
-            </p>
           </motion.section>
 
           {/* Or join one. */}

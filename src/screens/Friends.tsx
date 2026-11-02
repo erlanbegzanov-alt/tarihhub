@@ -322,13 +322,11 @@ export function Friends() {
                 </button>
               )}
             </div>
-            <p className="mt-3 text-[12.5px] leading-relaxed text-ink-soft">
-              {codeFailed
-                ? t(s.friends.codeFailed)
-                : code
-                  ? t(s.friends.myCodeHint)
-                  : t(s.friends.codeLoading)}
-            </p>
+            {!code && (
+              <p className="mt-3 text-[12.5px] leading-relaxed text-ink-soft">
+                {t(codeFailed ? s.friends.codeFailed : s.friends.codeLoading)}
+              </p>
+            )}
           </motion.section>
 
           {/* Add by code. */}
@@ -486,13 +484,6 @@ export function Friends() {
               </MatchList>
             </motion.div>
           )}
-
-          <motion.p
-            variants={staggerItem}
-            className="mt-7 rounded-card border border-dashed border-line px-4 py-3 text-center text-[12.5px] leading-relaxed text-ink-soft"
-          >
-            {t(s.friends.teamSoon)}
-          </motion.p>
         </>
       )}
     </motion.div>
