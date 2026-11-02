@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { daysUntilExam, forecastExam } from './examForecast'
+import { bestByVariant, daysUntilExam, forecastExam } from './examForecast'
 
 const at = (day: string, correct: number) => ({ day, correct, total: 20 })
 
@@ -40,6 +40,26 @@ describe('forecastExam', () => {
     const f = forecastExam([at('2026-09-01', 14), at('2026-09-15', 17), at('2026-10-01', 20)])
     expect(f.ahead!.score).toBeLessThanOrEqual(20)
     expect(f.ahead!.low).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('school booklets', () => {
+  it('counts only the first sitting of a booklet', () => {
+    const first = { day: '2026-10-01', correct: 8, total: 20, variant: '93002' }
+    const again = { day: '2026-10-08', correct: 18, total: 20, variant: '93002' }
+    const f = forecastExam([first, again])
+    expect(f.days).toBe(1)
+    expect(f.now).toBe(8)
+  })
+
+  it('keeps the best score per booklet for the shelf', () => {
+    const best = bestByVariant([
+      { day: '2026-10-01', correct: 8, total: 20, variant: '93002' },
+      { day: '2026-10-08', correct: 12, total: 20, variant: '93002' },
+      { day: '2026-10-09', correct: 15, total: 20 },
+    ])
+    expect(best.get('93002')?.correct).toBe(12)
+    expect(best.size).toBe(1)
   })
 })
 

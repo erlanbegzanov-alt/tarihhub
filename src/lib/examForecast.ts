@@ -18,6 +18,8 @@ export interface ExamAttempt {
   day: string
   correct: number
   total: number
+  /** The school booklet's number; absent for a drawn TarihHub variant. */
+  variant?: string
 }
 
 export interface ExamForecast {
@@ -55,9 +57,16 @@ const clamp = (v: number) => Math.max(0, Math.min(EXAM_TOTAL, v))
 
 export function forecastExam(attempts: ExamAttempt[], horizon = HORIZON_DAYS): ExamForecast {
   // One point per day: three mocks in one evening are one reading, not a trend.
+  // A booklet sat a second time measures memory of its answers, not the
+  // student, so only the first sitting of each booklet counts.
   const byDay = new Map<string, number[]>()
+  const sat = new Set<string>()
   for (const a of attempts) {
     if (a.total <= 0) continue
+    if (a.variant) {
+      if (sat.has(a.variant)) continue
+      sat.add(a.variant)
+    }
     const list = byDay.get(a.day) ?? []
     list.push((a.correct / a.total) * EXAM_TOTAL)
     byDay.set(a.day, list)
@@ -140,7 +149,10 @@ export function readExamAttempts(): ExamAttempt[] {
     if (!Array.isArray(list)) return []
     return list.filter(
       (a): a is ExamAttempt =>
-        typeof a?.day === 'string' && typeof a?.correct === 'number' && typeof a?.total === 'number',
+        typeof a?.day === 'string' &&
+        typeof a?.correct === 'number' &&
+        typeof a?.total === 'number' &&
+        (a.variant === undefined || typeof a.variant === 'string'),
     )
   } catch {
     return []
@@ -148,14 +160,27 @@ export function readExamAttempts(): ExamAttempt[] {
 }
 
 /** Appends one finished mock and returns the history including it. */
-export function recordExamAttempt(correct: number, total: number): ExamAttempt[] {
-  const next = [...readExamAttempts(), { day: localDateString(), correct, total }].slice(-MAX_STORED)
+export function recordExamAttempt(correct: number, total: number, variant?: string): ExamAttempt[] {
+  const attempt: ExamAttempt = { day: localDateString(), correct, total }
+  if (variant) attempt.variant = variant
+  const next = [...readExamAttempts(), attempt].slice(-MAX_STORED)
   try {
     window.localStorage.setItem(storageKey(), JSON.stringify(next))
   } catch {
     /* storage unavailable — the forecast still shows this session's history */
   }
   return next
+}
+
+/** Best score per school booklet, for the shelf. */
+export function bestByVariant(attempts: ExamAttempt[]): Map<string, ExamAttempt> {
+  const best = new Map<string, ExamAttempt>()
+  for (const a of attempts) {
+    if (!a.variant) continue
+    const prev = best.get(a.variant)
+    if (!prev || a.correct > prev.correct) best.set(a.variant, a)
+  }
+  return best
 }
 
 /*

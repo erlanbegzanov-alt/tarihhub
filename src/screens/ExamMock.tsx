@@ -27,11 +27,15 @@ import {
   EXAM_TIME_BUDGET_MS,
   EXAM_TOTAL,
   buildExamVariant,
+  buildSchoolVariant,
   formatCountdown,
   scoreExam,
 } from '../lib/exam'
 import type { BreakdownRow, ExamAnswers, ExamItem } from '../lib/exam'
+import { schoolVariants } from '../data/schoolVariants'
+import type { SchoolVariant } from '../data/types'
 import {
+  bestByVariant,
   daysUntilExam,
   forecastExam,
   readExamAttempts,
@@ -346,6 +350,47 @@ function ForecastPanel({
   )
 }
 
+/** One variant on a shelf: its name, its best score so far, and the start button. */
+function ShelfCard({
+  title,
+  meta,
+  share,
+  onStart,
+}: {
+  title: string
+  meta: string
+  /** Best score as a share of the paper, or `null` if never sat. */
+  share: number | null
+  onStart: () => void
+}) {
+  const { t } = useLang()
+  return (
+    <div className="flex items-center gap-4 rounded-card bg-surface px-4 py-3.5 shadow-soft ring-1 ring-line/60 sm:px-5">
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] font-semibold text-ink">{title}</p>
+        <p className="mt-0.5 text-[12.5px] leading-snug text-ink-faint">{meta}</p>
+        {share !== null && (
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-cream">
+            <div
+              className="h-full rounded-full bg-brand"
+              style={{ width: `${Math.max(share * 100, share > 0 ? 6 : 0)}%` }}
+            />
+          </div>
+        )}
+      </div>
+      <motion.button
+        type="button"
+        onClick={onStart}
+        whileTap={{ scale: 0.97 }}
+        transition={springSoft}
+        className="focus-ring shrink-0 rounded-full bg-brand px-5 py-2.5 text-[14px] font-semibold text-white shadow-soft hover:bg-brand-dark"
+      >
+        {t(s.exam.start)}
+      </motion.button>
+    </div>
+  )
+}
+
 /** One shelf of variants: a heading and what sits on it. */
 function Shelf({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -414,7 +459,7 @@ function RetakeMistakes({ items, onDone }: { items: ExamItem[]; onDone: () => vo
 
           <div className="rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60 sm:p-6">
             <span className="font-mono text-[12px] font-bold text-ink-faint">№{item.position}</span>
-            <h2 className="mt-2 text-[18px] leading-snug font-semibold text-ink sm:text-[20px]">
+            <h2 className="mt-2 text-[18px] leading-snug font-semibold whitespace-pre-line text-ink sm:text-[20px]">
               {t(item.question.question)}
             </h2>
           </div>
@@ -502,8 +547,13 @@ export function ExamMock() {
   const [filter, setFilter] = useState<'all' | Mark>('all')
   /** Bumped to draw a fresh variant — `buildExamVariant` re-runs on change. */
   const [round, setRound] = useState(0)
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- `round` is the retry counter: bumping it is exactly what should re-draw the variant.
-  const variant = useMemo(() => buildExamVariant(), [round])
+  /** The school booklet being sat, or `null` for a drawn TarihHub variant. */
+  const [booklet, setBooklet] = useState<SchoolVariant | null>(null)
+  const variant = useMemo(
+    () => (booklet ? buildSchoolVariant(booklet) : buildExamVariant()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `round` is the retry counter: bumping it is exactly what should re-draw the variant.
+    [round, booklet],
+  )
 
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState<ExamAnswers>({})
@@ -546,8 +596,8 @@ export function ExamMock() {
     recordedRound.current = round
     const answeredAny = variant.items.some((i) => answers[i.question.id])
     const { correct, total } = scoreExam(variant, answers)
-    setAttempts(answeredAny ? recordExamAttempt(correct, total) : readExamAttempts())
-  }, [phase, round, variant, answers])
+    setAttempts(answeredAny ? recordExamAttempt(correct, total, booklet?.id) : readExamAttempts())
+  }, [phase, round, variant, answers, booklet])
 
   const begin = () => {
     setDeadline(Date.now() + EXAM_TIME_BUDGET_MS)
@@ -566,6 +616,13 @@ export function ExamMock() {
     setFilter('all')
     setPhase('brief')
   }
+
+  const startVariant = (next: SchoolVariant | null) => {
+    setBooklet(next)
+    restart()
+  }
+
+  const variantLabel = booklet ? `${t(s.exam.variantNo)} ${booklet.id}` : t(s.exam.subtitle)
 
   /* The answer sheet's dots jump to that task's review, showing every task
      first so the one asked for is not hidden by the filter. */
@@ -655,6 +712,7 @@ export function ExamMock() {
   /* ------------------------------ shelves ------------------------------ */
 
   if (phase === 'shelves') {
+    const bests = bestByVariant(readExamAttempts())
     return (
       <motion.div
         variants={staggerContainer}
@@ -664,32 +722,42 @@ export function ExamMock() {
       >
         <ScreenHeader title={t(s.exam.variantsTitle)} onBack={() => setPhase('home')} />
 
-        {/* Official and school variants have no data yet; the shelves stand
-            so it is plain where they will go. */}
-        {[s.exam.shelfOfficial, s.exam.shelfSchool].map((title) => (
-          <Shelf key={title.kz} title={t(title)}>
-            <p className="rounded-card border border-dashed border-ink-faint/40 px-4 py-3.5 text-[13.5px] text-ink-faint">
-              {t(s.exam.shelfSoon)}
-            </p>
-          </Shelf>
-        ))}
+        {/* The official variant has no data yet; the shelf stands so it is
+            plain where it will go. */}
+        <Shelf title={t(s.exam.shelfOfficial)}>
+          <p className="rounded-card border border-dashed border-ink-faint/40 px-4 py-3.5 text-[13.5px] text-ink-faint">
+            {t(s.exam.shelfSoon)}
+          </p>
+        </Shelf>
+
+        <Shelf title={t(s.exam.shelfSchool)}>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {schoolVariants.map((b) => {
+              const best = bests.get(b.id)
+              return (
+                <ShelfCard
+                  key={b.id}
+                  title={`${t(s.exam.variantNo)} ${b.id}`}
+                  meta={
+                    best
+                      ? `${t(s.exam.bestScore)} ${best.correct}/${best.total} · ${t(s.exam.repeatNote)}`
+                      : t(s.exam.randomVariantMeta)
+                  }
+                  share={best ? best.correct / best.total : null}
+                  onStart={() => startVariant(b)}
+                />
+              )
+            })}
+          </div>
+        </Shelf>
 
         <Shelf title={t(s.exam.shelfOurs)}>
-          <div className="flex items-center gap-4 rounded-card bg-surface px-4 py-3.5 shadow-soft ring-1 ring-line/60 sm:px-5">
-            <div className="min-w-0 flex-1">
-              <p className="text-[15px] font-semibold text-ink">{t(s.exam.randomVariant)}</p>
-              <p className="mt-0.5 text-[12.5px] text-ink-faint">{t(s.exam.randomVariantMeta)}</p>
-            </div>
-            <motion.button
-              type="button"
-              onClick={restart}
-              whileTap={{ scale: 0.97 }}
-              transition={springSoft}
-              className="focus-ring shrink-0 rounded-full bg-brand px-5 py-2.5 text-[14px] font-semibold text-white shadow-soft hover:bg-brand-dark"
-            >
-              {t(s.exam.start)}
-            </motion.button>
-          </div>
+          <ShelfCard
+            title={t(s.exam.randomVariant)}
+            meta={t(s.exam.randomVariantMeta)}
+            share={null}
+            onStart={() => startVariant(null)}
+          />
         </Shelf>
       </motion.div>
     )
@@ -718,7 +786,7 @@ export function ExamMock() {
       >
         <ScreenHeader
           title={t(s.exam.title)}
-          sub={t(s.exam.subtitle)}
+          sub={variantLabel}
           onBack={() => setPhase('shelves')}
         />
 
@@ -797,7 +865,11 @@ export function ExamMock() {
         animate="animate"
         className="mx-auto max-w-2xl pb-4 lg:max-w-3xl"
       >
-        <ScreenHeader title={t(s.exam.resultTitle)} onBack={() => setPhase('home')} />
+        <ScreenHeader
+          title={t(s.exam.resultTitle)}
+          sub={booklet ? variantLabel : undefined}
+          onBack={() => setPhase('home')}
+        />
 
         {ranOutOfTime && (
           <motion.p
@@ -965,7 +1037,7 @@ export function ExamMock() {
                   >
                     №{position}
                   </span>
-                  <p className="min-w-0 flex-1 text-[14.5px] leading-snug font-semibold text-ink">
+                  <p className="min-w-0 flex-1 text-[14.5px] leading-snug font-semibold whitespace-pre-line text-ink">
                     {t(question.question)}
                   </p>
                 </div>
@@ -1024,7 +1096,7 @@ export function ExamMock() {
           )}
           <motion.button
             type="button"
-            onClick={restart}
+            onClick={() => setPhase('shelves')}
             whileTap={{ scale: 0.97 }}
             transition={springSoft}
             className={cn(result.correct < result.total ? secondaryButton : primaryButton, 'flex-1')}
@@ -1159,7 +1231,7 @@ export function ExamMock() {
             <span className="rounded-full bg-cream px-3 py-1 text-[11.5px] font-semibold text-ink-soft">
               {t(item.question.category)}
             </span>
-            <h2 className="mt-4 text-[19px] leading-snug font-semibold text-ink sm:text-[21px]">
+            <h2 className="mt-4 text-[19px] leading-snug font-semibold whitespace-pre-line text-ink sm:text-[21px]">
               {t(item.question.question)}
             </h2>
           </div>

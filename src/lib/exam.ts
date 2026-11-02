@@ -1,6 +1,13 @@
 import { contextBlocks } from '../data/contextBlocks'
 import { entQuestions } from '../data/entQuestions'
-import type { ContextBlock, ExamLevel, PatternKey, QuizQuestion, TopicId } from '../data/types'
+import type {
+  ContextBlock,
+  ExamLevel,
+  PatternKey,
+  QuizQuestion,
+  SchoolVariant,
+  TopicId,
+} from '../data/types'
 import { shuffled } from './shuffle'
 
 /**
@@ -121,14 +128,63 @@ export function buildExamVariant(random: () => number = Math.random): ExamVarian
 
   const items: ExamItem[] = []
   shuffled(taken, random).forEach((question) => {
-    items.push({ position: items.length + 1, question, block: null })
+    items.push({ position: items.length + 1, question: withShuffledOptions(question, random), block: null })
   })
   blocks.forEach((block) => {
     block.questions.forEach((question) => {
-      items.push({ position: items.length + 1, question, block })
+      items.push({ position: items.length + 1, question: withShuffledOptions(question, random), block })
     })
   })
 
+  return withLevels(items, blocks)
+}
+
+/**
+ * The bank stores the right answer as option `a` in 117 of its 122 questions,
+ * so served as stored, "always A" would score almost every standalone task.
+ * Every option list is reordered before it reaches the screen, as `Quiz.tsx`
+ * already does for practice.
+ */
+const withShuffledOptions = (question: QuizQuestion, random: () => number): QuizQuestion => ({
+  ...question,
+  options: shuffled(question.options, random),
+})
+
+/** A small seeded generator (mulberry32 over an FNV-1a hash of `seed`). */
+function seededRandom(seed: string): () => number {
+  let h = 2166136261
+  for (let i = 0; i < seed.length; i += 1) h = Math.imul(h ^ seed.charCodeAt(i), 16777619)
+  return () => {
+    h = (h + 0x6d2b79f5) | 0
+    let t = Math.imul(h ^ (h >>> 15), 1 | h)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/**
+ * A school booklet as a variant: its own twenty tasks in its own order, the
+ * same every time. Options are reordered too — some tasks come from the bank,
+ * right answer first — but by a seed, so a second sitting shows the same
+ * letters. Its level mix is whatever the booklet's is; `shortfall` reports it
+ * the same way as for a drawn variant.
+ */
+export function buildSchoolVariant(booklet: SchoolVariant): ExamVariant {
+  const random = seededRandom(booklet.id)
+  const items: ExamItem[] = booklet.standalone.map((question, i) => ({
+    position: i + 1,
+    question: withShuffledOptions(question, random),
+    block: null,
+  }))
+  booklet.blocks.forEach((block) => {
+    block.questions.forEach((question) => {
+      items.push({ position: items.length + 1, question: withShuffledOptions(question, random), block })
+    })
+  })
+  return withLevels(items, [...booklet.blocks])
+}
+
+function withLevels(items: ExamItem[], blocks: ContextBlock[]): ExamVariant {
   const levels = countLevels(items.map((i) => i.question))
   const shortfall: Partial<Record<ExamLevel, number>> = {}
   for (const level of LEVEL_ORDER) {
