@@ -27,6 +27,8 @@ export interface ExamForecast {
   daysNeeded: number
   /** Current level out of `EXAM_TOTAL`, or `null` with no mock at all. */
   now: number | null
+  /** How sure `now` is — the band drawn on the scale. */
+  nowBand: { low: number; high: number } | null
   /** Where the line lands `HORIZON_DAYS` from the latest mock; `null` until enough days. */
   ahead: { score: number; low: number; high: number } | null
   /** True when the band is too wide to say anything — mocks too close together or too uneven. */
@@ -71,10 +73,20 @@ export function forecastExam(attempts: ExamAttempt[], horizon = HORIZON_DAYS): E
 
   const n = points.length
   const empty = { days: n, ahead: null, unclear: false }
-  if (n === 0) return { ...empty, daysNeeded: FORECAST_MIN_DAYS, now: null }
+  if (n === 0) return { ...empty, daysNeeded: FORECAST_MIN_DAYS, now: null, nowBand: null }
   if (n < FORECAST_MIN_DAYS) {
-    const mean = points.reduce((s, p) => s + p.y, 0) / n
-    return { ...empty, daysNeeded: FORECAST_MIN_DAYS - n, now: clamp(mean) }
+    // No line yet: the level is the mean of every paper so far, and its band
+    // is the binomial noise of that many twenty-task papers.
+    const papers = points.reduce((s, p) => s + p.n, 0)
+    const mean = clamp(points.reduce((s, p) => s + p.y * p.n, 0) / papers)
+    const q = mean / EXAM_TOTAL
+    const sd = Math.sqrt((EXAM_TOTAL * q * (1 - q)) / papers)
+    return {
+      ...empty,
+      daysNeeded: FORECAST_MIN_DAYS - n,
+      now: mean,
+      nowBand: { low: clamp(mean - 1.28 * sd), high: clamp(mean + 1.28 * sd) },
+    }
   }
 
   const xBar = points.reduce((s, p) => s + p.x, 0) / n
@@ -103,10 +115,14 @@ export function forecastExam(attempts: ExamAttempt[], horizon = HORIZON_DAYS): E
   const low = clamp(score - 1.28 * sd)
   const high = clamp(score + 1.28 * sd)
 
+  const now = clamp(at(last))
+  const nowSd = Math.sqrt(scatter * (1 / n + (last - xBar) ** 2 / sxx))
+
   return {
     days: n,
     daysNeeded: 0,
-    now: clamp(at(last)),
+    now,
+    nowBand: { low: clamp(now - 1.28 * nowSd), high: clamp(now + 1.28 * nowSd) },
     ahead: { score: Math.round(score), low: Math.round(low), high: Math.round(high) },
     unclear: high - low > MAX_USEFUL_BAND,
   }
@@ -140,4 +156,41 @@ export function recordExamAttempt(correct: number, total: number): ExamAttempt[]
     /* storage unavailable — the forecast still shows this session's history */
   }
   return next
+}
+
+/*
+ * The student's own exam day, for the "N days left" line. Nysana defaulted it
+ * to 15 June, a guess; the real date is on the student's own ҰБТ pass, so here
+ * there is no default and the screen asks for it.
+ */
+const DATE_KEY_BASE = 'tarihhub_exam_date_v1'
+
+const dateKey = () => {
+  const uid = profileUid()
+  return uid ? `${DATE_KEY_BASE}_${uid}` : DATE_KEY_BASE
+}
+
+/** The saved exam day as local `YYYY-MM-DD`, or `null` if never set. */
+export function readExamDate(): string | null {
+  try {
+    const raw = window.localStorage.getItem(dateKey())
+    return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null
+  } catch {
+    return null
+  }
+}
+
+export function saveExamDate(day: string | null): void {
+  try {
+    if (day) window.localStorage.setItem(dateKey(), day)
+    else window.localStorage.removeItem(dateKey())
+  } catch {
+    /* storage unavailable — the line simply stays hidden */
+  }
+}
+
+/** Whole days from `today` to `day`, both local `YYYY-MM-DD`; never negative. */
+export function daysUntilExam(day: string, today = localDateString()): number {
+  const ms = Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)
+  return Math.max(0, Math.round(ms / 86_400_000))
 }
