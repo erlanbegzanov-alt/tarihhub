@@ -201,7 +201,8 @@ function ForecastScale({
   const t0 = x(EXAM_THRESHOLD)
   const tone = forecastTone(now)
   return (
-    <svg viewBox={`0 0 ${SCALE_W} 74`} width="100%" className="mt-4" aria-hidden>
+    // Capped so the scale's numbers stay small on a wide screen, as in Nysana.
+    <svg viewBox={`0 0 ${SCALE_W} 74`} className="mt-4 w-full max-w-[460px]" aria-hidden>
       <rect
         x={x(low)}
         y={AXIS_Y - 13}
@@ -304,113 +305,153 @@ function ForecastPanel({
       variants={staggerItem}
       className="mt-5 rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60 sm:p-6"
     >
-      <div className="flex items-baseline justify-between gap-3 font-mono text-[11px] tracking-[0.16em] text-ink-faint uppercase">
-        <span>{t(s.exam.forecastTitle)}</span>
-        {examDay && (
-          <span className="tabular-nums">
-            {daysUntilExam(examDay)} {t(s.exam.daysLeft)}
-          </span>
-        )}
-      </div>
-      <p className="mt-3 font-mono leading-none tabular-nums">
-        <b
-          className={cn(
-            'text-[52px] font-bold',
-            forecast.now !== null ? forecastTone(forecast.now).text : 'text-ink-faint',
+      {/* On a wide screen: the reading on the left, what follows from it on
+          the right — one column there would leave half the card empty. */}
+      <div className="lg:grid lg:grid-cols-2 lg:gap-10">
+        <div>
+          <div className="flex items-baseline justify-between gap-3 font-mono text-[11px] tracking-[0.16em] text-ink-faint uppercase">
+            <span>{t(s.exam.forecastTitle)}</span>
+            {examDay && (
+              <span className="tabular-nums">
+                {daysUntilExam(examDay)} {t(s.exam.daysLeft)}
+              </span>
+            )}
+          </div>
+          <p className="mt-3 font-mono leading-none tabular-nums">
+            <b
+              className={cn(
+                'text-[52px] font-bold',
+                forecast.now !== null ? forecastTone(forecast.now).text : 'text-ink-faint',
+              )}
+            >
+              {forecast.now !== null ? oneDecimal(forecast.now) : '—'}
+            </b>
+            <span className="ml-1.5 text-[20px] text-ink-faint">/ {EXAM_TOTAL}</span>
+          </p>
+          <p className="mt-2 text-[13.5px] text-ink-soft">
+            {forecast.now !== null ? t(s.exam.forecastNow) : t(s.exam.forecastEmpty)}
+          </p>
+
+          {forecast.now !== null && forecast.nowBand && (
+            <ForecastScale
+              now={forecast.now}
+              low={forecast.nowBand.low}
+              high={forecast.nowBand.high}
+              ahead={ahead}
+              thresholdLabel={t(s.exam.forecastThreshold)}
+            />
           )}
-        >
-          {forecast.now !== null ? oneDecimal(forecast.now) : '—'}
-        </b>
-        <span className="ml-1.5 text-[20px] text-ink-faint">/ {EXAM_TOTAL}</span>
-      </p>
-      <p className="mt-2 text-[13.5px] text-ink-soft">
-        {forecast.now !== null ? t(s.exam.forecastNow) : t(s.exam.forecastEmpty)}
-      </p>
+        </div>
 
-      {forecast.now !== null && forecast.nowBand && (
-        <ForecastScale
-          now={forecast.now}
-          low={forecast.nowBand.low}
-          high={forecast.nowBand.high}
-          ahead={ahead}
-          thresholdLabel={t(s.exam.forecastThreshold)}
-        />
-      )}
+        <div className="lg:flex lg:flex-col lg:justify-center">
+          <div className="mt-4 flex items-center gap-4 rounded-card bg-cream px-4 py-3.5 lg:mt-0">
+            <p className="min-w-0 flex-1 text-[13px] leading-snug text-ink-soft">
+              {t(s.exam.forecastAhead)}
+            </p>
+            <p className="shrink-0 font-mono text-[26px] font-bold text-ink tabular-nums">
+              {ahead ?? '—'}
+            </p>
+          </div>
+          {forecast.now !== null && !forecast.ahead && (
+            <p className="mt-2.5 text-[13px] leading-relaxed text-ink-soft">
+              {t(s.exam.forecastNeed)} <span className="font-bold">{forecast.daysNeeded}</span>
+            </p>
+          )}
+          {forecast.ahead && forecast.unclear && (
+            <p className="mt-2.5 text-[13px] leading-relaxed text-ink-soft">
+              {t(s.exam.forecastUnclear)}
+            </p>
+          )}
 
-      <div className="mt-4 flex items-center gap-4 rounded-card bg-cream px-4 py-3.5">
-        <p className="min-w-0 flex-1 text-[13px] leading-snug text-ink-soft">
-          {t(s.exam.forecastAhead)}
-        </p>
-        <p className="shrink-0 font-mono text-[26px] font-bold text-ink tabular-nums">
-          {ahead ?? '—'}
-        </p>
-      </div>
-      {forecast.now !== null && !forecast.ahead && (
-        <p className="mt-2.5 text-[13px] leading-relaxed text-ink-soft">
-          {t(s.exam.forecastNeed)} <span className="font-bold">{forecast.daysNeeded}</span>
-        </p>
-      )}
-      {forecast.ahead && forecast.unclear && (
-        <p className="mt-2.5 text-[13px] leading-relaxed text-ink-soft">
-          {t(s.exam.forecastUnclear)}
-        </p>
-      )}
-
-      <div className="mt-5 border-t border-line-soft pt-4">
-        <label className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="font-mono text-[11px] tracking-[0.16em] text-ink-faint uppercase">
-            {t(s.exam.examDate)}
-          </span>
-          <input
-            type="date"
-            value={examDay ?? ''}
-            min={localDateString()}
-            onChange={(e) => onExamDay(e.target.value || null)}
-            className="focus-ring rounded-full bg-cream px-3 py-1.5 text-[13.5px] font-semibold text-ink tabular-nums ring-1 ring-line/60"
-          />
-        </label>
-        {!examDay && (
-          <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">{t(s.exam.examDateAsk)}</p>
-        )}
+          <div className="mt-5 border-t border-line-soft pt-4">
+            <label className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span className="font-mono text-[11px] tracking-[0.16em] text-ink-faint uppercase">
+                {t(s.exam.examDate)}
+              </span>
+              <input
+                type="date"
+                value={examDay ?? ''}
+                min={localDateString()}
+                onChange={(e) => onExamDay(e.target.value || null)}
+                className="focus-ring rounded-full bg-cream px-3 py-1.5 text-[13.5px] font-semibold text-ink tabular-nums ring-1 ring-line/60"
+              />
+            </label>
+            {!examDay && (
+              <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">
+                {t(s.exam.examDateAsk)}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     </motion.section>
   )
 }
 
-/** One variant on a shelf: its name, its best score so far, and the start button. */
-function ShelfCard({
-  title,
-  meta,
-  share,
-  onStart,
-}: {
-  title: string
-  meta: string
-  /** Best score as a share of the paper, or `null` if never sat. */
-  share: number | null
-  onStart: () => void
-}) {
+const startButton =
+  'focus-ring rounded-full bg-brand px-5 py-2.5 text-[14px] font-semibold text-white shadow-soft hover:bg-brand-dark'
+
+/** A one-off variant on a shelf of its own: one row, name and start. */
+function ShelfCard({ title, meta, onStart }: { title: string; meta: string; onStart: () => void }) {
   const { t } = useLang()
   return (
     <div className="flex items-center gap-4 rounded-card bg-surface px-4 py-3.5 shadow-soft ring-1 ring-line/60 sm:px-5">
       <div className="min-w-0 flex-1">
         <p className="text-[15px] font-semibold text-ink">{title}</p>
         <p className="mt-0.5 text-[12.5px] leading-snug text-ink-faint">{meta}</p>
-        {share !== null && (
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-cream">
-            <div
-              className="h-full rounded-full bg-brand"
-              style={{ width: `${Math.max(share * 100, share > 0 ? 6 : 0)}%` }}
-            />
-          </div>
-        )}
       </div>
       <motion.button
         type="button"
         onClick={onStart}
         whileTap={{ scale: 0.97 }}
         transition={springSoft}
-        className="focus-ring shrink-0 rounded-full bg-brand px-5 py-2.5 text-[14px] font-semibold text-white shadow-soft hover:bg-brand-dark"
+        className={cn(startButton, 'shrink-0')}
+      >
+        {t(s.exam.start)}
+      </motion.button>
+    </div>
+  )
+}
+
+/**
+ * A booklet in the school grid, laid out as mockup 4: number and best score on
+ * one line, the bar, a note, and the button pinned to the bottom so every card
+ * in a row ends level whatever the note's length.
+ */
+function BookletCard({
+  title,
+  score,
+  share,
+  note,
+  onStart,
+}: {
+  title: string
+  /** Best score as «12/20», or `null` if never sat. */
+  score: string | null
+  share: number
+  note: string
+  onStart: () => void
+}) {
+  const { t } = useLang()
+  return (
+    <div className="flex flex-col gap-2.5 rounded-card bg-surface p-4 shadow-soft ring-1 ring-line/60">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[16px] font-bold text-brand">{title}</p>
+        <span className="font-mono text-[13px] text-ink-faint tabular-nums">{score ?? '—'}</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-cream">
+        <div
+          className="h-full rounded-full bg-brand"
+          style={{ width: `${Math.max(share * 100, share > 0 ? 6 : 0)}%` }}
+        />
+      </div>
+      <p className="text-[12.5px] leading-snug text-ink-faint">{note}</p>
+      <motion.button
+        type="button"
+        onClick={onStart}
+        whileTap={{ scale: 0.97 }}
+        transition={springSoft}
+        className={cn(startButton, 'mt-auto w-full')}
       >
         {t(s.exam.start)}
       </motion.button>
@@ -718,7 +759,7 @@ export function ExamMock() {
         variants={staggerContainer}
         initial="initial"
         animate="animate"
-        className="mx-auto max-w-2xl pb-4 lg:max-w-3xl"
+        className="mx-auto max-w-2xl pb-4 lg:max-w-5xl"
       >
         <ScreenHeader
           title={t(s.exam.title)}
@@ -770,19 +811,16 @@ export function ExamMock() {
             </Shelf>
 
             <Shelf title={t(s.exam.shelfSchool)}>
-              <div className="grid gap-2.5 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-3">
                 {schoolVariants.map((b) => {
                   const best = bests.get(b.id)
                   return (
-                    <ShelfCard
+                    <BookletCard
                       key={b.id}
                       title={`${t(s.exam.variantNo)} ${b.id}`}
-                      meta={
-                        best
-                          ? `${t(s.exam.bestScore)} ${best.correct}/${best.total} · ${t(s.exam.repeatNote)}`
-                          : t(s.exam.randomVariantMeta)
-                      }
-                      share={best ? best.correct / best.total : null}
+                      score={best ? `${best.correct}/${best.total}` : null}
+                      share={best ? best.correct / best.total : 0}
+                      note={best ? t(s.exam.repeatNote) : t(s.exam.randomVariantMeta)}
                       onStart={() => startVariant(b)}
                     />
                   )
@@ -794,7 +832,6 @@ export function ExamMock() {
               <ShelfCard
                 title={t(s.exam.randomVariant)}
                 meta={t(s.exam.randomVariantMeta)}
-                share={null}
                 onStart={() => startVariant(null)}
               />
             </Shelf>
