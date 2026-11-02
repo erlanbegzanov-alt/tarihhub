@@ -64,7 +64,7 @@ import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '..
 
 const LETTERS = ['A', 'B', 'C', 'D']
 
-type Phase = 'home' | 'shelves' | 'brief' | 'running' | 'result' | 'retake'
+type Phase = 'shelves' | 'brief' | 'running' | 'result' | 'retake'
 
 /** How one task of a finished attempt went. */
 type Mark = 'right' | 'wrong' | 'blank'
@@ -541,7 +541,8 @@ export function ExamMock() {
   // Re-render when the account resolves: the stored mocks are keyed per uid.
   useProfile()
 
-  const [phase, setPhase] = useState<Phase>('home')
+  const [phase, setPhase] = useState<Phase>('shelves')
+  const [tab, setTab] = useState<'variants' | 'forecast'>('variants')
   /** Bumped when the exam day is saved, so the home screen re-reads it. */
   const [, setDateVersion] = useState(0)
   const [filter, setFilter] = useState<'all' | Mark>('all')
@@ -669,50 +670,22 @@ export function ExamMock() {
     if (at >= 0) goTo(at)
   }
 
-  /* ------------------------------- home -------------------------------- */
-
-  if (phase === 'home') {
-    return (
-      <motion.div
-        variants={staggerContainer}
-        initial="initial"
-        animate="animate"
-        className="mx-auto max-w-2xl lg:max-w-3xl"
-      >
-        <ScreenHeader
-          title={t(s.exam.title)}
-          sub={t(s.exam.subtitle)}
-          onBack={() => navigate('/')}
-        />
-        <ForecastPanel
-          forecast={forecastExam(readExamAttempts())}
-          examDay={readExamDate()}
-          onExamDay={(day) => {
-            saveExamDate(day)
-            setDateVersion((v) => v + 1)
-          }}
-        />
-        <motion.div variants={staggerItem} className="mt-4">
-          <motion.button
-            type="button"
-            onClick={() => setPhase('shelves')}
-            whileHover={canHover ? { y: -2 } : undefined}
-            whileTap={{ scale: 0.98 }}
-            transition={springSoft}
-            className={cn(primaryButton, 'w-full')}
-          >
-            {t(s.exam.toVariants)}
-            <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2.2} />
-          </motion.button>
-        </motion.div>
-      </motion.div>
-    )
-  }
-
-  /* ------------------------------ shelves ------------------------------ */
+  /* ---------------------- shelves, with the forecast tab --------------- */
 
   if (phase === 'shelves') {
-    const bests = bestByVariant(readExamAttempts())
+    const attemptsSoFar = readExamAttempts()
+    const forecast = forecastExam(attemptsSoFar)
+    const bests = bestByVariant(attemptsSoFar)
+    const tabs: { key: 'variants' | 'forecast'; label: string }[] = [
+      { key: 'variants', label: t(s.exam.variantsTitle) },
+      {
+        key: 'forecast',
+        label:
+          forecast.now === null
+            ? t(s.exam.forecastTab)
+            : `${t(s.exam.forecastTab)} · ${oneDecimal(forecast.now)}`,
+      },
+    ]
     return (
       <motion.div
         variants={staggerContainer}
@@ -720,45 +693,86 @@ export function ExamMock() {
         animate="animate"
         className="mx-auto max-w-2xl pb-4 lg:max-w-3xl"
       >
-        <ScreenHeader title={t(s.exam.variantsTitle)} onBack={() => setPhase('home')} />
+        <ScreenHeader
+          title={t(s.exam.title)}
+          sub={t(s.exam.subtitle)}
+          onBack={() => navigate('/')}
+        />
 
-        {/* The official variant has no data yet; the shelf stands so it is
-            plain where it will go. */}
-        <Shelf title={t(s.exam.shelfOfficial)}>
-          <p className="rounded-card border border-dashed border-ink-faint/40 px-4 py-3.5 text-[13.5px] text-ink-faint">
-            {t(s.exam.shelfSoon)}
-          </p>
-        </Shelf>
+        {/* Variants first: the page is for sitting a paper. The forecast is
+            one tap away, with its reading on the tab itself. */}
+        <motion.div
+          variants={staggerItem}
+          role="tablist"
+          className="mt-4 flex rounded-full bg-surface p-1 shadow-soft ring-1 ring-line/60"
+        >
+          {tabs.map((tb) => (
+            <button
+              key={tb.key}
+              type="button"
+              role="tab"
+              aria-selected={tab === tb.key}
+              onClick={() => setTab(tb.key)}
+              className={cn(
+                'focus-ring flex-1 rounded-full px-3 py-2 text-[14px] font-semibold tabular-nums transition-colors duration-200',
+                tab === tb.key ? 'bg-brand text-white' : 'text-ink-soft hover:text-ink',
+              )}
+            >
+              {tb.label}
+            </button>
+          ))}
+        </motion.div>
 
-        <Shelf title={t(s.exam.shelfSchool)}>
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            {schoolVariants.map((b) => {
-              const best = bests.get(b.id)
-              return (
-                <ShelfCard
-                  key={b.id}
-                  title={`${t(s.exam.variantNo)} ${b.id}`}
-                  meta={
-                    best
-                      ? `${t(s.exam.bestScore)} ${best.correct}/${best.total} · ${t(s.exam.repeatNote)}`
-                      : t(s.exam.randomVariantMeta)
-                  }
-                  share={best ? best.correct / best.total : null}
-                  onStart={() => startVariant(b)}
-                />
-              )
-            })}
-          </div>
-        </Shelf>
-
-        <Shelf title={t(s.exam.shelfOurs)}>
-          <ShelfCard
-            title={t(s.exam.randomVariant)}
-            meta={t(s.exam.randomVariantMeta)}
-            share={null}
-            onStart={() => startVariant(null)}
+        {tab === 'forecast' ? (
+          <ForecastPanel
+            forecast={forecast}
+            examDay={readExamDate()}
+            onExamDay={(day) => {
+              saveExamDate(day)
+              setDateVersion((v) => v + 1)
+            }}
           />
-        </Shelf>
+        ) : (
+          <>
+            {/* The official variant has no data yet; the shelf stands so it is
+                plain where it will go. */}
+            <Shelf title={t(s.exam.shelfOfficial)}>
+              <p className="rounded-card border border-dashed border-ink-faint/40 px-4 py-3.5 text-[13.5px] text-ink-faint">
+                {t(s.exam.shelfSoon)}
+              </p>
+            </Shelf>
+
+            <Shelf title={t(s.exam.shelfSchool)}>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {schoolVariants.map((b) => {
+                  const best = bests.get(b.id)
+                  return (
+                    <ShelfCard
+                      key={b.id}
+                      title={`${t(s.exam.variantNo)} ${b.id}`}
+                      meta={
+                        best
+                          ? `${t(s.exam.bestScore)} ${best.correct}/${best.total} · ${t(s.exam.repeatNote)}`
+                          : t(s.exam.randomVariantMeta)
+                      }
+                      share={best ? best.correct / best.total : null}
+                      onStart={() => startVariant(b)}
+                    />
+                  )
+                })}
+              </div>
+            </Shelf>
+
+            <Shelf title={t(s.exam.shelfOurs)}>
+              <ShelfCard
+                title={t(s.exam.randomVariant)}
+                meta={t(s.exam.randomVariantMeta)}
+                share={null}
+                onStart={() => startVariant(null)}
+              />
+            </Shelf>
+          </>
+        )}
       </motion.div>
     )
   }
@@ -868,7 +882,7 @@ export function ExamMock() {
         <ScreenHeader
           title={t(s.exam.resultTitle)}
           sub={booklet ? variantLabel : undefined}
-          onBack={() => setPhase('home')}
+          onBack={() => setPhase('shelves')}
         />
 
         {ranOutOfTime && (

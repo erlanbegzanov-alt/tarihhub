@@ -1344,7 +1344,7 @@ export const s = {
       kz: 'Өз ҰБТ күніңді белгіле — қанша күн қалғанын санаймыз.',
       ru: 'Укажи дату своего ЕНТ — посчитаем, сколько дней осталось.',
     },
-    toVariants: { kz: 'Нұсқа таңдау', ru: 'Выбрать вариант' },
+    forecastTab: { kz: 'Болжам', ru: 'Прогноз' },
 
     // The shelves — where variants live, by where they come from.
     variantsTitle: { kz: 'Нұсқалар', ru: 'Варианты' },
