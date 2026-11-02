@@ -161,6 +161,27 @@ const SCALE_W = 340
 const SCALE_PAD = 14
 const AXIS_Y = 50
 
+/**
+ * From here a reading turns green. Ours, not an official grade: the only
+ * official line on this scale is the threshold of 5; 15 is three quarters
+ * of the paper.
+ */
+const FORECAST_STRONG = 15
+
+/**
+ * The reading's colour — red below the threshold, gold between, green from
+ * `FORECAST_STRONG`. Full class names, so the stylesheet keeps every one.
+ */
+function forecastTone(score: number) {
+  if (score < EXAM_THRESHOLD) {
+    return { text: 'text-wrong', stroke: 'stroke-wrong', fill: 'fill-wrong', band: 'fill-wrong-tint' }
+  }
+  if (score >= FORECAST_STRONG) {
+    return { text: 'text-correct', stroke: 'stroke-correct', fill: 'fill-correct', band: 'fill-correct-tint' }
+  }
+  return { text: 'text-gold-ink', stroke: 'stroke-gold', fill: 'fill-gold', band: 'fill-gold-tint' }
+}
+
 /** Nysana's rangefinder: the reading, how sure it is, and the official threshold. */
 function ForecastScale({
   now,
@@ -178,6 +199,7 @@ function ForecastScale({
   const x = (v: number) =>
     SCALE_PAD + (Math.max(0, Math.min(EXAM_TOTAL, v)) / EXAM_TOTAL) * (SCALE_W - SCALE_PAD * 2)
   const t0 = x(EXAM_THRESHOLD)
+  const tone = forecastTone(now)
   return (
     <svg viewBox={`0 0 ${SCALE_W} 74`} width="100%" className="mt-4" aria-hidden>
       <rect
@@ -185,7 +207,7 @@ function ForecastScale({
         y={AXIS_Y - 13}
         width={Math.max(2, x(high) - x(low))}
         height={13}
-        className="fill-gold-tint"
+        className={tone.band}
       />
       <line
         x1={SCALE_PAD}
@@ -250,12 +272,12 @@ function ForecastScale({
         y1={AXIS_Y - 22}
         x2={x(now)}
         y2={AXIS_Y + 6}
-        className="stroke-gold"
+        className={tone.stroke}
         strokeWidth={2.5}
       />
       <path
         d={`M ${x(now) - 5} ${AXIS_Y - 28} L ${x(now) + 5} ${AXIS_Y - 28} L ${x(now)} ${AXIS_Y - 20} Z`}
-        className="fill-gold"
+        className={tone.fill}
       />
     </svg>
   )
@@ -291,7 +313,12 @@ function ForecastPanel({
         )}
       </div>
       <p className="mt-3 font-mono leading-none tabular-nums">
-        <b className="text-[52px] font-bold text-gold-ink">
+        <b
+          className={cn(
+            'text-[52px] font-bold',
+            forecast.now !== null ? forecastTone(forecast.now).text : 'text-ink-faint',
+          )}
+        >
           {forecast.now !== null ? oneDecimal(forecast.now) : '—'}
         </b>
         <span className="ml-1.5 text-[20px] text-ink-faint">/ {EXAM_TOTAL}</span>
@@ -919,7 +946,14 @@ export function ExamMock() {
               {t(s.exam.forecastTitle)}
             </p>
             <p className="mt-1.5 font-mono leading-none tabular-nums">
-              <b className="text-[40px] font-bold text-gold-ink">
+              <b
+                className={cn(
+                  'text-[40px] font-bold',
+                  forecast && forecast.now !== null
+                    ? forecastTone(forecast.now).text
+                    : 'text-ink-faint',
+                )}
+              >
                 {forecast && forecast.now !== null ? oneDecimal(forecast.now) : '—'}
               </b>
               {forecast?.ahead && !forecast.unclear && (
