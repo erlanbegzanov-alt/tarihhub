@@ -85,6 +85,14 @@ describe('buildExamVariant', () => {
     }
   })
 
+  it('does not leave the right answer first — the bank stores it as option a', () => {
+    for (let seed = 1; seed <= 25; seed++) {
+      const v = buildExamVariant(seeded(seed))
+      const first = v.items.filter((i) => i.question.options[0].id === i.question.correctId)
+      expect(first.length).toBeLessThan(12)
+    }
+  })
+
   it('draws a different variant on three runs in a row', () => {
     const runs = [1, 2, 3].map((s) => buildExamVariant(seeded(s * 97)))
     const signatures = runs.map((v) => v.items.map((i) => i.question.id).join('|'))

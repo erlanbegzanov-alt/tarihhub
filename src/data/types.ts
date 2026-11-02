@@ -209,6 +209,20 @@ export interface ContextBlock {
   questions: QuizQuestion[]
 }
 
+/**
+ * A school mock booklet carried over as a fixed variant (`schoolVariants/`):
+ * the same twenty tasks every time, in the booklet's order, under the
+ * booklet's own number, so a student can sit again the paper they sat at school.
+ */
+export interface SchoolVariant {
+  /** The number printed on the booklet, e.g. `'93002'`. */
+  id: string
+  /** Tasks 1–10, in the booklet's order. Exactly 10. */
+  standalone: QuizQuestion[]
+  /** Tasks 11–15 and 16–20. */
+  blocks: [ContextBlock, ContextBlock]
+}
+
 export interface QuizQuestion {
   id: string
   /** When set, the question is only served for these personas. */
