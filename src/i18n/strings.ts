@@ -425,11 +425,6 @@ export const s = {
     hubModes: { kz: 'Режимді таңдаңыз', ru: 'Выберите режим' },
     /** The hub's one primary action, under the league standing. */
     hubPlayRanked: { kz: 'Рейтингте ойнау', ru: 'Играть рейтинг' },
-    /** Empty state on the hub for an account that has never duelled. */
-    hubNoPlay: {
-      kz: 'Қарапайым батл рейтингке әсер етпейді — сонан бастаңыз.',
-      ru: 'Обычный батл не влияет на рейтинг — начните с него.',
-    },
     /**
      * Per-mode summary line on the hub's mode cards, read as
      * "Дуэлей: 7 · 57% побед". Deliberately a label followed by the number
@@ -448,11 +443,6 @@ export const s = {
     /** Follows the `+18` / `−9` numbers, so both read as one sentence. */
     ratingPerWin: { kz: 'жеңіске', ru: 'за победу' },
     ratingPerLoss: { kz: 'жеңіліске', ru: 'за поражение' },
-    /** Says plainly that the rating cannot go negative. */
-    ratingFloor: {
-      kz: 'Рейтинг ешқашан нөлден төмен түспейді.',
-      ru: 'Рейтинг никогда не опускается ниже нуля.',
-    },
     /** Тhe league the rating currently sits in. */
     leagueLabel: { kz: 'Лига', ru: 'Лига' },
     /** Celebration on the result screen when the duel moved the player up a league. */
