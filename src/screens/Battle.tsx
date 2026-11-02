@@ -139,7 +139,6 @@ export function Battle() {
   const rankedRate =
     profile.rankedDuels > 0 ? Math.round((profile.rankedWins / profile.rankedDuels) * 100) : 0
   const playedRanked = profile.rankedDuels > 0
-  const playedAnything = profile.casualDuels + profile.rankedDuels > 0
 
   /** How many points short of the next league, or `null` at the top. */
   const toNext = tier.next ? Math.max(0, tier.next.min - (rating ?? 0)) : null
@@ -231,19 +230,13 @@ export function Battle() {
           </button>
         </div>
 
-        {playedRanked ? (
+        {playedRanked && (
           <div className="flex items-center justify-between gap-3 border-t border-line-soft bg-cream/50 px-5 py-3">
             <span className="text-[11.5px] font-semibold tracking-wide text-ink-faint uppercase">
               {t(s.battle.formTitle)}
             </span>
             <FormDots results={profile.recentRankedDuels.map((duel) => duel.won)} />
           </div>
-        ) : (
-          !playedAnything && (
-            <p className="border-t border-line-soft bg-cream/50 px-5 py-3 text-[12.5px] leading-relaxed text-ink-soft">
-              {t(s.battle.hubNoPlay)}
-            </p>
-          )
         )}
       </motion.section>
 

@@ -288,9 +288,6 @@ export function LeagueCard({
               {t(s.battle.ratingPerLoss)}
             </span>
           </div>
-          <p className="mt-1.5 text-[14px] leading-relaxed text-ink-soft">
-            {t(s.battle.ratingFloor)}
-          </p>
         </div>
       )}
     </div>
