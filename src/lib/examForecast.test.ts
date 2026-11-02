@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { forecastExam } from './examForecast'
+import { daysUntilExam, forecastExam } from './examForecast'
 
 const at = (day: string, correct: number) => ({ day, correct, total: 20 })
 
@@ -40,5 +40,18 @@ describe('forecastExam', () => {
     const f = forecastExam([at('2026-09-01', 14), at('2026-09-15', 17), at('2026-10-01', 20)])
     expect(f.ahead!.score).toBeLessThanOrEqual(20)
     expect(f.ahead!.low).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('daysUntilExam', () => {
+  it('counts calendar days, across a month and a year end', () => {
+    expect(daysUntilExam('2026-11-03', '2026-11-02')).toBe(1)
+    expect(daysUntilExam('2027-01-01', '2026-12-31')).toBe(1)
+    expect(daysUntilExam('2027-06-01', '2026-11-02')).toBe(211)
+  })
+
+  it('never goes below zero once the day has passed', () => {
+    expect(daysUntilExam('2026-11-02', '2026-11-02')).toBe(0)
+    expect(daysUntilExam('2026-10-01', '2026-11-02')).toBe(0)
   })
 })

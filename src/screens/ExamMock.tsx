@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconButton, ProgressBar, SectionHeading } from '../components/ui'
 import { topicLabel } from '../data/codifier'
@@ -22,20 +23,29 @@ import { ExamMapStimulus } from '../components/ExamMapStimulus'
 import { cn } from '../lib/cn'
 import {
   EXAM_STANDALONE_COUNT,
+  EXAM_THRESHOLD,
   EXAM_TIME_BUDGET_MS,
   EXAM_TOTAL,
   buildExamVariant,
   formatCountdown,
   scoreExam,
 } from '../lib/exam'
-import type { BreakdownRow, ExamAnswers } from '../lib/exam'
-import { forecastExam, readExamAttempts, recordExamAttempt } from '../lib/examForecast'
+import type { BreakdownRow, ExamAnswers, ExamItem } from '../lib/exam'
+import {
+  daysUntilExam,
+  forecastExam,
+  readExamAttempts,
+  readExamDate,
+  recordExamAttempt,
+  saveExamDate,
+} from '../lib/examForecast'
 import type { ExamAttempt, ExamForecast } from '../lib/examForecast'
-import { useProfile } from '../lib/progress'
+import { localDateString, useProfile } from '../lib/progress'
 import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 
 /**
- * The ҰБТ mock (`/battle/exam`).
+ * The ҰБТ mock (`/exam`): forecast first, then the shelves of variants, the
+ * attempt, and the result with its answer sheet.
  *
  * Differs from `Quiz.tsx` in the one way that matters: it withholds feedback
  * until the end. A practice quiz tells you straight away whether you were
@@ -50,7 +60,52 @@ import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '..
 
 const LETTERS = ['A', 'B', 'C', 'D']
 
-type Phase = 'brief' | 'running' | 'result'
+type Phase = 'home' | 'shelves' | 'brief' | 'running' | 'result' | 'retake'
+
+/** How one task of a finished attempt went. */
+type Mark = 'right' | 'wrong' | 'blank'
+
+const markOf = (item: ExamItem, answers: ExamAnswers): Mark => {
+  const picked = answers[item.question.id] ?? null
+  return picked === null ? 'blank' : picked === item.question.correctId ? 'right' : 'wrong'
+}
+
+const letterOf = (item: ExamItem, optionId: string) =>
+  LETTERS[item.question.options.findIndex((o) => o.id === optionId)] ?? ''
+
+const oneDecimal = (v: number) => v.toFixed(1).replace('.', ',')
+
+const primaryButton =
+  'focus-ring flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark'
+const secondaryButton =
+  'focus-ring flex items-center justify-center gap-2 rounded-full bg-surface px-5 py-3.5 text-[15px] font-semibold text-brand ring-[1.5px] ring-brand/45 hover:bg-brand-tint'
+
+/** Back arrow, title, an optional subtitle and right-hand slot — the top row of every phase. */
+function ScreenHeader({
+  title,
+  sub,
+  onBack,
+  children,
+}: {
+  title: string
+  sub?: ReactNode
+  onBack: () => void
+  children?: ReactNode
+}) {
+  const { t } = useLang()
+  return (
+    <motion.div variants={staggerItem} className="flex items-center gap-3">
+      <IconButton label={t(s.common.back)} onClick={onBack}>
+        <ArrowLeft className="h-5 w-5" strokeWidth={2} />
+      </IconButton>
+      <div className="min-w-0 flex-1">
+        <h1 className="truncate text-lg font-bold tracking-tight text-ink">{title}</h1>
+        {sub && <p className="text-[12.5px] text-ink-faint tabular-nums">{sub}</p>}
+      </div>
+      {children}
+    </motion.div>
+  )
+}
 
 /** One breakdown row: a label, "3/5", and a bar. */
 function BreakdownList<K>({
@@ -98,51 +153,168 @@ function BreakdownList<K>({
   )
 }
 
+const SCALE_W = 340
+const SCALE_PAD = 14
+const AXIS_Y = 50
+
+/** Nysana's rangefinder: the reading, how sure it is, and the official threshold. */
+function ForecastScale({
+  now,
+  low,
+  high,
+  ahead,
+  thresholdLabel,
+}: {
+  now: number
+  low: number
+  high: number
+  ahead: number | null
+  thresholdLabel: string
+}) {
+  const x = (v: number) =>
+    SCALE_PAD + (Math.max(0, Math.min(EXAM_TOTAL, v)) / EXAM_TOTAL) * (SCALE_W - SCALE_PAD * 2)
+  const t0 = x(EXAM_THRESHOLD)
+  return (
+    <svg viewBox={`0 0 ${SCALE_W} 74`} width="100%" className="mt-4" aria-hidden>
+      <rect
+        x={x(low)}
+        y={AXIS_Y - 13}
+        width={Math.max(2, x(high) - x(low))}
+        height={13}
+        className="fill-gold-tint"
+      />
+      <line
+        x1={SCALE_PAD}
+        y1={AXIS_Y}
+        x2={SCALE_W - SCALE_PAD}
+        y2={AXIS_Y}
+        className="stroke-line"
+        strokeWidth={2}
+      />
+      {[0, 5, 10, 15, 20].map((v) => (
+        <g key={v}>
+          <line
+            x1={x(v)}
+            y1={AXIS_Y}
+            x2={x(v)}
+            y2={AXIS_Y + 5}
+            className="stroke-line"
+            strokeWidth={1.5}
+          />
+          <text
+            x={x(v)}
+            y={AXIS_Y + 19}
+            textAnchor="middle"
+            fontSize={10}
+            className="fill-ink-faint font-mono"
+          >
+            {v}
+          </text>
+        </g>
+      ))}
+      <line
+        x1={t0}
+        y1={AXIS_Y - 30}
+        x2={t0}
+        y2={AXIS_Y + 4}
+        className="stroke-ink-faint"
+        strokeWidth={1}
+        strokeDasharray="3 3"
+      />
+      <text
+        x={t0}
+        y={AXIS_Y - 35}
+        textAnchor="middle"
+        fontSize={9.5}
+        letterSpacing="0.14em"
+        className="fill-ink-faint font-mono"
+      >
+        {thresholdLabel.toUpperCase()}
+      </text>
+      {ahead !== null && Math.abs(ahead - now) > 0.3 && (
+        <circle
+          cx={x(ahead)}
+          cy={AXIS_Y - 6.5}
+          r={4}
+          fill="none"
+          className="stroke-ink-faint"
+          strokeWidth={1.5}
+        />
+      )}
+      <line
+        x1={x(now)}
+        y1={AXIS_Y - 22}
+        x2={x(now)}
+        y2={AXIS_Y + 6}
+        className="stroke-gold"
+        strokeWidth={2.5}
+      />
+      <path
+        d={`M ${x(now) - 5} ${AXIS_Y - 28} L ${x(now) + 5} ${AXIS_Y - 28} L ${x(now)} ${AXIS_Y - 20} Z`}
+        className="fill-gold"
+      />
+    </svg>
+  )
+}
+
 /**
- * The Nysana forecast. Shown on the start screen as well as the result, and
- * shown with no mocks yet too — a card that only appears after a finished,
- * answered mock was invisible to anyone opening the page to look for it.
+ * Nysana's main screen in TarihHub's colours: the reading, how sure it is,
+ * where the line lands in a month, and the days left to the student's own
+ * exam. Shown with no mocks yet too — the empty state says what fills it.
  */
-function ForecastCard({ forecast, total }: { forecast: ExamForecast; total: number }) {
+function ForecastPanel({
+  forecast,
+  examDay,
+  onExamDay,
+}: {
+  forecast: ExamForecast
+  examDay: string | null
+  onExamDay: (day: string | null) => void
+}) {
   const { t } = useLang()
+  const ahead = forecast.ahead && !forecast.unclear ? forecast.ahead.score : null
   return (
     <motion.section
       variants={staggerItem}
-      className="mt-3 rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60"
+      className="mt-5 rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60 sm:p-6"
     >
-      <h2 className="text-[13px] font-semibold tracking-wide text-ink-faint uppercase">
-        {t(s.exam.forecastTitle)}
-      </h2>
-      <div className="mt-3 grid grid-cols-2 gap-2.5">
-        <div className="rounded-card bg-cream px-3 py-2.5">
-          <p className="text-[11.5px] font-semibold text-ink-faint">{t(s.exam.forecastNow)}</p>
-          {forecast.now !== null ? (
-            <p className="mt-1 text-[22px] font-bold text-ink tabular-nums">
-              ≈ {Math.round(forecast.now)}
-              <span className="text-[13px] font-semibold text-ink-faint">/{total}</span>
-            </p>
-          ) : (
-            <p className="mt-1 text-[22px] font-bold text-ink-faint">—</p>
-          )}
-        </div>
-        <div className="rounded-card bg-cream px-3 py-2.5">
-          <p className="text-[11.5px] font-semibold text-ink-faint">{t(s.exam.forecastAhead)}</p>
-          {forecast.ahead && !forecast.unclear ? (
-            <>
-              <p className="mt-1 text-[22px] font-bold text-brand tabular-nums">
-                ≈ {forecast.ahead.score}
-                <span className="text-[13px] font-semibold text-ink-faint">/{total}</span>
-              </p>
-              <p className="text-[12px] text-ink-faint tabular-nums">
-                {t(s.exam.forecastRange)} {forecast.ahead.low}–{forecast.ahead.high}
-              </p>
-            </>
-          ) : (
-            <p className="mt-1 text-[22px] font-bold text-ink-faint">—</p>
-          )}
-        </div>
+      <div className="flex items-baseline justify-between gap-3 font-mono text-[11px] tracking-[0.16em] text-ink-faint uppercase">
+        <span>{t(s.exam.forecastTitle)}</span>
+        {examDay && (
+          <span className="tabular-nums">
+            {daysUntilExam(examDay)} {t(s.exam.daysLeft)}
+          </span>
+        )}
       </div>
-      {!forecast.ahead && (
+      <p className="mt-3 font-mono leading-none tabular-nums">
+        <b className="text-[52px] font-bold text-gold-ink">
+          {forecast.now !== null ? oneDecimal(forecast.now) : '—'}
+        </b>
+        <span className="ml-1.5 text-[20px] text-ink-faint">/ {EXAM_TOTAL}</span>
+      </p>
+      <p className="mt-2 text-[13.5px] text-ink-soft">
+        {forecast.now !== null ? t(s.exam.forecastNow) : t(s.exam.forecastEmpty)}
+      </p>
+
+      {forecast.now !== null && forecast.nowBand && (
+        <ForecastScale
+          now={forecast.now}
+          low={forecast.nowBand.low}
+          high={forecast.nowBand.high}
+          ahead={ahead}
+          thresholdLabel={t(s.exam.forecastThreshold)}
+        />
+      )}
+
+      <div className="mt-4 flex items-center gap-4 rounded-card bg-cream px-4 py-3.5">
+        <p className="min-w-0 flex-1 text-[13px] leading-snug text-ink-soft">
+          {t(s.exam.forecastAhead)}
+        </p>
+        <p className="shrink-0 font-mono text-[26px] font-bold text-ink tabular-nums">
+          {ahead ?? '—'}
+        </p>
+      </div>
+      {forecast.now !== null && !forecast.ahead && (
         <p className="mt-2.5 text-[13px] leading-relaxed text-ink-soft">
           {t(s.exam.forecastNeed)} <span className="font-bold">{forecast.daysNeeded}</span>
         </p>
@@ -152,7 +324,169 @@ function ForecastCard({ forecast, total }: { forecast: ExamForecast; total: numb
           {t(s.exam.forecastUnclear)}
         </p>
       )}
+
+      <div className="mt-5 border-t border-line-soft pt-4">
+        <label className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="font-mono text-[11px] tracking-[0.16em] text-ink-faint uppercase">
+            {t(s.exam.examDate)}
+          </span>
+          <input
+            type="date"
+            value={examDay ?? ''}
+            min={localDateString()}
+            onChange={(e) => onExamDay(e.target.value || null)}
+            className="focus-ring rounded-full bg-cream px-3 py-1.5 text-[13.5px] font-semibold text-ink tabular-nums ring-1 ring-line/60"
+          />
+        </label>
+        {!examDay && (
+          <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">{t(s.exam.examDateAsk)}</p>
+        )}
+      </div>
     </motion.section>
+  )
+}
+
+/** One shelf of variants: a heading and what sits on it. */
+function Shelf({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <motion.section variants={staggerItem} className="mt-6">
+      <SectionHeading title={title} />
+      {children}
+    </motion.section>
+  )
+}
+
+/**
+ * «Қателерді қайта тапсыру»: the tasks missed in this attempt, again, with the
+ * answer shown at once — the opposite of the mock, because the point now is to
+ * learn the fact, not to measure. Never recorded: it would read as a five-task
+ * mock and drag the forecast about.
+ */
+function RetakeMistakes({ items, onDone }: { items: ExamItem[]; onDone: () => void }) {
+  const { t } = useLang()
+  const [index, setIndex] = useState(0)
+  const [picked, setPicked] = useState<string | null>(null)
+  const item = items[index]
+  const isLast = index === items.length - 1
+
+  const next = () => {
+    if (isLast) {
+      onDone()
+      return
+    }
+    setIndex(index + 1)
+    setPicked(null)
+  }
+
+  return (
+    <motion.div
+      variants={staggerContainer}
+      initial="initial"
+      animate="animate"
+      className="mx-auto max-w-2xl pb-4 lg:max-w-3xl"
+    >
+      <ScreenHeader
+        title={t(s.exam.retakeTitle)}
+        sub={`${index + 1}/${items.length}`}
+        onBack={onDone}
+      />
+      <motion.p variants={staggerItem} className="mt-3 text-[13px] text-ink-faint">
+        {t(s.exam.retakeNote)}
+      </motion.p>
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={item.question.id}
+          initial={{ opacity: 0, x: 24 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -24 }}
+          transition={{ duration: 0.26, ease: easeOut }}
+          className="mt-4"
+        >
+          {item.block?.passage && (
+            <div className="mb-3 rounded-card bg-cream px-4 py-3.5 ring-1 ring-line/60">
+              <p className="text-[14px] font-bold text-ink">{t(item.block.title)}</p>
+              <p className="mt-1.5 text-[14px] leading-relaxed text-ink-soft">
+                {t(item.block.passage)}
+              </p>
+            </div>
+          )}
+
+          <div className="rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60 sm:p-6">
+            <span className="font-mono text-[12px] font-bold text-ink-faint">№{item.position}</span>
+            <h2 className="mt-2 text-[18px] leading-snug font-semibold text-ink sm:text-[20px]">
+              {t(item.question.question)}
+            </h2>
+          </div>
+
+          <ul className="mt-3 flex flex-col gap-2.5">
+            {item.question.options.map((option, optionIndex) => {
+              const shown = picked !== null
+              const isRight = option.id === item.question.correctId
+              const isPicked = option.id === picked
+              return (
+                <li key={option.id}>
+                  <button
+                    type="button"
+                    disabled={shown}
+                    onClick={() => setPicked(option.id)}
+                    className={cn(
+                      'focus-ring flex w-full items-center gap-3.5 rounded-card px-4 py-3.5 text-left',
+                      'ring-1 transition-colors duration-200',
+                      !shown
+                        ? 'bg-surface text-ink shadow-soft ring-line/60 hover:ring-brand/40'
+                        : isRight
+                          ? 'bg-correct-tint text-ink ring-correct/50'
+                          : isPicked
+                            ? 'bg-wrong-tint text-ink ring-wrong/50'
+                            : 'bg-surface text-ink-faint ring-line/40',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'grid h-8 w-8 shrink-0 place-items-center rounded-full text-[13px] font-bold',
+                        shown && isRight
+                          ? 'bg-correct text-white'
+                          : shown && isPicked
+                            ? 'bg-wrong text-white'
+                            : 'bg-cream text-ink-soft',
+                      )}
+                    >
+                      {shown && isRight ? (
+                        <Check className="h-4 w-4" strokeWidth={3} />
+                      ) : shown && isPicked ? (
+                        <X className="h-4 w-4" strokeWidth={3} />
+                      ) : (
+                        LETTERS[optionIndex]
+                      )}
+                    </span>
+                    <span className="text-[15px] font-medium">{t(option.label)}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+
+          {picked !== null && (
+            <>
+              <p className="mt-3 rounded-card bg-cream px-4 py-3 text-[13.5px] leading-relaxed text-ink-soft">
+                {t(item.question.explanation)}
+              </p>
+              <motion.button
+                type="button"
+                onClick={next}
+                whileTap={{ scale: 0.98 }}
+                transition={springSoft}
+                className={cn(primaryButton, 'mt-4 w-full')}
+              >
+                {isLast ? t(s.exam.retakeDone) : t(s.exam.next)}
+                {!isLast && <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2.2} />}
+              </motion.button>
+            </>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </motion.div>
   )
 }
 
@@ -162,7 +496,10 @@ export function ExamMock() {
   // Re-render when the account resolves: the stored mocks are keyed per uid.
   useProfile()
 
-  const [phase, setPhase] = useState<Phase>('brief')
+  const [phase, setPhase] = useState<Phase>('home')
+  /** Bumped when the exam day is saved, so the home screen re-reads it. */
+  const [, setDateVersion] = useState(0)
+  const [filter, setFilter] = useState<'all' | Mark>('all')
   /** Bumped to draw a fresh variant — `buildExamVariant` re-runs on change. */
   const [round, setRound] = useState(0)
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `round` is the retry counter: bumping it is exactly what should re-draw the variant.
@@ -226,7 +563,19 @@ export function ExamMock() {
     setRanOutOfTime(false)
     setPassageOpen(true)
     setAttempts(null)
+    setFilter('all')
     setPhase('brief')
+  }
+
+  /* The answer sheet's dots jump to that task's review, showing every task
+     first so the one asked for is not hidden by the filter. */
+  const jumpToTask = (position: number) => {
+    setFilter('all')
+    requestAnimationFrame(() =>
+      document
+        .getElementById(`exam-task-${position}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+    )
   }
 
   const goTo = (next: number) => {
@@ -263,6 +612,100 @@ export function ExamMock() {
     if (at >= 0) goTo(at)
   }
 
+  /* ------------------------------- home -------------------------------- */
+
+  if (phase === 'home') {
+    return (
+      <motion.div
+        variants={staggerContainer}
+        initial="initial"
+        animate="animate"
+        className="mx-auto max-w-2xl lg:max-w-3xl"
+      >
+        <ScreenHeader
+          title={t(s.exam.title)}
+          sub={t(s.exam.subtitle)}
+          onBack={() => navigate('/')}
+        />
+        <ForecastPanel
+          forecast={forecastExam(readExamAttempts())}
+          examDay={readExamDate()}
+          onExamDay={(day) => {
+            saveExamDate(day)
+            setDateVersion((v) => v + 1)
+          }}
+        />
+        <motion.div variants={staggerItem} className="mt-4">
+          <motion.button
+            type="button"
+            onClick={() => setPhase('shelves')}
+            whileHover={canHover ? { y: -2 } : undefined}
+            whileTap={{ scale: 0.98 }}
+            transition={springSoft}
+            className={cn(primaryButton, 'w-full')}
+          >
+            {t(s.exam.toVariants)}
+            <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2.2} />
+          </motion.button>
+        </motion.div>
+      </motion.div>
+    )
+  }
+
+  /* ------------------------------ shelves ------------------------------ */
+
+  if (phase === 'shelves') {
+    return (
+      <motion.div
+        variants={staggerContainer}
+        initial="initial"
+        animate="animate"
+        className="mx-auto max-w-2xl pb-4 lg:max-w-3xl"
+      >
+        <ScreenHeader title={t(s.exam.variantsTitle)} onBack={() => setPhase('home')} />
+
+        {/* Official and school variants have no data yet; the shelves stand
+            so it is plain where they will go. */}
+        {[s.exam.shelfOfficial, s.exam.shelfSchool].map((title) => (
+          <Shelf key={title.kz} title={t(title)}>
+            <p className="rounded-card border border-dashed border-ink-faint/40 px-4 py-3.5 text-[13.5px] text-ink-faint">
+              {t(s.exam.shelfSoon)}
+            </p>
+          </Shelf>
+        ))}
+
+        <Shelf title={t(s.exam.shelfOurs)}>
+          <div className="flex items-center gap-4 rounded-card bg-surface px-4 py-3.5 shadow-soft ring-1 ring-line/60 sm:px-5">
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-semibold text-ink">{t(s.exam.randomVariant)}</p>
+              <p className="mt-0.5 text-[12.5px] text-ink-faint">{t(s.exam.randomVariantMeta)}</p>
+            </div>
+            <motion.button
+              type="button"
+              onClick={restart}
+              whileTap={{ scale: 0.97 }}
+              transition={springSoft}
+              className="focus-ring shrink-0 rounded-full bg-brand px-5 py-2.5 text-[14px] font-semibold text-white shadow-soft hover:bg-brand-dark"
+            >
+              {t(s.exam.start)}
+            </motion.button>
+          </div>
+        </Shelf>
+      </motion.div>
+    )
+  }
+
+  /* ------------------------------- retake ------------------------------ */
+
+  if (phase === 'retake') {
+    return (
+      <RetakeMistakes
+        items={variant.items.filter((i) => markOf(i, answers) !== 'right')}
+        onDone={() => setPhase('result')}
+      />
+    )
+  }
+
   /* ------------------------------- brief ------------------------------- */
 
   if (phase === 'brief') {
@@ -273,17 +716,11 @@ export function ExamMock() {
         animate="animate"
         className="mx-auto max-w-2xl lg:max-w-3xl"
       >
-        <motion.div variants={staggerItem} className="flex items-center gap-3">
-          <IconButton label={t(s.common.back)} onClick={() => navigate('/')}>
-            <ArrowLeft className="h-5 w-5" strokeWidth={2} />
-          </IconButton>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-bold tracking-tight text-ink">
-              {t(s.exam.title)}
-            </h1>
-            <p className="text-[12.5px] text-ink-faint">{t(s.exam.subtitle)}</p>
-          </div>
-        </motion.div>
+        <ScreenHeader
+          title={t(s.exam.title)}
+          sub={t(s.exam.subtitle)}
+          onBack={() => setPhase('shelves')}
+        />
 
         <motion.section
           variants={staggerItem}
@@ -317,8 +754,6 @@ export function ExamMock() {
             {t(s.exam.start)}
           </motion.button>
         </motion.section>
-
-        <ForecastCard forecast={forecastExam(readExamAttempts())} total={EXAM_TOTAL} />
       </motion.div>
     )
   }
@@ -328,6 +763,32 @@ export function ExamMock() {
   if (phase === 'result') {
     const result = scoreExam(variant, answers)
     const forecast = attempts ? forecastExam(attempts) : null
+    const marks = variant.items.map((item) => markOf(item, answers))
+    const wrong = result.total - result.correct - result.blank
+    const spentMs =
+      deadline === null ? null : Math.min(EXAM_TIME_BUDGET_MS, EXAM_TIME_BUDGET_MS - Math.max(0, msLeft))
+
+    /* The sheet in the paper's own three parts: tasks 1–10, then each context. */
+    const sheet: { label: string; at: number[] }[] = []
+    variant.items.forEach((item, i) => {
+      const label =
+        item.block === null
+          ? t(s.exam.singleTasks)
+          : item.position <= EXAM_STANDALONE_COUNT + 5
+            ? t(s.exam.contextOne)
+            : t(s.exam.contextTwo)
+      const part = sheet.find((p) => p.label === label)
+      if (part) part.at.push(i)
+      else sheet.push({ label, at: [i] })
+    })
+
+    const filters: { key: 'all' | Mark; label: string; n: number }[] = [
+      { key: 'all', label: t(s.exam.filterAll), n: result.total },
+      { key: 'wrong', label: t(s.exam.filterWrong), n: wrong },
+      { key: 'blank', label: t(s.exam.filterBlank), n: result.blank },
+      { key: 'right', label: t(s.exam.filterRight), n: result.correct },
+    ]
+    const shown = variant.items.filter((_, i) => filter === 'all' || marks[i] === filter)
 
     return (
       <motion.div
@@ -336,14 +797,7 @@ export function ExamMock() {
         animate="animate"
         className="mx-auto max-w-2xl pb-4 lg:max-w-3xl"
       >
-        <motion.div variants={staggerItem} className="flex items-center gap-3">
-          <IconButton label={t(s.common.back)} onClick={() => navigate('/')}>
-            <ArrowLeft className="h-5 w-5" strokeWidth={2} />
-          </IconButton>
-          <h1 className="min-w-0 flex-1 truncate text-lg font-bold tracking-tight text-ink">
-            {t(s.exam.resultTitle)}
-          </h1>
-        </motion.div>
+        <ScreenHeader title={t(s.exam.resultTitle)} onBack={() => setPhase('home')} />
 
         {ranOutOfTime && (
           <motion.p
@@ -355,38 +809,198 @@ export function ExamMock() {
           </motion.p>
         )}
 
-        {/* Score, threshold, blanks. */}
-        <motion.section
-          variants={staggerItem}
-          className="mt-4 rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60"
-        >
-          <div className="flex items-end gap-4">
-            <p className="text-[44px] leading-none font-bold text-brand tabular-nums">
-              {result.correct}
-              <span className="text-[22px] text-ink-faint">/{result.total}</span>
-            </p>
-            <p className="pb-1.5 text-[12.5px] font-semibold tracking-wide text-ink-faint uppercase">
+        {/* Score, forecast, time — the three numbers a finished paper gives. */}
+        <motion.div variants={staggerItem} className="mt-4 grid gap-2.5 sm:grid-cols-3">
+          <section className="rounded-card bg-surface p-4 shadow-soft ring-1 ring-line/60">
+            <p className="font-mono text-[11px] tracking-[0.16em] text-ink-faint uppercase">
               {t(s.exam.score)}
             </p>
-          </div>
-          <p
-            className={cn(
-              'mt-3 text-[13.5px] leading-relaxed',
-              result.passedThreshold ? 'text-ink-soft' : 'font-semibold text-wrong',
-            )}
-          >
-            {result.passedThreshold ? t(s.exam.thresholdOk) : t(s.exam.thresholdFail)}
-          </p>
-          {result.blank > 0 && (
-            <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">
-              {t(s.exam.blankLeft)}: <span className="font-bold">{result.blank}</span>.{' '}
-              {t(s.exam.blankCost)}
+            <p className="mt-1.5 font-mono leading-none tabular-nums">
+              <b className="text-[40px] font-bold text-brand">{result.correct}</b>
+              <span className="text-[18px] text-ink-faint">/{result.total}</span>
             </p>
-          )}
+            <p
+              className={cn(
+                'mt-2 text-[12.5px] leading-snug',
+                result.passedThreshold ? 'text-ink-soft' : 'font-semibold text-wrong',
+              )}
+            >
+              {result.passedThreshold ? t(s.exam.thresholdOk) : t(s.exam.thresholdFail)}
+            </p>
+          </section>
+          <section className="rounded-card bg-surface p-4 shadow-soft ring-1 ring-line/60">
+            <p className="font-mono text-[11px] tracking-[0.16em] text-ink-faint uppercase">
+              {t(s.exam.forecastTitle)}
+            </p>
+            <p className="mt-1.5 font-mono leading-none tabular-nums">
+              <b className="text-[40px] font-bold text-gold-ink">
+                {forecast && forecast.now !== null ? oneDecimal(forecast.now) : '—'}
+              </b>
+              {forecast?.ahead && !forecast.unclear && (
+                <span className="text-[18px] text-ink-faint"> → {forecast.ahead.score}</span>
+              )}
+            </p>
+            <p className="mt-2 text-[12.5px] leading-snug text-ink-soft">
+              {forecast?.ahead && !forecast.unclear
+                ? t(s.exam.forecastAheadShort)
+                : t(s.exam.forecastNow)}
+            </p>
+          </section>
+          <section className="rounded-card bg-surface p-4 shadow-soft ring-1 ring-line/60">
+            <p className="font-mono text-[11px] tracking-[0.16em] text-ink-faint uppercase">
+              {t(s.exam.time)}
+            </p>
+            <p className="mt-1.5 font-mono text-[40px] leading-none font-bold text-ink tabular-nums">
+              {spentMs === null ? '—' : formatCountdown(spentMs)}
+            </p>
+            <p className="mt-2 text-[12.5px] leading-snug text-ink-soft">{t(s.exam.timeOf)}</p>
+          </section>
+        </motion.div>
+
+        {result.blank > 0 && (
+          <motion.p
+            variants={staggerItem}
+            className="mt-2.5 text-[13px] leading-relaxed text-ink-soft"
+          >
+            {t(s.exam.blankLeft)}: <span className="font-bold">{result.blank}</span>.{' '}
+            {t(s.exam.blankCost)}
+          </motion.p>
+        )}
+
+        {/* The answer sheet: every task at a glance, a tap away from its review. */}
+        <motion.section
+          variants={staggerItem}
+          className="mt-3 rounded-card bg-surface p-4 shadow-soft ring-1 ring-line/60 sm:p-5"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-mono text-[11px] tracking-[0.16em] text-ink-faint uppercase">
+              {t(s.exam.answerSheet)}
+            </h2>
+            <p className="text-[12.5px] text-ink-soft tabular-nums">
+              {t(s.exam.filterRight)} {result.correct} · {t(s.exam.filterWrong)} {wrong} ·{' '}
+              {t(s.exam.filterBlank)} {result.blank}
+            </p>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-3">
+            {sheet.map((part) => (
+              <div key={part.label}>
+                <p className="mb-1.5 text-[12px] text-ink-faint">{part.label}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {part.at.map((i) => {
+                    const { position } = variant.items[i]
+                    return (
+                      <button
+                        key={position}
+                        type="button"
+                        onClick={() => jumpToTask(position)}
+                        aria-label={`№${position}`}
+                        className={cn(
+                          'focus-ring grid h-9 w-9 place-items-center rounded-full font-mono text-[13px] font-bold tabular-nums',
+                          marks[i] === 'right'
+                            ? 'bg-correct-tint text-correct'
+                            : marks[i] === 'wrong'
+                              ? 'bg-wrong-tint text-wrong ring-2 ring-wrong'
+                              : 'border border-dashed border-line text-ink-faint',
+                        )}
+                      >
+                        {position}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         </motion.section>
 
-        {/* Where the line through the student's mocks lands in a month. */}
-        {forecast && <ForecastCard forecast={forecast} total={result.total} />}
+        {/* Task-by-task review — the explanations withheld during the attempt. */}
+        <motion.div variants={staggerItem} className="mt-4 flex flex-wrap gap-2">
+          {filters.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFilter(f.key)}
+              aria-pressed={filter === f.key}
+              className={cn(
+                'focus-ring rounded-full px-3.5 py-1.5 text-[13px] font-semibold tabular-nums',
+                filter === f.key
+                  ? 'bg-brand text-white'
+                  : 'bg-surface text-ink-soft ring-1 ring-line/60 hover:ring-brand/40',
+              )}
+            >
+              {f.label} {f.n}
+            </button>
+          ))}
+        </motion.div>
+        <motion.ul variants={staggerItem} className="mt-3 flex flex-col gap-2.5">
+          {shown.length === 0 && (
+            <li className="text-[13.5px] text-ink-faint">{t(s.exam.filterNone)}</li>
+          )}
+          {shown.map((item) => {
+            const { position, question } = item
+            const mark = markOf(item, answers)
+            const picked = answers[question.id]
+            const correctOption = question.options.find((o) => o.id === question.correctId)!
+            const pickedOption = question.options.find((o) => o.id === picked)
+
+            return (
+              <li
+                key={question.id}
+                id={`exam-task-${position}`}
+                className={cn(
+                  'scroll-mt-24 rounded-card bg-surface p-4 shadow-soft ring-1',
+                  mark === 'wrong' ? 'ring-wrong/45' : 'ring-line/60',
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className={cn(
+                      'shrink-0 pt-px font-mono text-[13px] font-bold tabular-nums',
+                      mark === 'right'
+                        ? 'text-correct'
+                        : mark === 'wrong'
+                          ? 'text-wrong'
+                          : 'text-ink-faint',
+                    )}
+                  >
+                    №{position}
+                  </span>
+                  <p className="min-w-0 flex-1 text-[14.5px] leading-snug font-semibold text-ink">
+                    {t(question.question)}
+                  </p>
+                </div>
+
+                <div className="mt-3 grid gap-2 text-[13px] leading-snug sm:grid-cols-2">
+                  {mark !== 'right' && (
+                    <p
+                      className={cn(
+                        'rounded-card px-3.5 py-2.5',
+                        mark === 'blank' ? 'bg-cream text-ink-faint' : 'bg-wrong-tint text-wrong',
+                      )}
+                    >
+                      {mark === 'blank' || !pickedOption
+                        ? t(s.exam.leftBlank)
+                        : `${t(s.exam.yourAnswer)}: ${letterOf(item, pickedOption.id)} · ${t(pickedOption.label)}`}
+                    </p>
+                  )}
+                  <p
+                    className={cn(
+                      'rounded-card bg-correct-tint px-3.5 py-2.5 text-correct',
+                      mark === 'right' && 'sm:col-span-2',
+                    )}
+                  >
+                    {t(s.exam.correctAnswer)}: {letterOf(item, correctOption.id)} ·{' '}
+                    {t(correctOption.label)}
+                  </p>
+                </div>
+
+                <p className="mt-2.5 text-[13px] leading-relaxed text-ink-soft">
+                  {t(question.explanation)}
+                </p>
+              </li>
+            )
+          })}
+        </motion.ul>
 
         <motion.div variants={staggerItem} className="mt-6">
           <SectionHeading title={t(s.exam.byTopic)} />
@@ -395,78 +1009,26 @@ export function ExamMock() {
           <BreakdownList rows={result.byTopic} label={(id) => topicLabel(id, lang)} />
         </motion.div>
 
-        {/* Task-by-task review — the explanations withheld during the attempt. */}
-        <motion.div variants={staggerItem} className="mt-6">
-          <SectionHeading title={t(s.exam.reviewTitle)} />
-        </motion.div>
-        <motion.ul variants={staggerItem} className="flex flex-col gap-2.5">
-          {variant.items.map(({ position, question }) => {
-            const picked = answers[question.id] ?? null
-            const right = picked === question.correctId
-            const correctOption = question.options.find((o) => o.id === question.correctId)!
-            const pickedOption = question.options.find((o) => o.id === picked)
-
-            return (
-              <li
-                key={question.id}
-                className="rounded-card bg-surface p-4 shadow-soft ring-1 ring-line/60"
-              >
-                <div className="flex items-start gap-3">
-                  <span
-                    className={cn(
-                      'grid h-7 w-7 shrink-0 place-items-center rounded-full text-[12px] font-bold',
-                      right
-                        ? 'bg-correct text-white'
-                        : picked === null
-                          ? 'bg-cream text-ink-faint'
-                          : 'bg-wrong text-white',
-                    )}
-                  >
-                    {right ? (
-                      <Check className="h-4 w-4" strokeWidth={3} />
-                    ) : picked === null ? (
-                      position
-                    ) : (
-                      <X className="h-4 w-4" strokeWidth={3} />
-                    )}
-                  </span>
-                  <p className="min-w-0 flex-1 text-[14.5px] leading-snug font-semibold text-ink">
-                    {t(question.question)}
-                  </p>
-                </div>
-
-                <div className="mt-3 flex flex-col gap-1 pl-10 text-[13px]">
-                  {!right && (
-                    <p className={picked === null ? 'text-ink-faint' : 'text-wrong'}>
-                      {picked === null
-                        ? t(s.exam.leftBlank)
-                        : `${t(s.exam.yourAnswer)}: ${t(pickedOption!.label)}`}
-                    </p>
-                  )}
-                  <p className="text-correct">
-                    {t(s.exam.correctAnswer)}: {t(correctOption.label)}
-                  </p>
-                </div>
-
-                <p className="mt-2.5 pl-10 text-[13px] leading-relaxed text-ink-soft">
-                  {t(question.explanation)}
-                </p>
-              </li>
-            )
-          })}
-        </motion.ul>
-
-        {/* The mock is its own nav section now, so the only action left here
-            is another variant; the old «back to Battle» button is gone. */}
-        <motion.div variants={staggerItem} className="mt-6">
+        <motion.div variants={staggerItem} className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+          {result.correct < result.total && (
+            <motion.button
+              type="button"
+              onClick={() => setPhase('retake')}
+              whileTap={{ scale: 0.97 }}
+              transition={springSoft}
+              className={cn(primaryButton, 'flex-1')}
+            >
+              <RotateCcw className="h-[18px] w-[18px]" strokeWidth={2.2} />
+              {t(s.exam.retakeWrong)}
+            </motion.button>
+          )}
           <motion.button
             type="button"
             onClick={restart}
             whileTap={{ scale: 0.97 }}
             transition={springSoft}
-            className="focus-ring flex w-full items-center justify-center gap-2 rounded-full bg-brand px-5 py-3.5 text-[15px] font-semibold text-white shadow-soft hover:bg-brand-dark"
+            className={cn(result.correct < result.total ? secondaryButton : primaryButton, 'flex-1')}
           >
-            <RotateCcw className="h-[18px] w-[18px]" strokeWidth={2.2} />
             {t(s.exam.retry)}
           </motion.button>
         </motion.div>
