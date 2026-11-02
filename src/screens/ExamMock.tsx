@@ -33,7 +33,7 @@ import {
 } from '../lib/exam'
 import type { BreakdownRow, ExamAnswers, ExamItem } from '../lib/exam'
 import { schoolVariants } from '../data/schoolVariants'
-import type { SchoolVariant } from '../data/types'
+import type { ContextBlock, SchoolVariant } from '../data/types'
 import {
   bestByVariant,
   daysUntilExam,
@@ -470,6 +470,83 @@ function Shelf({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /**
+ * The text five tasks hang on. A booklet prints it once, above the first of
+ * them, so it opens in full there and folds to its title on the other four —
+ * a tap away for re-reading, not five copies of the same page.
+ */
+function ContextStimulus({
+  block,
+  position,
+  open,
+  onToggle,
+}: {
+  block: ContextBlock
+  position: number
+  open: boolean
+  onToggle: () => void
+}) {
+  const { t } = useLang()
+  return (
+    <div className="mb-3 overflow-hidden rounded-card bg-cream ring-1 ring-line/60">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="focus-ring flex w-full items-center gap-3 px-4 py-3 text-left"
+      >
+        {block.kind === 'map' ? (
+          <MapIcon className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={2} aria-hidden />
+        ) : (
+          <FileText className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={2} aria-hidden />
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block text-[11.5px] font-semibold tracking-wide text-ink-faint uppercase">
+            {position <= EXAM_STANDALONE_COUNT + 5 ? t(s.exam.contextOne) : t(s.exam.contextTwo)}
+          </span>
+          <span className="block truncate text-[14px] font-bold text-ink">{t(block.title)}</span>
+        </span>
+        <ChevronDown
+          className={cn(
+            'h-4 w-4 shrink-0 text-ink-faint transition-transform duration-200',
+            open && 'rotate-180',
+          )}
+          strokeWidth={2}
+          aria-hidden
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (block.passage || block.map) && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: easeOut }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-line-soft px-4 py-3.5">
+              {block.passage && (
+                <p className="text-[14px] leading-relaxed text-ink-soft">{t(block.passage)}</p>
+              )}
+              {/* Tasks 11–15 of a real variant are unanswerable without the
+                  map itself, so this is the stimulus, not an illustration
+                  beside one. */}
+              {block.map && (
+                <ExamMapStimulus
+                  eraKey={block.map.eraKey}
+                  markers={block.map.markers}
+                  route={block.map.route}
+                  className={block.passage ? 'mt-3.5' : undefined}
+                />
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/**
  * «Қателерді қайта тапсыру»: the tasks missed in this attempt, again, with the
  * answer shown at once — the opposite of the mock, because the point now is to
  * learn the fact, not to measure. Never recorded: it would read as a five-task
@@ -479,6 +556,7 @@ function RetakeMistakes({ items, onDone }: { items: ExamItem[]; onDone: () => vo
   const { t } = useLang()
   const [index, setIndex] = useState(0)
   const [picked, setPicked] = useState<string | null>(null)
+  const [passageOpen, setPassageOpen] = useState(true)
   const item = items[index]
   const isLast = index === items.length - 1
 
@@ -487,6 +565,7 @@ function RetakeMistakes({ items, onDone }: { items: ExamItem[]; onDone: () => vo
       onDone()
       return
     }
+    setPassageOpen(items[index + 1].block?.id !== item.block?.id)
     setIndex(index + 1)
     setPicked(null)
   }
@@ -516,13 +595,13 @@ function RetakeMistakes({ items, onDone }: { items: ExamItem[]; onDone: () => vo
           transition={{ duration: 0.26, ease: easeOut }}
           className="mt-4"
         >
-          {item.block?.passage && (
-            <div className="mb-3 rounded-card bg-cream px-4 py-3.5 ring-1 ring-line/60">
-              <p className="text-[14px] font-bold text-ink">{t(item.block.title)}</p>
-              <p className="mt-1.5 text-[14px] leading-relaxed text-ink-soft">
-                {t(item.block.passage)}
-              </p>
-            </div>
+          {item.block && (
+            <ContextStimulus
+              block={item.block}
+              position={item.position}
+              open={passageOpen}
+              onToggle={() => setPassageOpen((open) => !open)}
+            />
           )}
 
           <div className="rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60 sm:p-6">
@@ -705,11 +784,8 @@ export function ExamMock() {
   }
 
   const goTo = (next: number) => {
-    // A new stimulus opens expanded; moving inside the same block leaves the
-    // reader's own choice alone.
-    const from = variant.items[index]?.block?.id ?? null
-    const to = variant.items[next]?.block?.id ?? null
-    if (from !== to) setPassageOpen(true)
+    // Open in full on the first task of a block only; see ContextStimulus.
+    setPassageOpen(variant.items[next - 1]?.block?.id !== variant.items[next]?.block?.id)
     setIndex(next)
     setWarnBlank(false)
   }
@@ -1198,12 +1274,6 @@ export function ExamMock() {
   const answered = variant.items.filter((i) => answers[i.question.id]).length
   const progress = (answered / variant.items.length) * 100
   const picked = answers[item.question.id] ?? null
-  const blockLabel =
-    item.block === null
-      ? null
-      : item.position <= EXAM_STANDALONE_COUNT + 5
-        ? t(s.exam.contextOne)
-        : t(s.exam.contextTwo)
 
   return (
     <motion.div
@@ -1248,68 +1318,13 @@ export function ExamMock() {
           transition={{ duration: 0.26, ease: easeOut }}
           className="mt-5"
         >
-          {/* The stimulus. Collapsible, because five questions hang on it and
-              re-reading it must not mean scrolling back up the page. */}
           {item.block && (
-            <div className="mb-3 overflow-hidden rounded-card bg-cream ring-1 ring-line/60">
-              <button
-                type="button"
-                onClick={() => setPassageOpen((open) => !open)}
-                className="focus-ring flex w-full items-center gap-3 px-4 py-3 text-left"
-              >
-                {item.block.kind === 'map' ? (
-                  <MapIcon className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={2} aria-hidden />
-                ) : (
-                  <FileText className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={2} aria-hidden />
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[11.5px] font-semibold tracking-wide text-ink-faint uppercase">
-                    {blockLabel}
-                  </span>
-                  <span className="block truncate text-[14px] font-bold text-ink">
-                    {t(item.block.title)}
-                  </span>
-                </span>
-                <ChevronDown
-                  className={cn(
-                    'h-4 w-4 shrink-0 text-ink-faint transition-transform duration-200',
-                    passageOpen && 'rotate-180',
-                  )}
-                  strokeWidth={2}
-                  aria-hidden
-                />
-              </button>
-              <AnimatePresence initial={false}>
-                {passageOpen && (item.block.passage || item.block.map) && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.25, ease: easeOut }}
-                    className="overflow-hidden"
-                  >
-                    <div className="border-t border-line-soft px-4 py-3.5">
-                      {item.block.passage && (
-                        <p className="text-[14px] leading-relaxed text-ink-soft">
-                          {t(item.block.passage)}
-                        </p>
-                      )}
-                      {/* Tasks 11–15 of a real variant are unanswerable without
-                          the map itself, so this is the stimulus, not an
-                          illustration beside one. */}
-                      {item.block.map && (
-                        <ExamMapStimulus
-                          eraKey={item.block.map.eraKey}
-                          markers={item.block.map.markers}
-                          route={item.block.map.route}
-                          className={item.block.passage ? 'mt-3.5' : undefined}
-                        />
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <ContextStimulus
+              block={item.block}
+              position={item.position}
+              open={passageOpen}
+              onToggle={() => setPassageOpen((open) => !open)}
+            />
           )}
 
           <div className="rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60 sm:p-6">
