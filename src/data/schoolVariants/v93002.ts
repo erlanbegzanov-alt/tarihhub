@@ -8,9 +8,10 @@ import type { ContextBlock, QuizQuestion, SchoolVariant } from '../types'
  * against the Esenov textbook. Changes against the paper:
  * - Task 5 (who explored the Ural-Emba oil field) is replaced by a bank
  *   question: its answer was printed in the context-1 passage and in task 12.
- * - Context 2 was two photo portraits. We cannot use the photos, so it is now
- *   two numbered descriptions of the same two scientists, unnamed; tasks 16–18
- *   ask about "the description" instead of "the picture".
+ * - Context 2 was two photo portraits. We cannot use the booklet's photos, so
+ *   it is now two numbered descriptions of the same two scientists, unnamed;
+ *   tasks 16–18 ask about "the description" instead of "the picture". Our own
+ *   portrait of the second stands beside his description as picture 2.
  * - Task 12 listed the deposits as I–III but answered with 1–3; the list is
  *   numbered 1–3 to match.
  */
@@ -438,6 +439,9 @@ const ctx2: ContextBlock = {
   id: 'sch-93002-ctx2',
   kind: 'person',
   topicId: 54,
+  // Our own picture of the geologist; for the archaeologist the app has none,
+  // so description 1 stands alone.
+  figures: [{ n: 2, src: '/portraits/satbayev.webp' }],
   title: {
     kz: 'Қазақтың көрнекті ғалымдары',
     ru: 'Выдающиеся казахские учёные',

@@ -34,6 +34,15 @@ Format: `<personId> — <kind>`
   `bumin-kagan`, `tonykok`, `zhoshy-khan`, `batu-khan`, `yusup-balasaguni`,
   `makhmud-kashkari`, `zhangir-khan`, `syrym-datuly`
 
+## Added 2026-11-03
+
+- `kasym-khan` — replaced. The previous file was the owner's «Әбілқайыр хан» image,
+  filed under the wrong name; the new one is his «Қасым хан». Still monument kind.
+- `amangeldi-imanov`, `turar-ryskulov`, `kairat-ryskulbekov` — portrait kind (people
+  real photographs survive of), made by the owner the same way as the rest. They have
+  no figure page; they are used only as numbered pictures in exam person contexts,
+  listed in `src/data/examPortraits.ts`.
+
 ---
 
-Total: 51 files, all wired into the app.
+Total: 54 files: 51 wired into the figure pages, 3 used by the exam only.

@@ -205,6 +205,14 @@ export interface ContextBlock {
    * points, not a surveyed track, so a block using it says so in its own text.
    */
   map?: { eraKey: EraKey; markers: MapMarker[]; route?: number[] }
+  /**
+   * For `kind: 'person'` — the numbered pictures a booklet prints as «Сурет 1»,
+   * «Сурет 2». `src` is a `public/portraits/` file of a person whose portrait
+   * is based on a real photo; a monument-kind image is an illustration, not a
+   * likeness, so "who is in picture 1" cannot be asked of it. The picture
+   * never carries the name — that is the question.
+   */
+  figures?: { n: number; src: string }[]
   /** Exactly 5. Checked when a variant is assembled. */
   questions: QuizQuestion[]
 }

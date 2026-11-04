@@ -515,7 +515,7 @@ function ContextStimulus({
         />
       </button>
       <AnimatePresence initial={false}>
-        {open && (block.passage || block.map) && (
+        {open && (block.passage || block.map || block.figures) && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -524,8 +524,28 @@ function ContextStimulus({
             className="overflow-hidden"
           >
             <div className="border-t border-line-soft px-4 py-3.5">
+              {/* Captioned by number only: naming the person is the task. */}
+              {block.figures && (
+                <div className="mb-3.5 flex flex-wrap gap-3">
+                  {block.figures.map((f) => (
+                    <figure key={f.n} className="w-[104px]">
+                      <img
+                        src={f.src}
+                        alt={`${t(s.exam.figure)} ${f.n}`}
+                        loading="lazy"
+                        className="aspect-[3/4] w-full rounded-tile object-cover ring-1 ring-line/60"
+                      />
+                      <figcaption className="mt-1.5 text-center text-[12.5px] font-semibold text-ink-soft">
+                        {t(s.exam.figure)} {f.n}
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
               {block.passage && (
-                <p className="text-[14px] leading-relaxed text-ink-soft">{t(block.passage)}</p>
+                <p className="text-[14px] leading-relaxed whitespace-pre-line text-ink-soft">
+                  {t(block.passage)}
+                </p>
               )}
               {/* Tasks 11–15 of a real variant are unanswerable without the
                   map itself, so this is the stimulus, not an illustration

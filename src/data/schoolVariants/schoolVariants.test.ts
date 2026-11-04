@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSchoolVariant } from '../../lib/exam'
+import { EXAM_PORTRAITS } from '../examPortraits'
+import { people } from '../people'
 import type { LocalizedText, QuizQuestion, SchoolVariant } from '../types'
 import { schoolVariants } from '.'
 
@@ -12,7 +14,7 @@ const filled = (text: LocalizedText | undefined) =>
 
 describe('school booklets', () => {
   it('are papers of 10 standalone tasks and two contexts of 5', () => {
-    expect(schoolVariants.map((v) => v.id)).toEqual(['93002', '93006', '93707'])
+    expect(schoolVariants.map((v) => v.id)).toEqual(['93002', '93006', '93707', '93710', '93709', '93506', '93504', '93502', '93503'])
     for (const v of schoolVariants) {
       expect(v.standalone).toHaveLength(10)
       for (const block of v.blocks) {
@@ -42,6 +44,29 @@ describe('school booklets', () => {
       expect(order(buildSchoolVariant(v))).toBe(order(once))
       const first = once.items.filter((i) => i.question.options[0].id === i.question.correctId)
       expect(first.length, v.id).toBeLessThan(10)
+    }
+  })
+
+  it('show only pictures that are a likeness, numbered from 1', () => {
+    const likeness = new Set([
+      ...people.filter((p) => p.portrait?.kind === 'portrait').map((p) => p.portrait!.src),
+      ...EXAM_PORTRAITS,
+    ])
+    const onDisk = new Set(
+      Object.keys(import.meta.glob('../../../public/portraits/*.webp')).map((p) =>
+        p.replace('../../../public', ''),
+      ),
+    )
+    for (const src of likeness) expect(onDisk.has(src), src).toBe(true)
+    for (const v of schoolVariants) {
+      for (const b of v.blocks) {
+        if (!b.figures) continue
+        expect(b.kind, b.id).toBe('person')
+        for (const f of b.figures) expect(likeness.has(f.src), `${b.id} ${f.src}`).toBe(true)
+        const ns = b.figures.map((f) => f.n).sort((x, y) => x - y)
+        expect(new Set(ns).size, b.id).toBe(ns.length)
+        expect(ns.every((n) => n >= 1), b.id).toBe(true)
+      }
     }
   })
 
