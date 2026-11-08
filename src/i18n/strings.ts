@@ -43,6 +43,14 @@ export const s = {
     xp: { kz: 'XP', ru: 'XP' },
   },
 
+  /** The full-screen picture viewer (`components/ZoomableImage.tsx`). */
+  zoom: {
+    enlarge: { kz: 'Үлкейту', ru: 'Увеличить' },
+    zoomIn: { kz: 'Жақындату', ru: 'Приблизить' },
+    zoomOut: { kz: 'Алыстату', ru: 'Отдалить' },
+    reset: { kz: 'Бастапқы өлшем', ru: 'Исходный размер' },
+  },
+
   home: {
     searchPlaceholder: {
       kz: 'Қазақстан тарихынан іздеу...',
@@ -1308,6 +1316,11 @@ export const s = {
       kz: 'Алғашқы сынақты тапсыр — балың осында шығады.',
       ru: 'Сдай первый пробник — твой балл появится здесь.',
     },
+    /** Followed by "counted / recorded", e.g. "2 / 5". */
+    forecastCounted: {
+      kz: 'Таныс контекст кездескен нұсқа болжамға кірмейді. Есепке алынғаны:',
+      ru: 'Вариант со знакомым контекстом в прогноз не идёт. Засчитано:',
+    },
     daysLeft: { kz: 'күн қалды', ru: 'дн. до ЕНТ' },
     examDate: { kz: 'ҰБТ күні', ru: 'Дата ЕНТ' },
     examDateAsk: {
@@ -1365,6 +1378,16 @@ export const s = {
     correctAnswer: { kz: 'Дұрыс жауап', ru: 'Верный ответ' },
     leftBlank: { kz: 'Жауапсыз қалды', ru: 'Осталось без ответа' },
 
-    retry: { kz: 'Жаңа нұсқа', ru: 'Новый вариант' },
+    /** The results button that goes back to the shelves of variants. */
+    toVariants: { kz: 'Нұсқаларға оралу', ru: 'Вернуться к вариантам' },
+
+    // Asked before leaving an attempt in progress for another screen.
+    leaveTitle: { kz: 'Сынақтан шығасың ба?', ru: 'Выйти из пробника?' },
+    leaveText: {
+      kz: 'Жауаптарың жойылады, бұл сынақ болжамға кірмейді.',
+      ru: 'Ответы пропадут, и этот пробник не попадёт в прогноз.',
+    },
+    leaveStay: { kz: 'Сынақты жалғастыру', ru: 'Продолжить пробник' },
+    leaveConfirm: { kz: 'Шығу', ru: 'Выйти' },
   },
 }

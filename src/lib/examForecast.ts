@@ -1,3 +1,6 @@
+import { contextBlocks } from '../data/contextBlocks'
+import { schoolVariants } from '../data/schoolVariants'
+import type { ContextBlock } from '../data/types'
 import { EXAM_TOTAL } from './exam'
 import { localDateString, profileUid } from './progress'
 
@@ -20,11 +23,19 @@ export interface ExamAttempt {
   total: number
   /** The school booklet's number; absent for a drawn TarihHub variant. */
   variant?: string
+  /**
+   * The paper's two stimuli, as `stimulusId`s. Absent on records written
+   * before it was stored — `blocksOf` says what such a record is taken for.
+   */
+  blocks?: string[]
 }
 
 export interface ExamForecast {
-  /** Distinct days with a finished mock. */
+  /** Distinct days with a counted mock. */
   days: number
+  /** Finished mocks on record, and how many of them count toward the forecast. */
+  recorded: number
+  counted: number
   /** Days still needed before a pace exists. 0 once `ahead` can be computed. */
   daysNeeded: number
   /** Current level out of `EXAM_TOTAL`, or `null` with no mock at all. */
@@ -55,46 +66,105 @@ const dayNumber = (day: string) => {
 
 const clamp = (v: number) => Math.max(0, Math.min(EXAM_TOTAL, v))
 
+/** 95 % — the Wilson interval's z. */
+const Z = 1.96
+
+/**
+ * Wilson score interval for `k` right out of `n` tasks, on the 0–20 scale.
+ * Unlike mean ± z·sd it stays open at 0 and at the maximum — one paper at 20
+ * of 20 is not proof of a certain 20 — and it narrows as the tasks add up.
+ */
+function wilsonBand(k: number, n: number): { low: number; high: number } {
+  const p = k / n
+  const z2 = Z * Z
+  const centre = (p + z2 / (2 * n)) / (1 + z2 / n)
+  const half = (Z / (1 + z2 / n)) * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n))
+  return { low: clamp((centre - half) * EXAM_TOTAL), high: clamp((centre + half) * EXAM_TOTAL) }
+}
+
+/** The share right, pulled off 0 and 1 to the Wilson centre: a paper of 20/20 still has noise. */
+const wilsonCentre = (k: number, n: number) => (k + (Z * Z) / 2) / (n + Z * Z)
+
+/*
+ * A block's identity as a text, not as an id. A booklet that reuses a bank
+ * block re-stamps it with its own task numbers (`sch-93710-ctx2` is
+ * `ctx-1916`), so the id alone would call a passage already read new. Matched
+ * against the bank by the stimulus itself; a booklet's own text keeps its id.
+ */
+const stimulusKey = (b: ContextBlock) =>
+  JSON.stringify([b.kind, b.title, b.passage, b.map, b.mapImage, b.figures])
+const bankByStimulus = new Map(contextBlocks.map((b) => [stimulusKey(b), b.id]))
+
+export function stimulusId(block: ContextBlock): string {
+  return bankByStimulus.get(stimulusKey(block)) ?? block.id
+}
+
+/**
+ * The stimuli an attempt's paper carried. A record from before `blocks` was
+ * stored still names its booklet, and a booklet is fixed, so its blocks are
+ * read off the booklet. A drawn variant from then is unknown: `null`.
+ */
+function blocksOf(a: ExamAttempt): string[] | null {
+  if (a.blocks) return a.blocks
+  const booklet = a.variant ? schoolVariants.find((v) => v.id === a.variant) : undefined
+  return booklet ? booklet.blocks.map(stimulusId) : null
+}
+
 export function forecastExam(attempts: ExamAttempt[], horizon = HORIZON_DAYS): ExamForecast {
   // One point per day: three mocks in one evening are one reading, not a trend.
-  // A booklet sat a second time measures memory of its answers, not the
-  // student, so only the first sitting of each booklet counts.
-  const byDay = new Map<string, number[]>()
+  // A paper whose context the student has already read measures memory of
+  // that passage, not the student: drawn variants share a small pool of
+  // blocks, and booklets reuse bank blocks too. So a mock counts only if none
+  // of its blocks was in an earlier mock on record, counted or not — and a
+  // booklet only on its first sitting, whose standalone tasks are new too.
+  // A record that cannot name its blocks (a drawn variant from before they
+  // were stored) counts only as the first on record, where nothing came
+  // before it, and marks nothing as read; that leak is confined to histories
+  // from before the change, which exist only on the test contour.
+  const byDay = new Map<string, { k: number; tasks: number; scores: number[] }>()
   const sat = new Set<string>()
+  const seen = new Set<string>()
+  let recorded = 0
   for (const a of attempts) {
     if (a.total <= 0) continue
-    if (a.variant) {
-      if (sat.has(a.variant)) continue
-      sat.add(a.variant)
-    }
-    const list = byDay.get(a.day) ?? []
-    list.push((a.correct / a.total) * EXAM_TOTAL)
-    byDay.set(a.day, list)
+    recorded += 1
+    const blocks = blocksOf(a)
+    const fresh = blocks ? blocks.every((b) => !seen.has(b)) : recorded === 1
+    for (const b of blocks ?? []) seen.add(b)
+    const repeat = a.variant !== undefined && sat.has(a.variant)
+    if (a.variant) sat.add(a.variant)
+    if (!fresh || repeat) continue
+    const day = byDay.get(a.day) ?? { k: 0, tasks: 0, scores: [] }
+    day.k += a.correct
+    day.tasks += a.total
+    day.scores.push((a.correct / a.total) * EXAM_TOTAL)
+    byDay.set(a.day, day)
   }
+  const counted = [...byDay.values()].reduce((s, d) => s + d.scores.length, 0)
   const points = [...byDay.entries()]
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .slice(-MAX_POINTS)
-    .map(([day, scores]) => ({
+    .map(([day, { k, tasks, scores }]) => ({
       x: dayNumber(day),
       y: scores.reduce((s, v) => s + v, 0) / scores.length,
       n: scores.length,
+      k,
+      tasks,
     }))
 
   const n = points.length
-  const empty = { days: n, ahead: null, unclear: false }
+  const empty = { days: n, recorded, counted, ahead: null, unclear: false }
   if (n === 0) return { ...empty, daysNeeded: FORECAST_MIN_DAYS, now: null, nowBand: null }
   if (n < FORECAST_MIN_DAYS) {
-    // No line yet: the level is the mean of every paper so far, and its band
-    // is the binomial noise of that many twenty-task papers.
-    const papers = points.reduce((s, p) => s + p.n, 0)
-    const mean = clamp(points.reduce((s, p) => s + p.y * p.n, 0) / papers)
-    const q = mean / EXAM_TOTAL
-    const sd = Math.sqrt((EXAM_TOTAL * q * (1 - q)) / papers)
+    // No line yet: the level is the share of every counted task answered
+    // right, and its band the Wilson interval of that share.
+    const k = points.reduce((s, p) => s + p.k, 0)
+    const tasks = points.reduce((s, p) => s + p.tasks, 0)
     return {
       ...empty,
       daysNeeded: FORECAST_MIN_DAYS - n,
-      now: mean,
-      nowBand: { low: clamp(mean - 1.28 * sd), high: clamp(mean + 1.28 * sd) },
+      now: (k / tasks) * EXAM_TOTAL,
+      nowBand: wilsonBand(k, tasks),
     }
   }
 
@@ -107,10 +177,12 @@ export function forecastExam(attempts: ExamAttempt[], horizon = HORIZON_DAYS): E
   // A day's score is never exact: one twenty-task paper alone swings by
   // binomial noise. So the scatter around the line is floored at that noise —
   // three points that happen to sit on a line do not make a certain forecast.
+  // The share is taken at its Wilson centre, or three perfect papers would
+  // floor the noise at zero and draw a band of no width.
   const residual = points.reduce((s, p) => s + (p.y - at(p.x)) ** 2, 0) / (n - 2)
   const paperNoise =
     points.reduce((s, p) => {
-      const q = clamp(p.y) / EXAM_TOTAL
+      const q = wilsonCentre(p.k, p.tasks)
       return s + (EXAM_TOTAL * q * (1 - q)) / p.n
     }, 0) / n
   const scatter = Math.max(residual, paperNoise)
@@ -118,7 +190,7 @@ export function forecastExam(attempts: ExamAttempt[], horizon = HORIZON_DAYS): E
   const last = points[n - 1].x
   const target = last + horizon
   const score = clamp(at(target))
-  const q = score / EXAM_TOTAL
+  const q = wilsonCentre(score, EXAM_TOTAL)
   // Uncertainty of the line at the target plus the noise of the one paper sat there.
   const sd = Math.sqrt(scatter * (1 / n + (target - xBar) ** 2 / sxx) + EXAM_TOTAL * q * (1 - q))
   const low = clamp(score - 1.28 * sd)
@@ -129,6 +201,8 @@ export function forecastExam(attempts: ExamAttempt[], horizon = HORIZON_DAYS): E
 
   return {
     days: n,
+    recorded,
+    counted,
     daysNeeded: 0,
     now,
     nowBand: { low: clamp(now - 1.28 * nowSd), high: clamp(now + 1.28 * nowSd) },
@@ -152,17 +226,29 @@ export function readExamAttempts(): ExamAttempt[] {
         typeof a?.day === 'string' &&
         typeof a?.correct === 'number' &&
         typeof a?.total === 'number' &&
-        (a.variant === undefined || typeof a.variant === 'string'),
+        (a.variant === undefined || typeof a.variant === 'string') &&
+        (a.blocks === undefined ||
+          (Array.isArray(a.blocks) && a.blocks.every((b: unknown) => typeof b === 'string'))),
     )
   } catch {
     return []
   }
 }
 
-/** Appends one finished mock and returns the history including it. */
-export function recordExamAttempt(correct: number, total: number, variant?: string): ExamAttempt[] {
+/**
+ * Appends one finished mock and returns the history including it. `blocks`
+ * are the paper's context blocks; without them a drawn variant cannot prove
+ * its passages were new and stays out of the forecast unless it is the first.
+ */
+export function recordExamAttempt(
+  correct: number,
+  total: number,
+  variant?: string,
+  blocks?: ContextBlock[],
+): ExamAttempt[] {
   const attempt: ExamAttempt = { day: localDateString(), correct, total }
   if (variant) attempt.variant = variant
+  if (blocks) attempt.blocks = blocks.map(stimulusId)
   const next = [...readExamAttempts(), attempt].slice(-MAX_STORED)
   try {
     window.localStorage.setItem(storageKey(), JSON.stringify(next))

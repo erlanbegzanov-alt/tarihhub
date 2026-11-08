@@ -182,6 +182,31 @@ export interface MapMarker {
 }
 
 /**
+ * A finished picture of a map, drawn outside the app (the owner's are made in
+ * Gemini: a faint real basemap, coloured historical zones, state and city
+ * names). The names are baked into the pixels, so there is one file per
+ * language — `src.kz` labelled in Kazakh, `src.ru` in Russian — and both are
+ * required, like every other bilingual field. Shown at column width and opened
+ * full screen with zoom (`ZoomableImage`), because the small city names cannot
+ * be read on a phone otherwise.
+ *
+ * `alt` describes the map without naming what its tasks ask, for the same
+ * reason `ExamMapStimulus` never draws a marker's label.
+ */
+export interface MapImage {
+  /** Paths under `public/`, starting with `/`. */
+  src: LocalizedText
+  alt: LocalizedText
+  /**
+   * Pixel size of the files. It reserves the frame before the image loads, so
+   * both language versions must have these proportions or one is drawn
+   * stretched.
+   */
+  width: number
+  height: number
+}
+
+/**
  * One context block: a single stimulus plus EXACTLY five questions (§4.1).
  * Two of these are half the exam's marks.
  *
@@ -205,6 +230,11 @@ export interface ContextBlock {
    * points, not a surveyed track, so a block using it says so in its own text.
    */
   map?: { eraKey: EraKey; markers: MapMarker[]; route?: number[] }
+  /**
+   * For `kind: 'map'`, in place of `map`: a finished picture instead of the
+   * schematic the app draws. A map block carries exactly one of the two.
+   */
+  mapImage?: MapImage
   /**
    * For `kind: 'person'` — the numbered pictures a booklet prints as «Сурет 1»,
    * «Сурет 2». `src` is a `public/portraits/` file of a person whose portrait

@@ -7,6 +7,7 @@ import './index.css'
 import './lib/theme'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { whenExamIdle } from './lib/examGuard'
 import { installGlobalErrorReporting, report } from './lib/report'
 
 // Before anything else, so a failure during startup has somewhere to go.
@@ -31,6 +32,17 @@ const SW_UPDATE_INTERVAL_MS = 60_000
 
 registerSW({
   immediate: true,
+  /**
+   * A new build has taken over: reload into it — but not over a mock exam.
+   * The plugin reloads by itself unless this is given, and that reload used
+   * to land in the middle of a 40-minute attempt the moment a deploy went
+   * out. It waits now until the exam screen holds nothing a reload could lose:
+   * not during the attempt, and not over its result either, whose answer
+   * review lives only in memory. The old build keeps running meanwhile.
+   */
+  onNeedReload() {
+    whenExamIdle(() => window.location.reload())
+  },
   onRegisteredSW(_swUrl, registration) {
     if (!registration) return
     window.setInterval(() => {

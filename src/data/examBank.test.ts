@@ -4,6 +4,7 @@ import { contextBlocks } from './contextBlocks'
 import { entQuestions } from './entQuestions'
 import { lessonQuestions } from './lessonQuestions'
 import { quizQuestions } from './quiz'
+import { schoolVariants } from './schoolVariants'
 import type { QuizQuestion } from './types'
 
 /**
@@ -134,10 +135,43 @@ describe('context blocks', () => {
   it('gives every block the stimulus its kind promises', () => {
     // A map block with no `map` renders a title and nothing else, and its five
     // tasks become unanswerable — which is exactly the state the bank was in
-    // before `ExamMapStimulus` existed.
+    // before `ExamMapStimulus` existed. One with both would show two maps
+    // that need not agree, and five tasks can only be about one of them.
     for (const b of contextBlocks) {
-      if (b.kind === 'map') expect(b.map, `${b.id}: map`).toBeTruthy()
-      else expect(b.passage, `${b.id}: passage`).toBeTruthy()
+      if (b.kind === 'map') {
+        expect(
+          [b.map, b.mapImage].filter(Boolean),
+          `${b.id}: exactly one of map / mapImage`,
+        ).toHaveLength(1)
+      } else {
+        expect(b.passage, `${b.id}: passage`).toBeTruthy()
+      }
+    }
+  })
+
+  it('ships every raster map in both languages, from files that exist', () => {
+    // The names are baked into the picture, so a missing language does not
+    // fall back to the other one — it is a broken image in front of a student
+    // in the middle of a mock. Listed through vite, as the portrait check in
+    // schoolVariants.test.ts does, because this suite cannot use node:fs.
+    const shipped = new Set(
+      Object.keys(import.meta.glob('../../public/**/*.{webp,png,jpg,jpeg,avif}')).map((p) =>
+        p.slice('../../public'.length),
+      ),
+    )
+    // Before the first map exists this is the only line that can fail, so it
+    // is what proves the listing reads `public/` and yields `/dir/file` paths.
+    expect([...shipped].some((p) => /^\/[^.]/.test(p)), 'public/ listing').toBe(true)
+
+    for (const b of [...contextBlocks, ...schoolVariants.flatMap((v) => v.blocks)]) {
+      if (!b.mapImage) continue
+      const { src, alt, width, height } = b.mapImage
+      for (const lang of ['kz', 'ru'] as const) {
+        expect(shipped.has(src[lang]), `${b.id}: ${lang} file ${src[lang]} is not in public/`).toBe(true)
+        expect(alt[lang].trim(), `${b.id}: ${lang} alt`).not.toBe('')
+      }
+      expect(Number.isInteger(width) && width > 0, `${b.id}: width ${width}`).toBe(true)
+      expect(Number.isInteger(height) && height > 0, `${b.id}: height ${height}`).toBe(true)
     }
   })
 

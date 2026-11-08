@@ -1,11 +1,12 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import type { ReactNode } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import type { MouseEvent, ReactNode } from 'react'
 import type { AvatarGender } from '../data/ranks'
 import { useAlerts } from '../lib/alerts'
 import { cn } from '../lib/cn'
+import { examActivity, requestLeave } from '../lib/examGuard'
 import { springSoft } from '../lib/motion'
 import { levelInfo, useProfile } from '../lib/progress'
 import { resolveRankIdentity } from '../lib/rankIdentity'
@@ -42,6 +43,27 @@ function useIdentity() {
   })
 
   return { displayName, photoURL, identity, level: levelInfo(profile.xp) }
+}
+
+/**
+ * The click handler every shell link carries. While a mock exam attempt is
+ * running, following the link would throw the attempt away, so the click is
+ * held for the exam screen's leave dialog instead (`lib/examGuard.ts`).
+ *
+ * The router here is `BrowserRouter`, which has no `useBlocker` (that needs a
+ * data router), so the links are guarded where they are. A modified click
+ * opens a new tab and leaves the attempt where it is, and a link to the page
+ * already open goes nowhere; both pass untouched.
+ */
+function useLeaveGuard() {
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  return (to: string) => (event: MouseEvent<HTMLAnchorElement>) => {
+    if (examActivity() !== 'running' || to === pathname) return
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    requestLeave(() => navigate(to))
+  }
 }
 
 function IdentityAvatar({
@@ -125,6 +147,7 @@ function badgeFor(to: string, total: number): number {
 function Sidebar({ active }: { active: string }) {
   const { t, lang, toggleLang } = useLang()
   const { total } = useAlerts()
+  const guard = useLeaveGuard()
 
   return (
     <aside
@@ -134,7 +157,7 @@ function Sidebar({ active }: { active: string }) {
       )}
     >
       <div className="px-6 pt-7 pb-6">
-        <Link to="/" className="focus-ring rounded-xl" aria-label={t(s.appName)}>
+        <Link to="/" onClick={guard('/')} className="focus-ring rounded-xl" aria-label={t(s.appName)}>
           <Wordmark />
         </Link>
         <p className="mt-2.5 text-xs text-ink-faint">{t(s.appTagline)}</p>
@@ -148,6 +171,7 @@ function Sidebar({ active }: { active: string }) {
             <Link
               key={item.to}
               to={item.to}
+              onClick={guard(item.to)}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'group relative flex items-center gap-3 rounded-2xl px-3.5 py-3',
@@ -208,6 +232,7 @@ function MobileTopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
   const { t } = useLang()
   const { displayName, photoURL, identity } = useIdentity()
   const { total } = useAlerts()
+  const guard = useLeaveGuard()
 
   return (
     <div
@@ -237,10 +262,15 @@ function MobileTopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
           />
         )}
       </button>
-      <Link to="/" className="focus-ring rounded-lg" aria-label={t(s.appName)}>
+      <Link to="/" onClick={guard('/')} className="focus-ring rounded-lg" aria-label={t(s.appName)}>
         <Wordmark compact className="h-7" />
       </Link>
-      <Link to="/profile" className="focus-ring ml-auto shrink-0 rounded-full" aria-label={t(s.nav.profile)}>
+      <Link
+        to="/profile"
+        onClick={guard('/profile')}
+        className="focus-ring ml-auto shrink-0 rounded-full"
+        aria-label={t(s.nav.profile)}
+      >
         <IdentityAvatar
           size={32}
           displayName={displayName}
@@ -269,6 +299,13 @@ function MobileDrawer({
   const reduceMotion = useReducedMotion()
   const { displayName, photoURL, identity, level } = useIdentity()
   const { total } = useAlerts()
+  const guard = useLeaveGuard()
+  // The drawer closes either way, so a held link leaves the dialog alone on
+  // screen instead of under an open drawer.
+  const follow = (to: string) => (event: MouseEvent<HTMLAnchorElement>) => {
+    onClose()
+    guard(to)(event)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -323,7 +360,7 @@ function MobileDrawer({
 
             <Link
               to="/profile"
-              onClick={onClose}
+              onClick={follow('/profile')}
               className="focus-ring mx-3 mt-3 flex items-center gap-3 rounded-2xl bg-cream px-3.5 py-3"
             >
               <IdentityAvatar
@@ -356,7 +393,7 @@ function MobileDrawer({
                   <Link
                     key={item.to}
                     to={item.to}
-                    onClick={onClose}
+                    onClick={follow(item.to)}
                     aria-current={isActive ? 'page' : undefined}
                     className={cn(
                       'relative flex items-center gap-3 rounded-2xl px-3.5 py-3',

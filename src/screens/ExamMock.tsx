@@ -12,14 +12,15 @@ import {
   Target,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconButton, ProgressBar, SectionHeading } from '../components/ui'
 import { topicLabel } from '../data/codifier'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { ExamMapStimulus } from '../components/ExamMapStimulus'
+import { ZoomableImage } from '../components/ZoomableImage'
 import { cn } from '../lib/cn'
 import {
   EXAM_STANDALONE_COUNT,
@@ -31,7 +32,18 @@ import {
   formatCountdown,
   scoreExam,
 } from '../lib/exam'
-import type { BreakdownRow, ExamAnswers, ExamItem } from '../lib/exam'
+import type { BreakdownRow, ExamAnswers, ExamItem, ExamVariant } from '../lib/exam'
+import {
+  clearSavedAttempt,
+  readSavedAttempt,
+  restoreAttempt,
+  serialiseAttempt,
+  writeSavedAttempt,
+} from '../lib/examAttempt'
+import { answerLeave, requestLeave, setExamActivity, useLeaveRequested } from '../lib/examGuard'
+import { useSession } from '../lib/session'
+import { contextBlocks } from '../data/contextBlocks'
+import { entQuestions } from '../data/entQuestions'
 import { schoolVariants } from '../data/schoolVariants'
 import type { ContextBlock, SchoolVariant } from '../data/types'
 import {
@@ -200,9 +212,35 @@ function ForecastScale({
     SCALE_PAD + (Math.max(0, Math.min(EXAM_TOTAL, v)) / EXAM_TOTAL) * (SCALE_W - SCALE_PAD * 2)
   const t0 = x(EXAM_THRESHOLD)
   const tone = forecastTone(now)
+
+  /* The labels are sized in viewBox units, which shrink with the card: on a
+     phone the drawn 10 came out near 9px. Measured, so each label is its
+     design size where there is room and never under the 12px floor. */
+  const svgRef = useRef<SVGSVGElement>(null)
+  const [pxPerUnit, setPxPerUnit] = useState(1)
+  useLayoutEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    const measure = () => {
+      const width = svg.getBoundingClientRect().width
+      if (width > 0) setPxPerUnit(width / SCALE_W)
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(svg)
+    return () => observer.disconnect()
+  }, [])
+  const labelSize = (design: number) => Math.max(design, 12 / pxPerUnit)
+
   return (
     // Capped so the scale's numbers stay small on a wide screen, as in Nysana.
-    <svg viewBox={`0 0 ${SCALE_W} 74`} className="mt-4 w-full max-w-[460px]" aria-hidden>
+    <svg
+      ref={svgRef}
+      viewBox={`0 0 ${SCALE_W} 74`}
+      className="mt-4 w-full max-w-[460px]"
+      aria-hidden
+    >
       <rect
         x={x(low)}
         y={AXIS_Y - 13}
@@ -232,7 +270,7 @@ function ForecastScale({
             x={x(v)}
             y={AXIS_Y + 19}
             textAnchor="middle"
-            fontSize={10}
+            fontSize={labelSize(10)}
             className="fill-ink-faint font-mono"
           >
             {v}
@@ -252,7 +290,7 @@ function ForecastScale({
         x={t0}
         y={AXIS_Y - 35}
         textAnchor="middle"
-        fontSize={9.5}
+        fontSize={labelSize(9.5)}
         letterSpacing="0.14em"
         className="fill-ink-faint font-mono"
       >
@@ -331,6 +369,14 @@ function ForecastPanel({
           <p className="mt-2 text-[13.5px] text-ink-soft">
             {forecast.now !== null ? t(s.exam.forecastNow) : t(s.exam.forecastEmpty)}
           </p>
+          {forecast.counted < forecast.recorded && (
+            <p className="mt-1 text-[12px] text-ink-soft">
+              {t(s.exam.forecastCounted)}{' '}
+              <b className="tabular-nums">
+                {forecast.counted} / {forecast.recorded}
+              </b>
+            </p>
+          )}
 
           {forecast.now !== null && forecast.nowBand && (
             <ForecastScale
@@ -515,7 +561,7 @@ function ContextStimulus({
         />
       </button>
       <AnimatePresence initial={false}>
-        {open && (block.passage || block.map || block.figures) && (
+        {open && (block.passage || block.map || block.mapImage || block.figures) && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -555,6 +601,18 @@ function ContextStimulus({
                   eraKey={block.map.eraKey}
                   markers={block.map.markers}
                   route={block.map.route}
+                  className={block.passage ? 'mt-3.5' : undefined}
+                />
+              )}
+              {/* A finished map has its names baked in, so each language has
+                  its own file; it opens full screen because the city names
+                  are too small to read at column width on a phone. */}
+              {block.mapImage && (
+                <ZoomableImage
+                  src={t(block.mapImage.src)}
+                  alt={t(block.mapImage.alt)}
+                  width={block.mapImage.width}
+                  height={block.mapImage.height}
                   className={block.passage ? 'mt-3.5' : undefined}
                 />
               )}
@@ -702,13 +760,118 @@ function RetakeMistakes({ items, onDone }: { items: ExamItem[]; onDone: () => vo
   )
 }
 
+/**
+ * Asked before a running attempt is left for another screen — from this
+ * screen's back arrow or any of the shell's links (`lib/examGuard.ts`).
+ * Staying is the default, the focused button and what Esc does: staying by
+ * mistake costs a tap, leaving by mistake costs the attempt.
+ */
+function LeaveDialog({ open, onLeave }: { open: boolean; onLeave: () => void }) {
+  const { t } = useLang()
+  const stayRef = useRef<HTMLButtonElement>(null)
+  const leaveRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    stayRef.current?.focus()
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      answerLeave(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      // Back to what was focused before — unless it went with a closed drawer.
+      if (opener?.isConnected) opener.focus()
+    }
+  }, [open])
+
+  // Two buttons, and Tab cycles between them while the dialog is up.
+  const keepFocusInside = (event: ReactKeyboardEvent) => {
+    if (event.key !== 'Tab') return
+    const [first, last] = [stayRef.current, leaveRef.current]
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last?.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first?.focus()
+    }
+  }
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center p-4 sm:items-center">
+          <motion.div
+            aria-hidden
+            onClick={() => answerLeave(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: easeOut }}
+            className="absolute inset-0 bg-scrim/45"
+          />
+          <motion.div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="exam-leave-title"
+            aria-describedby="exam-leave-text"
+            onKeyDown={keepFocusInside}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={springSoft}
+            className="relative w-full max-w-sm rounded-card bg-surface p-5 shadow-lift"
+          >
+            <h2 id="exam-leave-title" className="text-[17px] font-bold text-ink">
+              {t(s.exam.leaveTitle)}
+            </h2>
+            <p id="exam-leave-text" className="mt-1.5 text-[14px] leading-relaxed text-ink-soft">
+              {t(s.exam.leaveText)}
+            </p>
+            <div className="mt-5 flex flex-col gap-2.5">
+              <button
+                ref={stayRef}
+                type="button"
+                onClick={() => answerLeave(false)}
+                className={primaryButton}
+              >
+                {t(s.exam.leaveStay)}
+              </button>
+              <button ref={leaveRef} type="button" onClick={onLeave} className={secondaryButton}>
+                {t(s.exam.leaveConfirm)}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+/** Where a saved attempt's ids are looked up again after a reload. */
+const ATTEMPT_SOURCES = { booklets: schoolVariants, questions: entQuestions, blocks: contextBlocks }
+
 export function ExamMock() {
   const navigate = useNavigate()
   const { t, lang } = useLang()
   // Re-render when the account resolves: the stored mocks are keyed per uid.
   useProfile()
+  const uid = useSession().user?.uid ?? null
 
-  const [phase, setPhase] = useState<Phase>('shelves')
+  /** The attempt this tab was sitting before a reload, read once on mount. */
+  const [resumed] = useState(() =>
+    restoreAttempt(readSavedAttempt(uid), ATTEMPT_SOURCES, Date.now()),
+  )
+
+  // A deadline that passed while the tab was away closes the attempt the way
+  // the countdown would have — the result, flagged as out of time.
+  const [phase, setPhase] = useState<Phase>(
+    resumed ? (resumed.expired ? 'result' : 'running') : 'shelves',
+  )
   const [tab, setTab] = useState<'variants' | 'forecast'>('variants')
   /** Bumped when the exam day is saved, so the home screen re-reads it. */
   const [, setDateVersion] = useState(0)
@@ -716,24 +879,35 @@ export function ExamMock() {
   /** Bumped to draw a fresh variant — `buildExamVariant` re-runs on change. */
   const [round, setRound] = useState(0)
   /** The school booklet being sat, or `null` for a drawn TarihHub variant. */
-  const [booklet, setBooklet] = useState<SchoolVariant | null>(null)
+  const [booklet, setBooklet] = useState<SchoolVariant | null>(resumed?.booklet ?? null)
+  /** The resumed attempt's paper, as drawn; cleared when a new one is drawn. */
+  const [restored, setRestored] = useState<ExamVariant | null>(resumed?.variant ?? null)
   const variant = useMemo(
-    () => (booklet ? buildSchoolVariant(booklet) : buildExamVariant()),
+    () => restored ?? (booklet ? buildSchoolVariant(booklet) : buildExamVariant()),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `round` is the retry counter: bumping it is exactly what should re-draw the variant.
-    [round, booklet],
+    [round, booklet, restored],
   )
 
-  const [index, setIndex] = useState(0)
-  const [answers, setAnswers] = useState<ExamAnswers>({})
-  const [passageOpen, setPassageOpen] = useState(true)
+  const [index, setIndex] = useState(resumed?.index ?? 0)
+  const [answers, setAnswers] = useState<ExamAnswers>(resumed?.answers ?? {})
+  // Resumed mid-block, the context stays folded as it would have been.
+  const [passageOpen, setPassageOpen] = useState(() =>
+    resumed
+      ? resumed.variant.items[resumed.index - 1]?.block?.id !==
+        resumed.variant.items[resumed.index]?.block?.id
+      : true,
+  )
   const [warnBlank, setWarnBlank] = useState(false)
-  const [ranOutOfTime, setRanOutOfTime] = useState(false)
+  const [ranOutOfTime, setRanOutOfTime] = useState(resumed?.expired ?? false)
   /** Wall-clock end of our 40-minute budget, set when the attempt starts. */
-  const [deadline, setDeadline] = useState<number | null>(null)
-  const [msLeft, setMsLeft] = useState(EXAM_TIME_BUDGET_MS)
+  const [deadline, setDeadline] = useState<number | null>(resumed?.deadline ?? null)
+  const [msLeft, setMsLeft] = useState(() =>
+    resumed ? resumed.deadline - Date.now() : EXAM_TIME_BUDGET_MS,
+  )
   /** Finished mocks including this one, set once the result is recorded. */
   const [attempts, setAttempts] = useState<ExamAttempt[] | null>(null)
   const recordedRound = useRef<number | null>(null)
+  const leaveRequested = useLeaveRequested()
 
   const item = variant.items[index]
   const isLast = index === variant.items.length - 1
@@ -756,16 +930,69 @@ export function ExamMock() {
     return () => window.clearInterval(id)
   }, [phase, deadline])
 
-  /* Record each finished mock exactly once — the forecast's only input. An
-     attempt with nothing answered (opened, then the clock ran out) is not a
-     reading of anything and would drag the line down. */
+  /* Record each finished mock exactly once — the forecast's only input.
+
+     The rule, in this one place: an attempt that ends is recorded, whether
+     the student finished it, the countdown closed it, or its deadline passed
+     while the tab was in the background or closed (it is closed on the next
+     mount, through this same effect). An attempt the student explicitly
+     abandons — by confirming the leave dialog — is not: it never reaches
+     `result`. The one exception is an attempt with nothing answered (opened,
+     then the clock ran out), which is not a reading of anything and would
+     drag the line down. */
   useEffect(() => {
     if (phase !== 'result' || recordedRound.current === round) return
     recordedRound.current = round
+    clearSavedAttempt(uid)
     const answeredAny = variant.items.some((i) => answers[i.question.id])
     const { correct, total } = scoreExam(variant, answers)
-    setAttempts(answeredAny ? recordExamAttempt(correct, total, booklet?.id) : readExamAttempts())
-  }, [phase, round, variant, answers, booklet])
+    setAttempts(
+      answeredAny
+        ? recordExamAttempt(correct, total, booklet?.id, variant.blocks)
+        : readExamAttempts(),
+    )
+  }, [phase, round, variant, answers, booklet, uid])
+
+  /* The attempt in progress, saved on every answer and every move, so that a
+     reload — or a new build taking over the tab — resumes the same paper on
+     the same task with the clock still running, as it would in the hall. */
+  useEffect(() => {
+    if (phase !== 'running' || deadline === null) return
+    writeSavedAttempt(
+      uid,
+      serialiseAttempt({ bookletId: booklet?.id ?? null, variant, answers, index, deadline }),
+    )
+  }, [phase, deadline, variant, answers, index, booklet, uid])
+
+  /* What the shell and the update check need to know (`lib/examGuard.ts`). */
+  useEffect(() => {
+    setExamActivity(
+      phase === 'running' ? 'running' : phase === 'result' || phase === 'retake' ? 'reviewing' : 'idle',
+    )
+    return () => setExamActivity('idle')
+  }, [phase])
+
+  /* Closing or reloading the tab mid-attempt asks first. The answers would
+     survive a reload anyway; this is for the tab closed by a stray tap. */
+  useEffect(() => {
+    if (phase !== 'running') return
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      // Chrome and Edge before 119 ask only when this is set.
+      event.returnValue = true
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [phase])
+
+  /* The leave dialog's "leave": the attempt is abandoned — its saved copy
+     dropped, nothing recorded. Clearing the deadline also stops the countdown
+     and the saving, in case the clock would run out during the page's exit. */
+  const abandon = () => {
+    clearSavedAttempt(uid)
+    setDeadline(null)
+    answerLeave(true)
+  }
 
   const begin = () => {
     setDeadline(Date.now() + EXAM_TIME_BUDGET_MS)
@@ -774,6 +1001,7 @@ export function ExamMock() {
   }
 
   const restart = () => {
+    setRestored(null)
     setRound((r) => r + 1)
     setIndex(0)
     setAnswers({})
@@ -1282,7 +1510,7 @@ export function ExamMock() {
             transition={springSoft}
             className={cn(result.correct < result.total ? secondaryButton : primaryButton, 'flex-1')}
           >
-            {t(s.exam.retry)}
+            {t(s.exam.toVariants)}
           </motion.button>
         </motion.div>
       </motion.div>
@@ -1302,8 +1530,10 @@ export function ExamMock() {
       animate="animate"
       className="mx-auto max-w-2xl pb-4 lg:max-w-3xl"
     >
+      <LeaveDialog open={leaveRequested} onLeave={abandon} />
+
       <motion.div variants={staggerItem} className="flex items-center gap-3">
-        <IconButton label={t(s.common.back)} onClick={() => navigate('/')}>
+        <IconButton label={t(s.common.back)} onClick={() => requestLeave(() => navigate('/'))}>
           <ArrowLeft className="h-5 w-5" strokeWidth={2} />
         </IconButton>
         <div className="min-w-0 flex-1">
