@@ -64,6 +64,14 @@ export function eraColor(key: EraKey): string {
   return eras[key].color
 }
 
+/**
+ * The era's scene illustration — the same files the Батл hub and the featured
+ * events already show (`public/history-events`), one per era, named by key.
+ */
+export function eraImage(key: EraKey): string {
+  return `/history-events/${key}.webp`
+}
+
 /** Eras offered as filter chips on the timeline screen. */
 export const timelineEraKeys: EraKey[] = [
   'ancient',

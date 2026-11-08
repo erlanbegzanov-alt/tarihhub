@@ -3,7 +3,7 @@ import { Check, ChevronRight, Play, Sparkles } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ProgressBar } from '../components/ui'
-import { eraColor } from '../data/eras'
+import { eraColor, eraImage } from '../data/eras'
 import { allLessons, lessonsOfUnit } from '../data/lessons'
 import { units } from '../data/units'
 import { s } from '../i18n/strings'
@@ -37,9 +37,6 @@ export function CourseOutline() {
         <h1 className="text-2xl font-bold tracking-tight text-ink md:text-[28px]">
           {t(s.course.title)}
         </h1>
-        <p className="mt-1.5 text-[14.5px] text-ink-soft">
-          {t(s.course.subtitle)}
-        </p>
 
         <div className="mt-5 rounded-card bg-surface p-4 shadow-soft ring-1 ring-line/60 sm:p-5">
           <div className="flex items-baseline justify-between gap-4">
@@ -77,36 +74,55 @@ export function CourseOutline() {
             <motion.section key={unit.id} variants={staggerItem}>
               {/* unit head */}
               <div
-                className="rounded-card bg-surface p-4 shadow-soft ring-1 ring-line/60 sm:p-5"
+                className="overflow-hidden rounded-card bg-surface shadow-soft ring-1 ring-line/60"
                 style={{ borderLeft: `4px solid ${accent}` }}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <p
-                      className="text-[12.5px] font-bold tracking-wide"
-                      style={{ color: accentInk }}
-                    >
-                      {t(s.course.unitBefore)}
-                      {unit.order}
-                      {t(s.course.unitAfter)}
-                    </p>
-                    <h2 className="mt-1 text-[19px] leading-snug font-semibold text-ink">
-                      {t(unit.title)}
-                    </h2>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-[15px] font-bold text-ink">
-                      {unitPassed}
-                      <span className="text-ink-faint"> / {lessons.length}</span>
-                    </p>
-                    <p className="text-[11.5px] text-ink-faint">
-                      {t(s.course.unitPassed)}
-                    </p>
-                  </div>
+                {/* The era's scene, fading into the card — the same art the Батл hub carries. */}
+                <div className="relative h-[112px] sm:h-[148px]">
+                  <img
+                    src={eraImage(unit.eraKey)}
+                    alt=""
+                    aria-hidden
+                    width={1024}
+                    height={572}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-0 top-0 -bottom-px bg-gradient-to-b from-transparent from-35% via-surface/85 via-80% to-surface"
+                  />
                 </div>
-                <p className="mt-2 max-w-prose text-[14px] leading-relaxed text-ink-soft">
-                  {t(unit.summary)}
-                </p>
+                <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p
+                        className="text-[12.5px] font-bold tracking-wide"
+                        style={{ color: accentInk }}
+                      >
+                        {t(s.course.unitBefore)}
+                        {unit.order}
+                        {t(s.course.unitAfter)}
+                      </p>
+                      <h2 className="mt-1 text-[19px] leading-snug font-semibold text-ink">
+                        {t(unit.title)}
+                      </h2>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-[15px] font-bold text-ink">
+                        {unitPassed}
+                        <span className="text-ink-faint"> / {lessons.length}</span>
+                      </p>
+                      <p className="text-[11.5px] text-ink-faint">
+                        {t(s.course.unitPassed)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-2 max-w-prose text-[14px] leading-relaxed text-ink-soft">
+                    {t(unit.summary)}
+                  </p>
+                </div>
               </div>
 
               {/* lessons */}
