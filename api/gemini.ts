@@ -90,6 +90,12 @@ const FIRST_PIECE_BUDGET_MS = 15_000
 
 const MAX_HISTORY = 12
 const MAX_TEXT_LENGTH = 4000
+/**
+ * An explain request carries a whole lesson section, not a chat line. The
+ * longest section in the course is ~4150 characters, so the chat's 4000 cap
+ * turned "explain" into a guaranteed 400 on exactly those sections.
+ */
+const MAX_PASSAGE_LENGTH = 8000
 
 interface HistoryTurn {
   role: 'user' | 'assistant'
@@ -497,7 +503,7 @@ function validateBody(value: unknown): RequestBody | null {
     if (typeof body.heading !== 'string' || body.heading.length === 0 || body.heading.length > MAX_TEXT_LENGTH) {
       return null
     }
-    if (typeof body.body !== 'string' || body.body.length === 0 || body.body.length > MAX_TEXT_LENGTH) {
+    if (typeof body.body !== 'string' || body.body.length === 0 || body.body.length > MAX_PASSAGE_LENGTH) {
       return null
     }
     return { mode: 'explain', lang, heading: body.heading, body: body.body, config }

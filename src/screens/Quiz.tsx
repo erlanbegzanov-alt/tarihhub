@@ -17,8 +17,10 @@ import {
   LESSON_PASS_RATIO,
   completeDaily,
   completeQuiz,
+  lessonXpRemaining,
   localDateString,
   recordLessonQuizResult,
+  useProfile,
 } from '../lib/progress'
 import { shuffled } from '../lib/shuffle'
 
@@ -37,6 +39,7 @@ export function Quiz({ daily = false }: { daily?: boolean } = {}) {
   const { t } = useLang()
   const person = getPerson(personId)
   const lesson = getLesson(lessonId)
+  const profile = useProfile()
 
   /** Bumped on retry so question cards re-enter with a fresh animation key. */
   const [round, setRound] = useState(0)
@@ -72,12 +75,17 @@ export function Quiz({ daily = false }: { daily?: boolean } = {}) {
   /** Whether the finished attempt reached the lesson pass mark. Lesson mode only. */
   const [lessonPassed, setLessonPassed] = useState(false)
   /**
-   * Whether this mounted screen has already paid its `XP_PER_QUIZ`. Retry
-   * re-draws the questions and lets the reader practice again, but it must
-   * not reopen the XP faucet — `restart` deliberately never resets this, so
-   * finishing the same on-screen session five times pays once, not five.
-   * (`recordLessonQuizResult` doesn't need the same guard — it already only
-   * pays a lesson's completion XP the first time that lesson is ever passed.)
+   * Whether this mounted screen has already counted its finish (and, for a
+   * person quiz, paid its `XP_PER_QUIZ`). Retry re-draws the questions and
+   * lets the reader practice again, but it must not reopen the XP faucet —
+   * `restart` deliberately never resets this, so finishing the same on-screen
+   * session five times pays once, not five.
+   *
+   * A lesson quiz pays no flat `XP_PER_QUIZ` at all. Its only XP comes from
+   * `recordLessonQuizResult`, which pays score XP as improvement over the
+   * lesson's best plus the one-time pass bonus — persisted, so it holds across
+   * remounts too. A flat 20 per finish used to be paid here on top, which is
+   * how 6/30 showed "+20 XP" and why leaving and reopening a test paid again.
    */
   const xpAwardedRef = useRef(false)
   /** What the result screen actually just paid — `0` on a retry's finish. */
@@ -95,22 +103,24 @@ export function Quiz({ daily = false }: { daily?: boolean } = {}) {
   const advance = () => {
     if (isLast) {
       // `correctCount` already includes the current answer — `choose` runs first.
-      // A lesson quiz is still a quiz: it earns the usual XP, streak and badges…
-      if (!xpAwardedRef.current) {
-        xpAwardedRef.current = true
-        setXpEarnedThisRound(XP_PER_QUIZ)
-        // `completeDaily` pays nothing if today's set is already finished, so
-        // a second visit costs the reader nothing and earns them nothing.
-        if (daily) completeDaily(correctCount, questions.length, XP_PER_QUIZ)
-        else completeQuiz(correctCount, questions.length, XP_PER_QUIZ)
-      } else {
-        setXpEarnedThisRound(0)
-      }
-      // …and, on top of that, decides whether the lesson itself is passed.
+      const firstFinish = !xpAwardedRef.current
+      xpAwardedRef.current = true
       if (lessonId) {
-        setLessonPassed(
-          recordLessonQuizResult(lessonId, correctCount, questions.length),
-        )
+        // Still a quiz for the counter and badges — but its XP is the
+        // lesson's own rule below, and the result screen shows exactly that.
+        if (firstFinish) completeQuiz(correctCount, questions.length, 0)
+        const outcome = recordLessonQuizResult(lessonId, correctCount, questions.length)
+        setLessonPassed(outcome.passed)
+        setXpEarnedThisRound(outcome.xpEarned)
+      } else if (!firstFinish) {
+        setXpEarnedThisRound(0)
+      } else if (daily) {
+        // `completeDaily` pays nothing if today's set is already finished, and
+        // says so — a second visit no longer displays a "+20" it never paid.
+        setXpEarnedThisRound(completeDaily(correctCount, questions.length, XP_PER_QUIZ))
+      } else {
+        completeQuiz(correctCount, questions.length, XP_PER_QUIZ)
+        setXpEarnedThisRound(XP_PER_QUIZ)
       }
       setFinished(true)
       return
@@ -247,6 +257,9 @@ export function Quiz({ daily = false }: { daily?: boolean } = {}) {
             {t(s.quiz.passMark)}: {passMark}/{questions.length}
           </p>
         )}
+        {lessonMode && xpEarnedThisRound === 0 && (
+          <p className="mt-1.5 text-[12.5px] text-ink-faint">{t(s.quiz.xpBestOnly)}</p>
+        )}
 
         {/* A missed pass mark leads with "try again"; nothing else is offered
             as the celebratory next step. */}
@@ -327,7 +340,7 @@ export function Quiz({ daily = false }: { daily?: boolean } = {}) {
         </div>
         <XpPill>
           <Zap className="h-3 w-3" strokeWidth={2.6} fill="currentColor" />
-          +{XP_PER_QUIZ} XP
+          +{lessonId ? lessonXpRemaining(lessonId, profile) : XP_PER_QUIZ} XP
         </XpPill>
       </motion.div>
 

@@ -116,14 +116,6 @@ export const s = {
   lesson: {
     missing: { kz: 'Сабақ табылмады', ru: 'Урок не найден' },
     progress: { kz: 'Оқылды', ru: 'Пройдено' },
-    /**
-     * Honest footnote: the content comes from the project's checked reference,
-     * and disputed points stay marked as disputed inside the lesson itself.
-     */
-    sourceNote: {
-      kz: 'Сабақ мәтіні жобаның тексерілген тарихи анықтамалығынан жазылған. Даулы деректер сол күйі даулы деп көрсетілген.',
-      ru: 'Текст урока написан по проверенному историческому справочнику проекта. Спорные сведения так и помечены спорными.',
-    },
     completedTitle: { kz: 'Сабақ тапсырылды', ru: 'Урок сдан' },
     /** Real best attempt at this lesson's quiz, shown as "4/5". */
     bestScore: { kz: 'Үздік нәтиже', ru: 'Лучший результат' },
@@ -177,10 +169,6 @@ export const s = {
   /** Unit-by-unit course outline (`/course`) and the lesson rows inside it. */
   course: {
     title: { kz: 'Курс бағдарламасы', ru: 'Программа курса' },
-    subtitle: {
-      kz: 'Бөлімдер мен сабақтар — ежелгі дәуірден бүгінге дейін',
-      ru: 'Разделы и уроки — от древности до наших дней',
-    },
     /** Course-wide counter under the big "7 / 62". */
     lessonsPassed: { kz: 'сабақ тапсырылды', ru: 'уроков сдано' },
     /** Per-unit counter, kept short enough to sit beside the "3 / 7". */
@@ -230,6 +218,11 @@ export const s = {
 
     /** Pass mark for the lesson quiz, e.g. "Өту шегі — 4/5". */
     passMark: { kz: 'Өту шегі', ru: 'Проходной балл' },
+    /** Under a lesson result that paid 0 XP: retakes pay only a new best. */
+    xpBestOnly: {
+      kz: 'XP тек осы сабақтағы ең жақсы нәтижеңізді жаңартқанда беріледі.',
+      ru: 'XP начисляется, только когда вы улучшаете свой лучший результат по уроку.',
+    },
     lessonPassedTitle: { kz: 'Сабақ есептелді', ru: 'Урок засчитан' },
     lessonPassedText: {
       kz: 'Тестті тапсырдыңыз — сабақ курс бойынша өтілді деп белгіленді.',
