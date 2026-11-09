@@ -16,6 +16,7 @@ export interface Paint {
   ledge: string
 }
 
+/** A block that carries a picture under its colour — every league and mode. */
 export interface LeaguePaint extends Paint {
   image: string
 }
@@ -29,12 +30,13 @@ export const LEAGUE_PAINT: LeaguePaint[] = [
   { bg: '#6a4aa8', ledge: '#4a3179', image: '/battle/league-4.webp' },
 ]
 
+/** Each mode's picture is on its own theme: бәйге, көкпар, айтыс, friends at a yurt. */
 export const MODE_PAINT = {
-  casual: { bg: '#c24d0c', ledge: '#8c3607' },
-  team: { bg: '#0d8462', ledge: '#085a43' },
-  kahoot: { bg: '#2c4a8f', ledge: '#1c3166' },
-  friends: { bg: '#6a4aa8', ledge: '#4a3179' },
-} satisfies Record<string, Paint>
+  casual: { bg: '#c24d0c', ledge: '#8c3607', image: '/battle/mode-casual.webp' },
+  team: { bg: '#0d8462', ledge: '#085a43', image: '/battle/mode-team.webp' },
+  kahoot: { bg: '#2c4a8f', ledge: '#1c3166', image: '/battle/mode-kahoot.webp' },
+  friends: { bg: '#6a4aa8', ledge: '#4a3179', image: '/battle/mode-friends.webp' },
+} satisfies Record<string, LeaguePaint>
 
 /** Waiting-on-you red, fixed for the same reason: white sits on it. */
 export const ALERT_RED = '#c8321f'

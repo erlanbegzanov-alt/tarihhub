@@ -27,7 +27,7 @@ import { KahootHeader } from '../components/kahoot'
 import { FormDots, ratingTierIcon } from '../components/battle'
 import { SectionHeading } from '../components/ui'
 import { ALERT_RED, LEAGUE_PAINT, MODE_PAINT } from '../data/battlePaint'
-import type { Paint } from '../data/battlePaint'
+import type { LeaguePaint } from '../data/battlePaint'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { useAlerts } from '../lib/alerts'
@@ -39,7 +39,8 @@ import { useProfile } from '../lib/progress'
 import { useSession } from '../lib/session'
 
 /**
- * One mode, as a colour block.
+ * One mode, as a colour block with its picture fading into the colour at the
+ * bottom, where the name sits.
  *
  * No subtitle: Erlan had the one-line descriptions taken off, the name, icon
  * and picture say enough. Pressing it sinks it onto its ledge.
@@ -53,7 +54,7 @@ function ModeBlock({
   onClick,
   className,
 }: {
-  paint: Paint
+  paint: LeaguePaint
   icon: LucideIcon
   title: string
   /** One line of this mode's own record, or `null` when there is none yet. */
@@ -77,6 +78,20 @@ function ModeBlock({
       className={cn('focus-ring relative overflow-hidden rounded-[24px] text-left', className)}
       style={{ background: paint.bg, boxShadow: `0 5px 0 0 ${paint.ledge}` }}
     >
+      <img
+        src={paint.image}
+        alt=""
+        aria-hidden
+        decoding="async"
+        className="absolute inset-0 h-full w-full object-cover object-[center_30%]"
+      />
+      <span
+        aria-hidden
+        className="absolute inset-0"
+        style={{
+          background: `linear-gradient(to top, ${paint.bg} 8%, color-mix(in srgb, ${paint.bg} 60%, transparent) 42%, color-mix(in srgb, ${paint.bg} 5%, transparent) 85%), linear-gradient(to right, color-mix(in srgb, ${paint.bg} 45%, transparent), transparent 55%)`,
+        }}
+      />
       {stat && alert && (
         <span
           className="absolute top-3 right-3 rounded-full px-2.5 py-1 text-[12px] font-bold text-white tabular-nums"
@@ -85,7 +100,7 @@ function ModeBlock({
           {stat}
         </span>
       )}
-      <span className="absolute inset-x-4 bottom-4 flex flex-col gap-2 lg:inset-x-5 lg:bottom-5">
+      <span className="absolute inset-x-4 bottom-4 flex flex-col gap-2 [text-shadow:0_1px_3px_rgb(0_0_0/0.4)] lg:inset-x-5 lg:bottom-5">
         <Icon className="h-[22px] w-[22px] text-white" strokeWidth={2} aria-hidden />
         <span className="font-display text-[16px] leading-tight font-bold text-white lg:text-[20px]">
           {title}
