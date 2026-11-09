@@ -1,7 +1,9 @@
 /**
  * The colours of the Батл hub's blocks (`src/screens/Battle.tsx`), in the
  * «Ойын» direction: a solid colour block and a darker ledge under it. The era
- * illustrations the blocks carried at first now head the course's unit cards.
+ * illustrations the blocks carried at first now head the course's unit cards;
+ * each league has its own picture instead (owner's, 2026-11-09), painted in
+ * that league's colour with the subject on the right.
  *
  * Fixed hexes, not the era tokens, and data rather than theme: these blocks
  * carry white type in both themes, and the era tokens lighten in dark mode,
@@ -14,13 +16,17 @@ export interface Paint {
   ledge: string
 }
 
+export interface LeaguePaint extends Paint {
+  image: string
+}
+
 /** One per league, in the order the leagues climb. */
-export const LEAGUE_PAINT: Paint[] = [
-  { bg: '#8a6a3f', ledge: '#5f4a2b' },
-  { bg: '#3d6585', ledge: '#27445c' },
-  { bg: '#8c6a0e', ledge: '#5c4508' },
-  { bg: '#34775a', ledge: '#22503c' },
-  { bg: '#6a4aa8', ledge: '#4a3179' },
+export const LEAGUE_PAINT: LeaguePaint[] = [
+  { bg: '#8a6a3f', ledge: '#5f4a2b', image: '/battle/league-0.webp' },
+  { bg: '#3d6585', ledge: '#27445c', image: '/battle/league-1.webp' },
+  { bg: '#8c6a0e', ledge: '#5c4508', image: '/battle/league-2.webp' },
+  { bg: '#34775a', ledge: '#22503c', image: '/battle/league-3.webp' },
+  { bg: '#6a4aa8', ledge: '#4a3179', image: '/battle/league-4.webp' },
 ]
 
 export const MODE_PAINT = {

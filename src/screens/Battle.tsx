@@ -169,8 +169,26 @@ export function Battle() {
         className="relative mt-5 overflow-hidden rounded-[26px] lg:h-[220px]"
         style={{ background: league.bg, boxShadow: `0 6px 0 0 ${league.ledge}` }}
       >
+        {/* Each league has its own picture, and the picture grows with it: the
+            eagle is a speck over the Қола steppe and fills the sky at Алмас.
+            Every picture is painted in its league's colour with the subject on
+            the right, so the veil only has to settle the left half for the type. */}
+        <img
+          src={league.image}
+          alt=""
+          aria-hidden
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover object-right"
+        />
+        <span
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(to right, ${league.bg} 18%, color-mix(in srgb, ${league.bg} 55%, transparent) 50%, color-mix(in srgb, ${league.bg} 10%, transparent) 85%), linear-gradient(to top, rgb(0 0 0 / 0.28), transparent 60%), linear-gradient(to bottom, rgb(0 0 0 / 0.26), transparent 45%)`,
+          }}
+        />
 
-        <div className="relative flex flex-col gap-5 p-5 lg:h-full lg:justify-between lg:p-7">
+        <div className="relative flex flex-col gap-5 p-5 [text-shadow:0_1px_3px_rgb(0_0_0/0.35)] lg:h-full lg:justify-between lg:p-7">
           <div className="flex items-center gap-3.5 lg:gap-4">
             <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-2xl bg-white/20 lg:h-16 lg:w-16">
               <TierIcon className="h-7 w-7 text-white lg:h-8 lg:w-8" strokeWidth={2} aria-hidden />
