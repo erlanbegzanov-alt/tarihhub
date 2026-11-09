@@ -28,6 +28,8 @@ export interface ExamAttempt {
    * before it was stored — `blocksOf` says what such a record is taken for.
    */
   blocks?: string[]
+  /** Time spent on the paper. Absent on records written before 2026-11-09. */
+  ms?: number
 }
 
 export interface ExamForecast {
@@ -56,7 +58,7 @@ export const HORIZON_DAYS = 30
 const MAX_USEFUL_BAND = 8
 /** Only the recent pace matters; a September score says little about November. */
 const MAX_POINTS = 10
-const MAX_STORED = 60
+const MAX_STORED = 300
 const STORAGE_KEY_BASE = 'tarihhub_exam_attempts_v1'
 
 const dayNumber = (day: string) => {
@@ -228,7 +230,8 @@ export function readExamAttempts(): ExamAttempt[] {
         typeof a?.total === 'number' &&
         (a.variant === undefined || typeof a.variant === 'string') &&
         (a.blocks === undefined ||
-          (Array.isArray(a.blocks) && a.blocks.every((b: unknown) => typeof b === 'string'))),
+          (Array.isArray(a.blocks) && a.blocks.every((b: unknown) => typeof b === 'string'))) &&
+        (a.ms === undefined || typeof a.ms === 'number'),
     )
   } catch {
     return []
@@ -245,10 +248,12 @@ export function recordExamAttempt(
   total: number,
   variant?: string,
   blocks?: ContextBlock[],
+  ms?: number,
 ): ExamAttempt[] {
   const attempt: ExamAttempt = { day: localDateString(), correct, total }
   if (variant) attempt.variant = variant
   if (blocks) attempt.blocks = blocks.map(stimulusId)
+  if (ms !== undefined && ms > 0) attempt.ms = Math.round(ms)
   const next = [...readExamAttempts(), attempt].slice(-MAX_STORED)
   try {
     window.localStorage.setItem(storageKey(), JSON.stringify(next))

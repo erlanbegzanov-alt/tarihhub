@@ -10,6 +10,7 @@ import {
   Map as MapIcon,
   RotateCcw,
   Target,
+  Trophy,
   X,
 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -56,6 +57,7 @@ import {
   saveExamDate,
 } from '../lib/examForecast'
 import type { ExamAttempt, ExamForecast } from '../lib/examForecast'
+import { dayLabel, examHistory, minutesOf } from '../lib/examHistory'
 import { localDateString, useProfile } from '../lib/progress'
 import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 
@@ -431,6 +433,123 @@ function ForecastPanel({
         </div>
       </div>
     </motion.section>
+  )
+}
+
+/**
+ * Every mock this student has sat, newest first, with the count up top — the
+ * one number here that only ever grows. A paper that beat all before it is
+ * marked, and the bar runs to the next milestone so there is always a near
+ * goal. The log is the forecast's own, kept on this device.
+ */
+function HistoryPanel({ attempts }: { attempts: ExamAttempt[] }) {
+  const { t, lang } = useLang()
+  const h = examHistory(attempts)
+  if (h.count === 0) {
+    return (
+      <motion.section
+        variants={staggerItem}
+        className="mt-5 rounded-card bg-surface p-5 text-[14px] leading-relaxed text-ink-soft shadow-soft ring-1 ring-line/60 sm:p-6"
+      >
+        {t(s.exam.historyEmpty)}
+      </motion.section>
+    )
+  }
+  const into =
+    h.nextMilestone === null ? 1 : (h.count - h.lastMilestone) / (h.nextMilestone - h.lastMilestone)
+  const stats: { label: string; value: string }[] = [
+    { label: t(s.exam.historyBest), value: h.best ? `${h.best.correct}/${h.best.total}` : '—' },
+    { label: t(s.exam.historyAverage), value: h.average === null ? '—' : oneDecimal(h.average) },
+    {
+      label: t(s.exam.historyAvgTime),
+      value: h.averageMs === null ? '—' : `${minutesOf(h.averageMs)} ${t(s.exam.minutesShort)}`,
+    },
+    { label: t(s.exam.historyBooklets), value: `${h.bookletsDone}/${schoolVariants.length}` },
+  ]
+  return (
+    <>
+      <motion.section
+        variants={staggerItem}
+        className="mt-5 rounded-card bg-surface p-5 shadow-soft ring-1 ring-line/60 sm:p-6"
+      >
+        <div className="flex items-end gap-3">
+          <b className="font-mono text-[52px] leading-none font-bold text-brand tabular-nums">{h.count}</b>
+          <p className="pb-1 text-[14px] leading-snug text-ink-soft">{t(s.exam.historyCount)}</p>
+        </div>
+
+        <div className="mt-4">
+          <div className="flex items-baseline justify-between gap-3 text-[12.5px] text-ink-faint">
+            <span>
+              {h.nextMilestone === null
+                ? t(s.exam.historyAllMilestones)
+                : `${t(s.exam.historyNext)}: ${h.nextMilestone}`}
+            </span>
+            {h.nextMilestone !== null && (
+              <span className="font-mono tabular-nums">
+                {h.count}/{h.nextMilestone}
+              </span>
+            )}
+          </div>
+          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-cream">
+            <div
+              className="h-full rounded-full bg-brand"
+              style={{ width: `${Math.max(into * 100, 4)}%` }}
+            />
+          </div>
+        </div>
+
+        <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {stats.map((st) => (
+            <div key={st.label} className="rounded-card bg-cream px-3.5 py-3">
+              <dt className="text-[12px] text-ink-faint">{st.label}</dt>
+              <dd className="mt-1 font-mono text-[20px] font-bold text-ink tabular-nums">{st.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </motion.section>
+
+      <motion.section variants={staggerItem} className="mt-6">
+        <SectionHeading title={t(s.exam.historyList)} />
+        <ol className="flex flex-col gap-2">
+          {h.rows.map(({ attempt, record }, i) => (
+            <li
+              key={h.count - i}
+              className="flex items-center gap-3 rounded-card bg-surface px-4 py-3 shadow-soft ring-1 ring-line/60"
+            >
+              <span className="w-8 shrink-0 font-mono text-[12px] text-ink-faint tabular-nums">
+                #{h.count - i}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[14.5px] font-semibold text-ink">
+                  {attempt.variant
+                    ? `${t(s.exam.variantNo)} ${attempt.variant}`
+                    : t(s.exam.historyOurs)}
+                </p>
+                <p className="mt-0.5 text-[12.5px] text-ink-faint tabular-nums">
+                  {dayLabel(attempt.day, lang)}
+                  {attempt.ms ? ` · ${minutesOf(attempt.ms)} ${t(s.exam.minutesShort)}` : ''}
+                </p>
+              </div>
+              {record && (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-cream px-2 py-0.5 text-[11.5px] font-semibold text-brand">
+                  <Trophy className="h-3 w-3" strokeWidth={2.2} aria-hidden />
+                  {t(s.exam.historyRecord)}
+                </span>
+              )}
+              <span
+                className={cn(
+                  'shrink-0 font-mono text-[16px] font-bold tabular-nums',
+                  attempt.correct < EXAM_THRESHOLD ? 'text-ink-faint' : 'text-ink',
+                )}
+              >
+                {attempt.correct}/{attempt.total}
+              </span>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-3 text-[12px] text-ink-faint">{t(s.exam.historyDevice)}</p>
+      </motion.section>
+    </>
   )
 }
 
@@ -872,7 +991,7 @@ export function ExamMock() {
   const [phase, setPhase] = useState<Phase>(
     resumed ? (resumed.expired ? 'result' : 'running') : 'shelves',
   )
-  const [tab, setTab] = useState<'variants' | 'forecast'>('variants')
+  const [tab, setTab] = useState<'variants' | 'forecast' | 'history'>('variants')
   /** Bumped when the exam day is saved, so the home screen re-reads it. */
   const [, setDateVersion] = useState(0)
   const [filter, setFilter] = useState<'all' | Mark>('all')
@@ -946,12 +1065,14 @@ export function ExamMock() {
     clearSavedAttempt(uid)
     const answeredAny = variant.items.some((i) => answers[i.question.id])
     const { correct, total } = scoreExam(variant, answers)
+    const spent =
+      deadline === null ? undefined : EXAM_TIME_BUDGET_MS - Math.max(0, deadline - Date.now())
     setAttempts(
       answeredAny
-        ? recordExamAttempt(correct, total, booklet?.id, variant.blocks)
+        ? recordExamAttempt(correct, total, booklet?.id, variant.blocks, spent)
         : readExamAttempts(),
     )
-  }, [phase, round, variant, answers, booklet, uid])
+  }, [phase, round, variant, answers, booklet, uid, deadline])
 
   /* The attempt in progress, saved on every answer and every move, so that a
      reload — or a new build taking over the tab — resumes the same paper on
@@ -1018,7 +1139,7 @@ export function ExamMock() {
     restart()
   }
 
-  const variantLabel = booklet ? `${t(s.exam.variantNo)} ${booklet.id}` : t(s.exam.subtitle)
+  const variantLabel = booklet ? `${t(s.exam.variantNo)} ${booklet.id}` : t(s.exam.randomVariant)
 
   /* The answer sheet's dots jump to that task's review, showing every task
      first so the one asked for is not hidden by the filter. */
@@ -1068,7 +1189,7 @@ export function ExamMock() {
     const attemptsSoFar = readExamAttempts()
     const forecast = forecastExam(attemptsSoFar)
     const bests = bestByVariant(attemptsSoFar)
-    const tabs: { key: 'variants' | 'forecast'; label: string }[] = [
+    const tabs: { key: 'variants' | 'forecast' | 'history'; label: string }[] = [
       { key: 'variants', label: t(s.exam.variantsTitle) },
       {
         key: 'forecast',
@@ -1076,6 +1197,12 @@ export function ExamMock() {
           forecast.now === null
             ? t(s.exam.forecastTab)
             : `${t(s.exam.forecastTab)} · ${oneDecimal(forecast.now)}`,
+      },
+      {
+        key: 'history',
+        label: attemptsSoFar.length
+          ? `${t(s.exam.historyTab)} · ${attemptsSoFar.length}`
+          : t(s.exam.historyTab),
       },
     ]
     return (
@@ -1085,11 +1212,7 @@ export function ExamMock() {
         animate="animate"
         className="mx-auto max-w-2xl pb-4 lg:max-w-5xl"
       >
-        <ScreenHeader
-          title={t(s.exam.title)}
-          sub={t(s.exam.subtitle)}
-          onBack={() => navigate('/')}
-        />
+        <ScreenHeader title={t(s.exam.title)} onBack={() => navigate('/')} />
 
         {/* Variants first: the page is for sitting a paper. The forecast is
             one tap away, with its reading on the tab itself. */}
@@ -1115,7 +1238,9 @@ export function ExamMock() {
           ))}
         </motion.div>
 
-        {tab === 'forecast' ? (
+        {tab === 'history' ? (
+          <HistoryPanel attempts={attemptsSoFar} />
+        ) : tab === 'forecast' ? (
           <ForecastPanel
             forecast={forecast}
             examDay={readExamDate()}
