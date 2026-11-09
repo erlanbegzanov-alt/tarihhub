@@ -18,6 +18,8 @@ import {
   completeDaily,
   completeQuiz,
   lessonXpRemaining,
+  quizXpRemaining,
+  recordPersonQuizResult,
   localDateString,
   recordLessonQuizResult,
   useProfile,
@@ -119,8 +121,7 @@ export function Quiz({ daily = false }: { daily?: boolean } = {}) {
         // says so — a second visit no longer displays a "+20" it never paid.
         setXpEarnedThisRound(completeDaily(correctCount, questions.length, XP_PER_QUIZ))
       } else {
-        completeQuiz(correctCount, questions.length, XP_PER_QUIZ)
-        setXpEarnedThisRound(XP_PER_QUIZ)
+        setXpEarnedThisRound(recordPersonQuizResult(personId, correctCount, questions.length))
       }
       setFinished(true)
       return
@@ -257,7 +258,7 @@ export function Quiz({ daily = false }: { daily?: boolean } = {}) {
             {t(s.quiz.passMark)}: {passMark}/{questions.length}
           </p>
         )}
-        {lessonMode && xpEarnedThisRound === 0 && (
+        {!daily && xpEarnedThisRound === 0 && (
           <p className="mt-1.5 text-[12.5px] text-ink-faint">{t(s.quiz.xpBestOnly)}</p>
         )}
 
@@ -340,7 +341,15 @@ export function Quiz({ daily = false }: { daily?: boolean } = {}) {
         </div>
         <XpPill>
           <Zap className="h-3 w-3" strokeWidth={2.6} fill="currentColor" />
-          +{lessonId ? lessonXpRemaining(lessonId, profile) : XP_PER_QUIZ} XP
+          +
+          {lessonId
+            ? lessonXpRemaining(lessonId, profile)
+            : daily
+              ? profile.dailyDate === localDateString()
+                ? 0
+                : XP_PER_QUIZ
+              : quizXpRemaining(personId, profile)}{' '}
+          XP
         </XpPill>
       </motion.div>
 

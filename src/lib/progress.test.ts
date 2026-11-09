@@ -12,6 +12,8 @@ import {
   levelInfo,
   loadProfileForUser,
   normalizeProfile,
+  quizXpRemaining,
+  recordPersonQuizResult,
   recordLessonQuizResult,
   recordVisit,
 } from './progress'
@@ -220,5 +222,42 @@ describe('completeQuiz', () => {
     completeQuiz(5, 5, 20)
     expect(getProfile().xp).toBe(40)
     expect(getProfile().unlockedBadges).toContain('sage')
+  })
+})
+
+describe('recordPersonQuizResult', () => {
+  it('pays only the improvement on this quiz, so repeating it cannot farm XP', () => {
+    expect(recordPersonQuizResult('abylai', 5, 10)).toBe(10)
+    expect(recordPersonQuizResult('abylai', 5, 10)).toBe(0)
+    expect(recordPersonQuizResult('abylai', 4, 10)).toBe(0)
+    expect(recordPersonQuizResult('abylai', 10, 10)).toBe(LESSON_SCORE_XP_MAX - 10)
+    for (let i = 0; i < 20; i += 1) recordPersonQuizResult('abylai', 10, 10)
+    expect(getProfile().xp).toBe(LESSON_SCORE_XP_MAX)
+    expect(quizXpRemaining('abylai')).toBe(0)
+    // Another person's quiz is its own budget.
+    expect(quizXpRemaining('tauke')).toBe(LESSON_SCORE_XP_MAX)
+    // Every finish still counts for the counter.
+    expect(getProfile().quizzesCompleted).toBe(24)
+  })
+})
+
+describe('the flame badge', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('comes from seven daily sets in a row, not from seven app opens', () => {
+    vi.useFakeTimers()
+    for (let d = 1; d <= 7; d += 1) {
+      vi.setSystemTime(new Date(`2026-03-0${d}T09:00:00`))
+      recordVisit()
+    }
+    expect(getProfile().streak).toBe(7)
+    expect(getProfile().unlockedBadges).not.toContain('flame')
+
+    for (let d = 1; d <= 7; d += 1) {
+      vi.setSystemTime(new Date(`2026-04-0${d}T09:00:00`))
+      completeDaily(3, 5, 20)
+      if (d < 7) expect(getProfile().unlockedBadges).not.toContain('flame')
+    }
+    expect(getProfile().unlockedBadges).toContain('flame')
   })
 })

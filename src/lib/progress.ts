@@ -598,15 +598,11 @@ export function recordVisit(): void {
       ? state.streak + 1
       : 1
 
-  const unlocked = new Set(state.unlockedBadges)
-  if (nextStreak >= 7) unlocked.add('flame')
-
   write({
     ...state,
     streak: nextStreak,
     totalVisits: state.totalVisits + 1,
     lastVisitDate: today,
-    unlockedBadges: [...unlocked],
   })
 }
 
@@ -615,7 +611,6 @@ export function completeQuiz(correct: number, total: number, xp: number): void {
   const unlocked = new Set(state.unlockedBadges)
   if (state.quizzesCompleted + 1 >= 5) unlocked.add('strategist')
   if (correct === total) unlocked.add('sage')
-  if (state.streak >= 7) unlocked.add('flame')
 
   write({
     ...state,
@@ -623,6 +618,65 @@ export function completeQuiz(correct: number, total: number, xp: number): void {
     quizzesCompleted: state.quizzesCompleted + 1,
     unlockedBadges: [...unlocked],
   })
+}
+
+/**
+ * The `lessonQuizBest` key a person (or mixed) quiz keeps its best score
+ * under. The prefix keeps it from ever colliding with a lesson id, and reusing
+ * that map means the score already syncs and merges like a lesson's does.
+ */
+export function quizBestKey(personId: string | undefined): string {
+  return `quiz:${personId ?? 'mix'}`
+}
+
+/** What a person quiz can still pay this reader — what its header promises. */
+export function quizXpRemaining(
+  personId: string | undefined,
+  profile: Pick<ProfileState, 'lessonQuizBest'> = state,
+): number {
+  const best = profile.lessonQuizBest[quizBestKey(personId)]
+  return Math.max(0, LESSON_SCORE_XP_MAX - (best ? lessonScoreXp(best.correct, best.total) : 0))
+}
+
+/**
+ * Records a finished person quiz (or the mixed one) and returns the XP paid.
+ *
+ * It used to pay a flat 20 on every finish, so one quiz repeated fifty times
+ * was a thousand XP — the top ranks for retaking the same ten questions. Now
+ * it follows the lesson rule: XP for the score, paid only as an improvement on
+ * this quiz's best, so the most any one quiz can ever give is
+ * `LESSON_SCORE_XP_MAX`. The counter and badges still move on every finish.
+ */
+export function recordPersonQuizResult(
+  personId: string | undefined,
+  correct: number,
+  total: number,
+): number {
+  if (!Number.isFinite(total) || total < 1) return 0
+  const safeTotal = Math.round(total)
+  const safeCorrect = Math.max(0, Math.min(safeTotal, Number.isFinite(correct) ? Math.round(correct) : 0))
+  const key = quizBestKey(personId)
+  const best = state.lessonQuizBest[key]
+  const xpEarned = Math.max(
+    0,
+    lessonScoreXp(safeCorrect, safeTotal) - (best ? lessonScoreXp(best.correct, best.total) : 0),
+  )
+  const beatsBest = !best || safeCorrect / safeTotal > best.correct / best.total
+
+  const unlocked = new Set(state.unlockedBadges)
+  if (state.quizzesCompleted + 1 >= 5) unlocked.add('strategist')
+  if (safeCorrect === safeTotal) unlocked.add('sage')
+
+  write({
+    ...state,
+    xp: state.xp + xpEarned,
+    quizzesCompleted: state.quizzesCompleted + 1,
+    unlockedBadges: [...unlocked],
+    lessonQuizBest: beatsBest
+      ? { ...state.lessonQuizBest, [key]: { correct: safeCorrect, total: safeTotal } }
+      : state.lessonQuizBest,
+  })
+  return xpEarned
 }
 
 /**
@@ -642,16 +696,19 @@ export function completeDaily(correct: number, total: number, xp: number): numbe
   const today = localDateString()
   if (state.dailyDate === today) return 0
 
+  const dailyStreak = nextDailyStreak(state.dailyDate, state.dailyStreak, today)
   const unlocked = new Set(state.unlockedBadges)
   if (state.quizzesCompleted + 1 >= 5) unlocked.add('strategist')
   if (correct === total) unlocked.add('sage')
+  // Seven daily sets in a row — the badge says "studied", so app opens don't count.
+  if (dailyStreak >= 7) unlocked.add('flame')
 
   write({
     ...state,
     xp: state.xp + xp,
     quizzesCompleted: state.quizzesCompleted + 1,
     dailyDate: today,
-    dailyStreak: nextDailyStreak(state.dailyDate, state.dailyStreak, today),
+    dailyStreak,
     unlockedBadges: [...unlocked],
   })
   return xp
