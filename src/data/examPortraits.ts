@@ -9,4 +9,8 @@ export const EXAM_PORTRAITS = [
   '/portraits/amangeldi-imanov.webp',
   '/portraits/turar-ryskulov.webp',
   '/portraits/kairat-ryskulbekov.webp',
+  // Added 2026-11-09 for booklets 93002, 93506 and 93504.
+  '/portraits/alkey-margulan.webp',
+  '/portraits/bakhytzhan-karatayev.webp',
+  '/portraits/olzhas-suleimenov.webp',
 ]

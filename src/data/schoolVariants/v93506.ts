@@ -20,9 +20,9 @@ import type { ContextBlock, QuizQuestion, SchoolVariant } from '../types'
  *   so the block is a document text on the same subject. The stems never
  *   referred to the map and are unchanged. In statements III–IV of №12 the
  *   spelling «бұдын» is unified to «бұдун», as in the passage.
- * - №16–20: the booklet printed one captioned photo. The app has no picture
- *   of Бақытжан Қаратаев, so the block is one numbered description, without
- *   his name and without the answer to any of its tasks; no picture is shown.
+ * - №16–20: the booklet printed one captioned photo; our own portrait of him
+ *   (2026-11-09) stands as picture 1 beside one numbered description, without
+ *   his name and without the answer to any of its tasks.
  *   The stems name him, as printed.
  * - №16: options A and B are lost on this scan; restored from the identical
  *   task 16 of booklet 93502 (A «Кадет партиясы», B «"Алаш" партиясы").
@@ -548,7 +548,8 @@ const ctx2: ContextBlock = {
   id: 'sch-93506-ctx2',
   kind: 'person',
   topicId: 54,
-  // The app has no picture of this person, so description 1 stands alone.
+  // Our own picture of him, added 2026-11-09, as the booklet's photo was.
+  figures: [{ n: 1, src: '/portraits/bakhytzhan-karatayev.webp' }],
   title: {
     kz: 'XX ғасыр басындағы қазақ қайраткері',
     ru: 'Казахский деятель начала XX века',

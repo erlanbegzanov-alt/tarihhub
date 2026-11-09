@@ -53,3 +53,6 @@ Total: 55 files, all wired into the figure pages.
   figure pages in the AI section (they were wired to the exam only).
 - `abulkhair-khan` — the owner's «Әбілқайыр хан» image, restored from git (it had
   been filed as `kasym-khan.webp` before 2026-11-03). Monument kind.
+- `alkey-margulan`, `bakhytzhan-karatayev`, `olzhas-suleimenov` (2026-11-09) — portrait
+  kind, made by the owner the same way as the rest. Used only as numbered pictures
+  in the person contexts of booklets 93002, 93506 and 93504 (`src/data/examPortraits.ts`).

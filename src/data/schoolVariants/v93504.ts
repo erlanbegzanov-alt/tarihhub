@@ -24,7 +24,7 @@ import type { ContextBlock, QuizQuestion, SchoolVariant } from '../types'
  * - №16–20: the booklet printed three unnamed photos. They are now three
  *   numbered descriptions that name no one and print no task's answer:
  *   1 Мұхтар Әуезов, 2 Қаныш Сәтбаев (our own portraits stand beside both),
- *   3 Олжас Сүлейменов (the app has no picture of him: description only).
+ *   3 Олжас Сүлейменов (all three with our own portraits).
  *   «N-суреттегі тұлға» is re-stemmed to «N-тұлға», and in №17
  *   «Суреттегі тұлғаларға» to «Берілген тұлғаларға».
  * - №16 asked person 2's field of science (geology), which repeats 93002-17
@@ -392,11 +392,11 @@ const ctx2: ContextBlock = {
   id: 'sch-93504-ctx2',
   kind: 'person',
   topicId: 54,
-  // Our own pictures of persons 1 and 2; the app has none of person 3, so his
-  // description stands alone.
+  // Our own pictures of all three persons (Сүлейменов added 2026-11-09).
   figures: [
     { n: 1, src: '/portraits/mukhtar-auezov.webp' },
     { n: 2, src: '/portraits/satbayev.webp' },
+    { n: 3, src: '/portraits/olzhas-suleimenov.webp' },
   ],
   title: {
     kz: 'Қазақтың көрнекті зиялылары',
