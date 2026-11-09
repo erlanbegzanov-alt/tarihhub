@@ -56,3 +56,6 @@ Total: 55 files, all wired into the figure pages.
 - `alkey-margulan`, `bakhytzhan-karatayev`, `olzhas-suleimenov` (2026-11-09) — portrait
   kind, made by the owner the same way as the rest. Used only as numbered pictures
   in the person contexts of booklets 93002, 93506 and 93504 (`src/data/examPortraits.ts`).
+- `alkey-margulan` and `bakhytzhan-karatayev` also head their own figure pages in the AI
+  section (2026-11-09). `olzhas-suleimenov` stays exam-only: he is alive, and the AI
+  section speaks in the first person as the figure.
