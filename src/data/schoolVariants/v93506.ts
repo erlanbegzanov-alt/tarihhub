@@ -21,7 +21,7 @@ import type { ContextBlock, QuizQuestion, SchoolVariant } from '../types'
  *   referred to the map and are unchanged. In statements III–IV of №12 the
  *   spelling «бұдын» is unified to «бұдун», as in the passage.
  * - №16–20: the booklet printed one captioned photo; our own portrait of him
- *   (2026-11-09) stands as picture 1 beside one numbered description, without
+ *   (2026-11-09) stands as picture 1 beside one description, without
  *   his name and without the answer to any of its tasks.
  *   The stems name him, as printed.
  * - №16: options A and B are lost on this scan; restored from the identical
@@ -556,12 +556,12 @@ const ctx2: ContextBlock = {
   },
   passage: {
     kz:
-      '1. Қоғам және мемлекет қайраткері, ағартушы, демократ (1863–1934). ' +
+      'Қоғам және мемлекет қайраткері, ағартушы, демократ (1863–1934). ' +
       'XX ғасырдың басында ағартушылық қызметімен танылды. ' +
       'II Мемлекеттік Думаның депутаты болды. ' +
       '1919 жылғы шілдеде құрылған Қазревкомның алғашқы құрамына кірді.',
     ru:
-      '1. Общественный и государственный деятель, просветитель, демократ (1863–1934). ' +
+      'Общественный и государственный деятель, просветитель, демократ (1863–1934). ' +
       'В начале XX века стал известен просветительской деятельностью. ' +
       'Был депутатом II Государственной думы. ' +
       'Вошёл в первый состав Казревкома, созданного в июле 1919 года.',
