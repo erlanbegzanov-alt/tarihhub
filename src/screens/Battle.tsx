@@ -82,6 +82,7 @@ function ModeBlock({
         src={paint.image}
         alt=""
         aria-hidden
+        loading="lazy"
         decoding="async"
         className="absolute inset-0 h-full w-full object-cover object-[center_30%]"
       />

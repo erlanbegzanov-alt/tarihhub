@@ -114,14 +114,19 @@ export function Quiz({ daily = false }: { daily?: boolean } = {}) {
         const outcome = recordLessonQuizResult(lessonId, correctCount, questions.length)
         setLessonPassed(outcome.passed)
         setXpEarnedThisRound(outcome.xpEarned)
+      } else if (!daily) {
+        // Recorded on every finish, retries included: the rule only pays an
+        // improvement on this quiz's best, so a retry can't farm — and a better
+        // retry on the same screen must pay what the header promised.
+        setXpEarnedThisRound(
+          recordPersonQuizResult(person ? personId : undefined, correctCount, questions.length, firstFinish),
+        )
       } else if (!firstFinish) {
         setXpEarnedThisRound(0)
-      } else if (daily) {
+      } else {
         // `completeDaily` pays nothing if today's set is already finished, and
         // says so — a second visit no longer displays a "+20" it never paid.
         setXpEarnedThisRound(completeDaily(correctCount, questions.length, XP_PER_QUIZ))
-      } else {
-        setXpEarnedThisRound(recordPersonQuizResult(personId, correctCount, questions.length))
       }
       setFinished(true)
       return
@@ -348,7 +353,7 @@ export function Quiz({ daily = false }: { daily?: boolean } = {}) {
               ? profile.dailyDate === localDateString()
                 ? 0
                 : XP_PER_QUIZ
-              : quizXpRemaining(personId, profile)}{' '}
+              : quizXpRemaining(person ? personId : undefined, profile)}{' '}
           XP
         </XpPill>
       </motion.div>

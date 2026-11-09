@@ -43,11 +43,13 @@ export interface ExamHistory {
 export function examHistory(attempts: ExamAttempt[]): ExamHistory {
   const count = attempts.length
   let best: ExamAttempt | null = null
+  // Compared as a share, so a paper out of a different total still ranks fairly.
   let topSoFar = -1
   const marked: HistoryRow[] = attempts.map((attempt) => {
-    const record = attempt.correct > topSoFar
+    const share = attempt.total > 0 ? attempt.correct / attempt.total : 0
+    const record = share > topSoFar
     if (record) {
-      topSoFar = attempt.correct
+      topSoFar = share
       best = attempt
     }
     return { attempt, record }

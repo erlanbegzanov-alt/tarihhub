@@ -1053,8 +1053,9 @@ export function ExamMock() {
 
      The rule, in this one place: an attempt that ends is recorded, whether
      the student finished it, the countdown closed it, or its deadline passed
-     while the tab was in the background or closed (it is closed on the next
-     mount, through this same effect). An attempt the student explicitly
+     while the tab was in the background or reloaded (it is closed on the next
+     mount, through this same effect; closing the tab loses the attempt, as
+     it lives in sessionStorage). An attempt the student explicitly
      abandons — by confirming the leave dialog — is not: it never reaches
      `result`. The one exception is an attempt with nothing answered (opened,
      then the clock ran out), which is not a reading of anything and would

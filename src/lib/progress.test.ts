@@ -261,3 +261,11 @@ describe('the flame badge', () => {
     expect(getProfile().unlockedBadges).toContain('flame')
   })
 })
+
+describe('recordPersonQuizResult on a retry from the same screen', () => {
+  it('still pays a better score but does not count the quiz twice', () => {
+    recordPersonQuizResult('abylai', 5, 10)
+    expect(recordPersonQuizResult('abylai', 10, 10, false)).toBe(LESSON_SCORE_XP_MAX - 10)
+    expect(getProfile().quizzesCompleted).toBe(1)
+  })
+})

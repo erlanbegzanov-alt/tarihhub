@@ -651,6 +651,8 @@ export function recordPersonQuizResult(
   personId: string | undefined,
   correct: number,
   total: number,
+  /** False on a retry from the same screen: XP and the best still count, the quiz counter does not. */
+  countFinish = true,
 ): number {
   if (!Number.isFinite(total) || total < 1) return 0
   const safeTotal = Math.round(total)
@@ -663,14 +665,15 @@ export function recordPersonQuizResult(
   )
   const beatsBest = !best || safeCorrect / safeTotal > best.correct / best.total
 
+  const quizzesCompleted = state.quizzesCompleted + (countFinish ? 1 : 0)
   const unlocked = new Set(state.unlockedBadges)
-  if (state.quizzesCompleted + 1 >= 5) unlocked.add('strategist')
+  if (quizzesCompleted >= 5) unlocked.add('strategist')
   if (safeCorrect === safeTotal) unlocked.add('sage')
 
   write({
     ...state,
     xp: state.xp + xpEarned,
-    quizzesCompleted: state.quizzesCompleted + 1,
+    quizzesCompleted,
     unlockedBadges: [...unlocked],
     lessonQuizBest: beatsBest
       ? { ...state.lessonQuizBest, [key]: { correct: safeCorrect, total: safeTotal } }
