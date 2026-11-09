@@ -5,8 +5,9 @@
  * primary action (play a ranked duel), and the modes sit below it.
  *
  * Drawn in the «Ойын» direction Erlan picked off the design canvas: solid
- * colour blocks with a ledge under them, each carrying an era illustration from
- * the course, and Unbounded for the names. The modes are deliberately not four
+ * colour blocks with a ledge under them and Unbounded for the names. The era
+ * illustrations they carried at first moved to the course's unit cards, at
+ * Erlan's request (2026-11-09). The modes are deliberately not four
  * equal tiles — Қарапайым, the one most people open, is the big one — because
  * a grid of identical boxes was what read as boring.
  *
@@ -38,16 +39,7 @@ import { useProfile } from '../lib/progress'
 import { useSession } from '../lib/session'
 
 /**
- * The block colour fading out over its picture, towards `direction`. `solid`
- * is where the fade starts, in %: on the league card it must reach past the
- * picture's left edge (42% across on a wide screen), or that edge shows as a
- * hard line through the colour.
- */
-const veil = (bg: string, direction: 'top' | 'right', solid = 30) =>
-  `linear-gradient(to ${direction}, ${bg} ${solid}%, color-mix(in srgb, ${bg} 60%, transparent) ${solid + 25}%, color-mix(in srgb, ${bg} 5%, transparent) 100%)`
-
-/**
- * One mode, as an illustrated block.
+ * One mode, as a colour block.
  *
  * No subtitle: Erlan had the one-line descriptions taken off, the name, icon
  * and picture say enough. Pressing it sinks it onto its ledge.
@@ -85,14 +77,6 @@ function ModeBlock({
       className={cn('focus-ring relative overflow-hidden rounded-[24px] text-left', className)}
       style={{ background: paint.bg, boxShadow: `0 5px 0 0 ${paint.ledge}` }}
     >
-      <img
-        src={paint.image}
-        alt=""
-        aria-hidden
-        decoding="async"
-        className="absolute inset-0 h-full w-full object-cover"
-      />
-      <span aria-hidden className="absolute inset-0" style={{ background: veil(paint.bg, 'top') }} />
       {stat && alert && (
         <span
           className="absolute top-3 right-3 rounded-full px-2.5 py-1 text-[12px] font-bold text-white tabular-nums"
@@ -185,14 +169,6 @@ export function Battle() {
         className="relative mt-5 overflow-hidden rounded-[26px] lg:h-[220px]"
         style={{ background: league.bg, boxShadow: `0 6px 0 0 ${league.ledge}` }}
       >
-        <img
-          src={league.image}
-          alt=""
-          aria-hidden
-          decoding="async"
-          className="absolute inset-y-0 right-0 h-full w-[62%] object-cover lg:w-[58%]"
-        />
-        <span aria-hidden className="absolute inset-0" style={{ background: veil(league.bg, 'right', 46) }} />
 
         <div className="relative flex flex-col gap-5 p-5 lg:h-full lg:justify-between lg:p-7">
           <div className="flex items-center gap-3.5 lg:gap-4">
