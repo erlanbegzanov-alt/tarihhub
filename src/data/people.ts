@@ -2360,6 +2360,7 @@ export const people: Person[] = [
   },
   {
     id: 'amangeldy-imanov',
+    portrait: { src: '/portraits/amangeldi-imanov.webp', kind: 'portrait' },
     eraBadge: { kz: 'XX ғасыр басы', ru: 'Начало XX века' },
     eraKey: 'alash',
     category: 'batyrs',
@@ -2423,6 +2424,7 @@ export const people: Person[] = [
   },
   {
     id: 'abulkhair-khan',
+    portrait: { src: '/portraits/abulkhair-khan.webp', kind: 'monument' },
     eraBadge: { kz: 'XVIII ғасыр', ru: 'XVIII век' },
     eraKey: 'khanate',
     category: 'khans',
@@ -2483,6 +2485,7 @@ export const people: Person[] = [
   },
   {
     id: 'turar-ryskulov',
+    portrait: { src: '/portraits/turar-ryskulov.webp', kind: 'portrait' },
     eraBadge: { kz: 'XX ғасыр', ru: 'XX век' },
     eraKey: 'soviet',
     category: 'leaders',
@@ -2540,6 +2543,7 @@ export const people: Person[] = [
   },
   {
     id: 'kairat-ryskulbekov',
+    portrait: { src: '/portraits/kairat-ryskulbekov.webp', kind: 'portrait' },
     eraBadge: { kz: 'XX ғасыр', ru: 'XX век' },
     eraKey: 'soviet',
     category: 'leaders',

@@ -910,10 +910,6 @@ export const s = {
 
   ai: {
     title: { kz: 'AI', ru: 'AI' },
-    subtitle: {
-      kz: 'Тұлғаны тауып, оның өзінен сұра',
-      ru: 'Найди личность и спроси у неё самой',
-    },
     choosePersona: { kz: 'Кіммен сөйлесесіз?', ru: 'С кем поговорим?' },
 
     /* The search that used to be its own «Поиск» section. One list of people,

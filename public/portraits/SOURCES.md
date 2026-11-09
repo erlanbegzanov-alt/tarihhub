@@ -45,4 +45,11 @@ Format: `<personId> — <kind>`
 
 ---
 
-Total: 54 files: 51 wired into the figure pages, 3 used by the exam only.
+Total: 55 files, all wired into the figure pages.
+
+## Added 2026-11-09
+
+- `amangeldi-imanov`, `turar-ryskulov`, `kairat-ryskulbekov` now also head their
+  figure pages in the AI section (they were wired to the exam only).
+- `abulkhair-khan` — the owner's «Әбілқайыр хан» image, restored from git (it had
+  been filed as `kasym-khan.webp` before 2026-11-03). Monument kind.

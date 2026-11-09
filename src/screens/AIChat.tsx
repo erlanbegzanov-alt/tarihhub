@@ -89,9 +89,7 @@ function PersonaPicker({ onPick }: { onPick: (person: Person) => void }) {
       <motion.div variants={staggerItem}>
         <h1 className="text-2xl font-bold tracking-tight text-ink md:text-[28px]">
           {t(s.ai.title)}
-        </h1>
-        <p className="mt-1.5 text-[14.5px] text-ink-soft">{t(s.ai.subtitle)}</p>
-      </motion.div>
+        </h1>      </motion.div>
 
       <motion.div variants={staggerItem} className="mt-4 md:max-w-2xl">
         <SearchField
