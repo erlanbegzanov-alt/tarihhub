@@ -69,6 +69,20 @@ describe('the daily set', () => {
     expect(seen.size).toBe(100 * DAILY_SIZE)
   })
 
+  it('keeps already-served days unchanged when questions are added after launch', () => {
+    // Recorded before d68–d90 joined the bank. A new question used to reshuffle
+    // every ring, so a reader mid-streak met questions they had already done.
+    expect(dailyQuestionIds('2026-09-30')).toEqual(['buminkagan1', 'd23', 'tonykok7', 'yasawi7', 'kerey-khan10'])
+    expect(dailyQuestionIds('2026-10-01')).toEqual(['d48', 'ent-ind-9', 'bukhar-zhyrau4', 'zhakyp-akbayev5', 'abai9'])
+  })
+
+  it('serves the questions added after launch only once the launch questions are used up', () => {
+    const late = new Set(Array.from({ length: 23 }, (_, i) => `d${68 + i}`))
+    for (const date of days('2026-09-30', 120)) {
+      for (const id of dailyQuestionIds(date)) expect(late.has(id), `${id} on ${date}`).toBe(false)
+    }
+  })
+
   it('moves on from one day to the next', () => {
     const today = dailyQuestionIds('2026-10-01')
     const tomorrow = dailyQuestionIds('2026-10-02')
