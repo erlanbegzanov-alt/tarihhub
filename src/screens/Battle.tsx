@@ -18,7 +18,7 @@
  * `navItems.ts`): it is what the course prepares for, and standing it beside
  * Кахут and the duels said it was one game among several.
  */
-import { Flame, Swords, Trophy, UserPlus, Users, Zap } from 'lucide-react'
+import { Flame, Lock, Swords, Trophy, UserPlus, Users, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
@@ -31,7 +31,7 @@ import type { LeaguePaint } from '../data/battlePaint'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
 import { useAlerts } from '../lib/alerts'
-import { fetchBattlePlayer, ratingTierFor } from '../lib/battle'
+import { RATING_TIERS, fetchBattlePlayer, ratingTierFor } from '../lib/battle'
 import { cn } from '../lib/cn'
 import { FEATURE_TEAM_BATTLE } from '../lib/environment'
 import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/motion'
@@ -263,6 +263,71 @@ export function Battle() {
             </motion.button>
           </div>
         </div>
+      </motion.section>
+
+      {/* The whole ladder, so the next league's picture is something to climb
+          toward: the reader's own is lit, the ones above are dimmed and say
+          what they cost. Scrolls sideways on a phone, one row on a wide screen. */}
+      <motion.section variants={staggerItem} className="mt-6">
+        <h2 className="font-display text-[15px] font-bold text-ink">{t(s.battle.leaguesTitle)}</h2>
+        <ol className="-mx-4 mt-3 flex snap-x gap-3 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-5 lg:overflow-visible lg:px-0">
+          {RATING_TIERS.map((rt, i) => {
+            const paint = LEAGUE_PAINT[i]
+            const reached = i <= tier.index
+            const current = i === tier.index
+            return (
+              <li
+                key={rt.min}
+                aria-current={current ? 'true' : undefined}
+                className={cn(
+                  'relative h-[118px] w-[150px] shrink-0 snap-start overflow-hidden rounded-[18px] lg:w-auto',
+                  current && 'ring-[3px] ring-offset-2 ring-offset-cream',
+                )}
+                style={{
+                  background: paint.bg,
+                  boxShadow: `0 4px 0 0 ${paint.ledge}`,
+                  ...(current ? { ['--tw-ring-color' as string]: paint.bg } : {}),
+                }}
+              >
+                <img
+                  src={paint.image}
+                  alt=""
+                  aria-hidden
+                  loading="lazy"
+                  decoding="async"
+                  className={cn(
+                    'absolute inset-0 h-full w-full object-cover object-right',
+                    !reached && 'grayscale-[60%]',
+                  )}
+                />
+                <span
+                  aria-hidden
+                  className="absolute inset-0"
+                  style={{
+                    background: reached
+                      ? `linear-gradient(to top, ${paint.bg} 10%, color-mix(in srgb, ${paint.bg} 30%, transparent) 60%, transparent)`
+                      : `linear-gradient(to top, ${paint.bg} 10%, color-mix(in srgb, ${paint.bg} 70%, transparent) 60%, color-mix(in srgb, ${paint.bg} 45%, transparent))`,
+                  }}
+                />
+                {!reached && (
+                  <Lock
+                    className="absolute top-2.5 right-2.5 h-4 w-4 text-white/90"
+                    strokeWidth={2.4}
+                    aria-hidden
+                  />
+                )}
+                <span className="absolute inset-x-3 bottom-2.5 text-white [text-shadow:0_1px_3px_rgb(0_0_0/0.45)]">
+                  <span className="font-display block text-[15px] leading-tight font-bold">
+                    {t(rt.name)}
+                  </span>
+                  <span className="block text-[12px] font-semibold text-white/90 tabular-nums">
+                    {current ? `${rating ?? 0} ${t(s.battle.ratingPoints)}` : `${rt.min}+ ${t(s.battle.ratingPoints)}`}
+                  </span>
+                </span>
+              </li>
+            )
+          })}
+        </ol>
       </motion.section>
 
       {playedRanked && (

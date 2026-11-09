@@ -417,6 +417,7 @@ export const s = {
 
     ratingLabel: { kz: 'Батл рейтингі', ru: 'Боевой рейтинг' },
     ratingPoints: { kz: 'ұпай', ru: 'очков' },
+    leaguesTitle: { kz: 'Лигалар', ru: 'Лиги' },
     nextTier: { kz: 'Келесі дәрежеге дейін', ru: 'До следующей лиги' },
     maxTier: { kz: 'Ең жоғарғы дәреже!', ru: 'Высшая лига!' },
 
