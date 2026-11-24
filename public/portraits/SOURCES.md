@@ -34,6 +34,28 @@ Format: `<personId> — <kind>`
   `bumin-kagan`, `tonykok`, `zhoshy-khan`, `batu-khan`, `yusup-balasaguni`,
   `makhmud-kashkari`, `zhangir-khan`, `syrym-datuly`
 
+## Added 2026-11-03
+
+- `kasym-khan` — replaced. The previous file was the owner's «Әбілқайыр хан» image,
+  filed under the wrong name; the new one is his «Қасым хан». Still monument kind.
+- `amangeldi-imanov`, `turar-ryskulov`, `kairat-ryskulbekov` — portrait kind (people
+  real photographs survive of), made by the owner the same way as the rest. They have
+  no figure page; they are used only as numbered pictures in exam person contexts,
+  listed in `src/data/examPortraits.ts`.
+
 ---
 
-Total: 51 files, all wired into the app.
+Total: 55 files, all wired into the figure pages.
+
+## Added 2026-11-09
+
+- `amangeldi-imanov`, `turar-ryskulov`, `kairat-ryskulbekov` now also head their
+  figure pages in the AI section (they were wired to the exam only).
+- `abulkhair-khan` — the owner's «Әбілқайыр хан» image, restored from git (it had
+  been filed as `kasym-khan.webp` before 2026-11-03). Monument kind.
+- `alkey-margulan`, `bakhytzhan-karatayev`, `olzhas-suleimenov` (2026-11-09) — portrait
+  kind, made by the owner the same way as the rest. Used only as numbered pictures
+  in the person contexts of booklets 93002, 93506 and 93504 (`src/data/examPortraits.ts`).
+- `alkey-margulan` and `bakhytzhan-karatayev` also head their own figure pages in the AI
+  section (2026-11-09). `olzhas-suleimenov` stays exam-only: he is alive, and the AI
+  section speaks in the first person as the figure.

@@ -24,6 +24,44 @@ export const XP_PER_LEVEL = 200
 export const XP_PER_LESSON = 20
 
 /**
+ * The score part of a lesson quiz's XP: what a perfect score is worth, paid in
+ * proportion to the share answered correctly (see `lessonScoreXp`). A lesson
+ * is worth at most this plus `XP_PER_LESSON`, ever.
+ */
+export const LESSON_SCORE_XP_MAX = 20
+
+/** XP a lesson-quiz score is worth on its own: `LESSON_SCORE_XP_MAX` × share correct, rounded. */
+export function lessonScoreXp(correct: number, total: number): number {
+  if (!Number.isFinite(total) || total < 1) return 0
+  const safeTotal = Math.round(total)
+  const safeCorrect = Math.max(
+    0,
+    Math.min(safeTotal, Number.isFinite(correct) ? Math.round(correct) : 0),
+  )
+  return Math.round((LESSON_SCORE_XP_MAX * safeCorrect) / safeTotal)
+}
+
+/** What one lesson-quiz attempt did: whether it passed, and the XP it actually paid. */
+export interface LessonQuizOutcome {
+  passed: boolean
+  xpEarned: number
+}
+
+/**
+ * The most XP a lesson's quiz can still pay this reader — what the quiz header
+ * promises. Zero once the lesson is passed with a perfect score.
+ */
+export function lessonXpRemaining(
+  lessonId: string,
+  profile: Pick<ProfileState, 'completedLessons' | 'lessonQuizBest'> = state,
+): number {
+  const best = profile.lessonQuizBest[lessonId]
+  const scorePaid = best ? lessonScoreXp(best.correct, best.total) : 0
+  const bonusLeft = profile.completedLessons.includes(lessonId) ? 0 : XP_PER_LESSON
+  return Math.max(0, LESSON_SCORE_XP_MAX - scorePaid) + bonusLeft
+}
+
+/**
  * Share of a lesson quiz that has to be answered correctly for the lesson to
  * count as passed. This is the only way a lesson is ever completed — reading it
  * to the bottom proves nothing on its own.
@@ -560,15 +598,11 @@ export function recordVisit(): void {
       ? state.streak + 1
       : 1
 
-  const unlocked = new Set(state.unlockedBadges)
-  if (nextStreak >= 7) unlocked.add('flame')
-
   write({
     ...state,
     streak: nextStreak,
     totalVisits: state.totalVisits + 1,
     lastVisitDate: today,
-    unlockedBadges: [...unlocked],
   })
 }
 
@@ -577,7 +611,6 @@ export function completeQuiz(correct: number, total: number, xp: number): void {
   const unlocked = new Set(state.unlockedBadges)
   if (state.quizzesCompleted + 1 >= 5) unlocked.add('strategist')
   if (correct === total) unlocked.add('sage')
-  if (state.streak >= 7) unlocked.add('flame')
 
   write({
     ...state,
@@ -588,33 +621,100 @@ export function completeQuiz(correct: number, total: number, xp: number): void {
 }
 
 /**
+ * The `lessonQuizBest` key a person (or mixed) quiz keeps its best score
+ * under. The prefix keeps it from ever colliding with a lesson id, and reusing
+ * that map means the score already syncs and merges like a lesson's does.
+ */
+export function quizBestKey(personId: string | undefined): string {
+  return `quiz:${personId ?? 'mix'}`
+}
+
+/** What a person quiz can still pay this reader — what its header promises. */
+export function quizXpRemaining(
+  personId: string | undefined,
+  profile: Pick<ProfileState, 'lessonQuizBest'> = state,
+): number {
+  const best = profile.lessonQuizBest[quizBestKey(personId)]
+  return Math.max(0, LESSON_SCORE_XP_MAX - (best ? lessonScoreXp(best.correct, best.total) : 0))
+}
+
+/**
+ * Records a finished person quiz (or the mixed one) and returns the XP paid.
+ *
+ * It used to pay a flat 20 on every finish, so one quiz repeated fifty times
+ * was a thousand XP — the top ranks for retaking the same ten questions. Now
+ * it follows the lesson rule: XP for the score, paid only as an improvement on
+ * this quiz's best, so the most any one quiz can ever give is
+ * `LESSON_SCORE_XP_MAX`. The counter and badges still move on every finish.
+ */
+export function recordPersonQuizResult(
+  personId: string | undefined,
+  correct: number,
+  total: number,
+  /** False on a retry from the same screen: XP and the best still count, the quiz counter does not. */
+  countFinish = true,
+): number {
+  if (!Number.isFinite(total) || total < 1) return 0
+  const safeTotal = Math.round(total)
+  const safeCorrect = Math.max(0, Math.min(safeTotal, Number.isFinite(correct) ? Math.round(correct) : 0))
+  const key = quizBestKey(personId)
+  const best = state.lessonQuizBest[key]
+  const xpEarned = Math.max(
+    0,
+    lessonScoreXp(safeCorrect, safeTotal) - (best ? lessonScoreXp(best.correct, best.total) : 0),
+  )
+  const beatsBest = !best || safeCorrect / safeTotal > best.correct / best.total
+
+  const quizzesCompleted = state.quizzesCompleted + (countFinish ? 1 : 0)
+  const unlocked = new Set(state.unlockedBadges)
+  if (quizzesCompleted >= 5) unlocked.add('strategist')
+  if (safeCorrect === safeTotal) unlocked.add('sage')
+
+  write({
+    ...state,
+    xp: state.xp + xpEarned,
+    quizzesCompleted,
+    unlockedBadges: [...unlocked],
+    lessonQuizBest: beatsBest
+      ? { ...state.lessonQuizBest, [key]: { correct: safeCorrect, total: safeTotal } }
+      : state.lessonQuizBest,
+  })
+  return xpEarned
+}
+
+/**
  * Records a finished daily set: XP, the quiz counter, and the daily streak.
  *
  * Pays **once per calendar day**. A second run of the same set is not an error
  * and the screen lets it happen — re-reading the five questions is the point —
  * but it earns nothing, so the set can never be farmed for XP by reloading.
  * That guard lives here rather than in the screen because the screen is not
- * the only thing that could ever call this.
+ * the only thing that could ever call this. Returns the XP actually paid — 0
+ * on a repeat — so the result screen shows what was earned, not a constant.
  *
  * The daily streak is separate from `streak`, which counts app opens; see the
  * field comments on `ProfileState`.
  */
-export function completeDaily(correct: number, total: number, xp: number): void {
+export function completeDaily(correct: number, total: number, xp: number): number {
   const today = localDateString()
-  if (state.dailyDate === today) return
+  if (state.dailyDate === today) return 0
 
+  const dailyStreak = nextDailyStreak(state.dailyDate, state.dailyStreak, today)
   const unlocked = new Set(state.unlockedBadges)
   if (state.quizzesCompleted + 1 >= 5) unlocked.add('strategist')
   if (correct === total) unlocked.add('sage')
+  // Seven daily sets in a row — the badge says "studied", so app opens don't count.
+  if (dailyStreak >= 7) unlocked.add('flame')
 
   write({
     ...state,
     xp: state.xp + xp,
     quizzesCompleted: state.quizzesCompleted + 1,
     dailyDate: today,
-    dailyStreak: nextDailyStreak(state.dailyDate, state.dailyStreak, today),
+    dailyStreak,
     unlockedBadges: [...unlocked],
   })
+  return xp
 }
 
 /** Records that a person's detail page was actually opened (deduped). */
@@ -678,25 +778,32 @@ export function recordSectionCheckDone(
 }
 
 /**
- * Records one attempt at a lesson's gating quiz and returns whether *this*
- * attempt reached `LESSON_PASS_RATIO`.
+ * Records one attempt at a lesson's gating quiz: whether *this* attempt
+ * reached `LESSON_PASS_RATIO`, and the XP it actually paid.
  *
- * The three things this has to get right:
+ * The XP rule — the only XP a lesson quiz ever pays:
+ * - score XP, `lessonScoreXp` (0…`LESSON_SCORE_XP_MAX`, proportional to the
+ *   share correct), paid only as the *improvement* over this lesson's best
+ *   score so far. Retakes can never farm: the same or a worse score pays 0,
+ *   and the lifetime total for a lesson's score is capped at its best;
+ * - `XP_PER_LESSON`, on the first pass only, never again.
+ * So 6/30 on a first try pays 4, then 24/30 pays 12 + 20, then 30/30 pays 4.
+ *
+ * And the rest it has to get right:
  * - a worse retry never overwrites a better `lessonQuizBest` entry;
- * - `XP_PER_LESSON` is paid on the first pass only, never again;
  * - a failed attempt leaves `completedLessons` and `lessonProgress` untouched,
  *   so it can't undo a lesson that was already passed.
  *
- * The returned flag is about this attempt alone, so the result screen can say
- * "not this time" honestly even when the lesson was banked on an earlier try.
+ * `passed` is about this attempt alone, so the result screen can say "not this
+ * time" honestly even when the lesson was banked on an earlier try.
  */
 export function recordLessonQuizResult(
   lessonId: string,
   correct: number,
   total: number,
-): boolean {
+): LessonQuizOutcome {
   // An empty quiz can't be passed — it isn't a real assessment.
-  if (!Number.isFinite(total) || total < 1) return false
+  if (!Number.isFinite(total) || total < 1) return { passed: false, xpEarned: 0 }
 
   const safeTotal = Math.round(total)
   const safeCorrect = Math.max(
@@ -709,10 +816,15 @@ export function recordLessonQuizResult(
   const best = state.lessonQuizBest[lessonId]
   const beatsBest = !best || ratio > best.correct / best.total
   const completes = passed && !state.completedLessons.includes(lessonId)
+  const scoreXp = Math.max(
+    0,
+    lessonScoreXp(safeCorrect, safeTotal) - (best ? lessonScoreXp(best.correct, best.total) : 0),
+  )
+  const xpEarned = scoreXp + (completes ? XP_PER_LESSON : 0)
 
   write({
     ...state,
-    xp: completes ? state.xp + XP_PER_LESSON : state.xp,
+    xp: state.xp + xpEarned,
     lessonProgress: passed
       ? { ...state.lessonProgress, [lessonId]: 100 }
       : state.lessonProgress,
@@ -727,7 +839,7 @@ export function recordLessonQuizResult(
       : state.lessonQuizBest,
   })
 
-  return passed
+  return { passed, xpEarned }
 }
 
 /**

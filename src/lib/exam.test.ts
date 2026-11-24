@@ -99,11 +99,26 @@ describe('buildExamVariant', () => {
     expect(new Set(signatures).size).toBe(3)
   })
 
-  it('takes the scarce C band before the plentiful A band', () => {
-    // The bank holds one C question against 76 A ones. If selection ran in
-    // A-first order, the C slot would be gone every time.
-    const v = buildExamVariant(seeded(3))
-    expect(v.levels.C).toBeGreaterThan(0)
+  it('fills the standalone C and B quotas before the plentiful A band', () => {
+    // The blocks are counted first and today already cover C, so the C quota
+    // left for № 1–10 is usually zero; the order shows on B instead. A block
+    // pair light on B leaves the three quotas wanting more than ten slots
+    // between them, and A-first selection would then leave B short.
+    // Seeds spaced by 97: consecutive small seeds of this generator start out
+    // alike and never draw some block pairs at all.
+    let contested = 0
+    for (let seed = 97; seed <= 97 * 40; seed += 97) {
+      const v = buildExamVariant(seeded(seed))
+      const fromBlocks = { A: 0, B: 0, C: 0 }
+      const standalone = { A: 0, B: 0, C: 0 }
+      for (const i of v.items) if (i.question.level) (i.block ? fromBlocks : standalone)[i.question.level] += 1
+      const need = (l: 'A' | 'B' | 'C') => Math.max(0, LEVEL_TARGET[l] - fromBlocks[l])
+      if (need('A') + need('B') + need('C') > EXAM_STANDALONE_COUNT) contested += 1
+      expect(standalone.C, `seed ${seed}`).toBe(need('C'))
+      expect(standalone.B, `seed ${seed}`).toBe(need('B'))
+    }
+    // Without a contested draw the assertions above could not tell the orders apart.
+    expect(contested).toBeGreaterThan(0)
   })
 
   it('reports a shortfall that exactly matches what is missing', () => {

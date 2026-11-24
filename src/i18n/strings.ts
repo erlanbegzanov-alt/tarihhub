@@ -43,6 +43,14 @@ export const s = {
     xp: { kz: 'XP', ru: 'XP' },
   },
 
+  /** The full-screen picture viewer (`components/ZoomableImage.tsx`). */
+  zoom: {
+    enlarge: { kz: 'Үлкейту', ru: 'Увеличить' },
+    zoomIn: { kz: 'Жақындату', ru: 'Приблизить' },
+    zoomOut: { kz: 'Алыстату', ru: 'Отдалить' },
+    reset: { kz: 'Бастапқы өлшем', ru: 'Исходный размер' },
+  },
+
   home: {
     searchPlaceholder: {
       kz: 'Қазақстан тарихынан іздеу...',
@@ -108,14 +116,6 @@ export const s = {
   lesson: {
     missing: { kz: 'Сабақ табылмады', ru: 'Урок не найден' },
     progress: { kz: 'Оқылды', ru: 'Пройдено' },
-    /**
-     * Honest footnote: the content comes from the project's checked reference,
-     * and disputed points stay marked as disputed inside the lesson itself.
-     */
-    sourceNote: {
-      kz: 'Сабақ мәтіні жобаның тексерілген тарихи анықтамалығынан жазылған. Даулы деректер сол күйі даулы деп көрсетілген.',
-      ru: 'Текст урока написан по проверенному историческому справочнику проекта. Спорные сведения так и помечены спорными.',
-    },
     completedTitle: { kz: 'Сабақ тапсырылды', ru: 'Урок сдан' },
     /** Real best attempt at this lesson's quiz, shown as "4/5". */
     bestScore: { kz: 'Үздік нәтиже', ru: 'Лучший результат' },
@@ -169,10 +169,6 @@ export const s = {
   /** Unit-by-unit course outline (`/course`) and the lesson rows inside it. */
   course: {
     title: { kz: 'Курс бағдарламасы', ru: 'Программа курса' },
-    subtitle: {
-      kz: 'Бөлімдер мен сабақтар — ежелгі дәуірден бүгінге дейін',
-      ru: 'Разделы и уроки — от древности до наших дней',
-    },
     /** Course-wide counter under the big "7 / 62". */
     lessonsPassed: { kz: 'сабақ тапсырылды', ru: 'уроков сдано' },
     /** Per-unit counter, kept short enough to sit beside the "3 / 7". */
@@ -222,6 +218,11 @@ export const s = {
 
     /** Pass mark for the lesson quiz, e.g. "Өту шегі — 4/5". */
     passMark: { kz: 'Өту шегі', ru: 'Проходной балл' },
+    /** Under a lesson result that paid 0 XP: retakes pay only a new best. */
+    xpBestOnly: {
+      kz: 'XP тек осы тесттегі ең жақсы нәтижеңізді жаңартқанда беріледі.',
+      ru: 'XP начисляется, только когда вы улучшаете свой лучший результат в этом тесте.',
+    },
     lessonPassedTitle: { kz: 'Сабақ есептелді', ru: 'Урок засчитан' },
     lessonPassedText: {
       kz: 'Тестті тапсырдыңыз — сабақ курс бойынша өтілді деп белгіленді.',
@@ -416,6 +417,7 @@ export const s = {
 
     ratingLabel: { kz: 'Батл рейтингі', ru: 'Боевой рейтинг' },
     ratingPoints: { kz: 'ұпай', ru: 'очков' },
+    leaguesTitle: { kz: 'Лигалар', ru: 'Лиги' },
     nextTier: { kz: 'Келесі дәрежеге дейін', ru: 'До следующей лиги' },
     maxTier: { kz: 'Ең жоғарғы дәреже!', ru: 'Высшая лига!' },
 
@@ -909,10 +911,6 @@ export const s = {
 
   ai: {
     title: { kz: 'AI', ru: 'AI' },
-    subtitle: {
-      kz: 'Тұлғаны тауып, оның өзінен сұра',
-      ru: 'Найди личность и спроси у неё самой',
-    },
     choosePersona: { kz: 'Кіммен сөйлесесіз?', ru: 'С кем поговорим?' },
 
     /* The search that used to be its own «Поиск» section. One list of people,
@@ -1218,10 +1216,6 @@ export const s = {
    */
   exam: {
     title: { kz: 'ҰБТ сынағы', ru: 'Пробник ҰБТ' },
-    subtitle: {
-      kz: '20 тапсырма: 10 жеке және 5 тапсырмадан тұратын 2 контекст',
-      ru: '20 заданий: 10 отдельных и 2 контекста по 5',
-    },
     hubSub: {
       kz: 'Нақты формат бойынша толық нұсқа',
       ru: 'Полный вариант по настоящему формату',
@@ -1250,6 +1244,7 @@ export const s = {
     contextOne: { kz: 'Контекст 1 · №11–15', ru: 'Контекст 1 · №11–15' },
     contextTwo: { kz: 'Контекст 2 · №16–20', ru: 'Контекст 2 · №16–20' },
     showPassage: { kz: 'Мәтінді көрсету', ru: 'Показать текст' },
+    figure: { kz: 'Сурет', ru: 'Рисунок' },
     hidePassage: { kz: 'Мәтінді жасыру', ru: 'Скрыть текст' },
     prev: { kz: 'Артқа', ru: 'Назад' },
     next: { kz: 'Әрі қарай', ru: 'Дальше' },
@@ -1307,6 +1302,11 @@ export const s = {
       kz: 'Алғашқы сынақты тапсыр — балың осында шығады.',
       ru: 'Сдай первый пробник — твой балл появится здесь.',
     },
+    /** Followed by "counted / recorded", e.g. "2 / 5". */
+    forecastCounted: {
+      kz: 'Таныс контекст кездескен нұсқа болжамға кірмейді. Есепке алынғаны:',
+      ru: 'Вариант со знакомым контекстом в прогноз не идёт. Засчитано:',
+    },
     daysLeft: { kz: 'күн қалды', ru: 'дн. до ЕНТ' },
     examDate: { kz: 'ҰБТ күні', ru: 'Дата ЕНТ' },
     examDateAsk: {
@@ -1314,6 +1314,31 @@ export const s = {
       ru: 'Укажи дату своего ЕНТ — посчитаем, сколько дней осталось.',
     },
     forecastTab: { kz: 'Болжам', ru: 'Прогноз' },
+
+    // History tab — `src/lib/examHistory.ts`.
+    historyTab: { kz: 'Тарих', ru: 'История' },
+    historyEmpty: {
+      kz: 'Әзірге бірде-бір сынақ жоқ. Біріншісін тапсыр — тарихың осында жиналады.',
+      ru: 'Пока ни одного пробника. Сдай первый — история соберётся здесь.',
+    },
+    historyCount: { kz: 'сынақ тапсырдың', ru: 'пробников сдано' },
+    historyNext: { kz: 'Келесі белес', ru: 'Следующая цель' },
+    historyAllMilestones: {
+      kz: 'Барлық белестен өттің — керемет!',
+      ru: 'Все цели пройдены — отлично!',
+    },
+    historyBest: { kz: 'Ең жақсы', ru: 'Лучший' },
+    historyAverage: { kz: 'Орташа балл', ru: 'Средний балл' },
+    historyAvgTime: { kz: 'Орташа уақыт', ru: 'Среднее время' },
+    historyBooklets: { kz: 'Мектеп нұсқалары', ru: 'Школьные варианты' },
+    historyList: { kz: 'Барлық сынақтар', ru: 'Все пробники' },
+    historyOurs: { kz: 'TarihHub нұсқасы', ru: 'Вариант TarihHub' },
+    historyRecord: { kz: 'Рекорд', ru: 'Рекорд' },
+    historyDevice: {
+      kz: 'Тарих осы құрылғыда сақталады.',
+      ru: 'История хранится на этом устройстве.',
+    },
+    minutesShort: { kz: 'мин', ru: 'мин' },
 
     // The shelves — where variants live, by where they come from.
     variantsTitle: { kz: 'Нұсқалар', ru: 'Варианты' },
@@ -1364,6 +1389,16 @@ export const s = {
     correctAnswer: { kz: 'Дұрыс жауап', ru: 'Верный ответ' },
     leftBlank: { kz: 'Жауапсыз қалды', ru: 'Осталось без ответа' },
 
-    retry: { kz: 'Жаңа нұсқа', ru: 'Новый вариант' },
+    /** The results button that goes back to the shelves of variants. */
+    toVariants: { kz: 'Нұсқаларға оралу', ru: 'Вернуться к вариантам' },
+
+    // Asked before leaving an attempt in progress for another screen.
+    leaveTitle: { kz: 'Сынақтан шығасың ба?', ru: 'Выйти из пробника?' },
+    leaveText: {
+      kz: 'Жауаптарың жойылады, бұл сынақ болжамға кірмейді.',
+      ru: 'Ответы пропадут, и этот пробник не попадёт в прогноз.',
+    },
+    leaveStay: { kz: 'Сынақты жалғастыру', ru: 'Продолжить пробник' },
+    leaveConfirm: { kz: 'Шығу', ru: 'Выйти' },
   },
 }

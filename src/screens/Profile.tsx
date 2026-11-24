@@ -30,6 +30,7 @@ import { canHover, springSoft, staggerContainer, staggerItem } from '../lib/moti
 import {
   DEFAULT_STATE,
   levelInfo,
+  localDateString,
   normalizeProfile,
   replaceProfile,
   setAvatarGender,
@@ -37,6 +38,7 @@ import {
   setDisplayedRankTier,
   useProfile,
 } from '../lib/progress'
+import { streakAlive } from '../lib/dailyStreak'
 import { OWNER_EMAIL, OWNER_TIER_INDEX, OWNER_TITLE } from '../lib/rankStyle'
 import { signOutUser, updateDisplayName, useSession } from '../lib/session'
 import { useTheme } from '../lib/theme'
@@ -212,7 +214,8 @@ export function Profile() {
     {
       id: 'streak',
       icon: Flame,
-      value: profile.streak,
+      // The same streak as the home screen's: daily sets finished, not app opens.
+      value: streakAlive(profile.dailyDate, localDateString()) ? profile.dailyStreak : 0,
       label: t(s.profile.streak),
       color: 'var(--color-era-saka)',
     },

@@ -1,7 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeft,
-  BookOpen,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -23,10 +22,11 @@ import { buildLessonQuiz } from '../data/quiz'
 import { getUnit } from '../data/units'
 import { s } from '../i18n/strings'
 import { useLang } from '../i18n/useLang'
-import { explainSection } from '../lib/ai'
+import { type AiFailure, AiError, explainSection } from '../lib/ai'
 import { cn } from '../lib/cn'
 import { canHover, easeOut, springSoft, staggerContainer, staggerItem } from '../lib/motion'
 import { recordLessonStarted, useProfile } from '../lib/progress'
+import { report } from '../lib/report'
 
 /**
  * Where the reader left off inside each lesson.
@@ -55,6 +55,21 @@ function writeSection(lessonId: string, index: number): void {
   }
 }
 
+/**
+ * The same per-reason lines the persona chat shows (AIChat.tsx). Exhaustive by
+ * type: a new `AiFailure` without a line here does not build. Before this the
+ * panel said only "try again", which is wrong advice when the deployment has
+ * no `GEMINI_API_KEY` (500 -> 'unconfigured') and no retry can ever succeed.
+ */
+const explainFailureLines: Record<AiFailure, typeof s.ai.failUpstream> = {
+  'signed-out': s.ai.failSignedOut,
+  limit: s.ai.failLimit,
+  unconfigured: s.ai.failUnconfigured,
+  upstream: s.ai.failUpstream,
+  timeout: s.ai.failTimeout,
+  network: s.ai.failNetwork,
+}
+
 export function LessonDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -72,7 +87,9 @@ export function LessonDetail() {
   const [explainOpen, setExplainOpen] = useState(false)
   const [explainText, setExplainText] = useState<string | null>(null)
   const [explainLoading, setExplainLoading] = useState(false)
-  const [explainErrored, setExplainErrored] = useState(false)
+  /** Why the last explain call failed, or `null` — not a bare boolean, so the
+   *  panel can tell "the server has no Gemini key" from "try again". */
+  const [explainFailure, setExplainFailure] = useState<AiFailure | null>(null)
 
   // Opening a lesson is the only progress the reader awards themselves, and it
   // can never complete anything — that takes passing the quiz below.
@@ -104,7 +121,7 @@ export function LessonDetail() {
     explainRequestRef.current += 1
     setExplainOpen(false)
     setExplainText(null)
-    setExplainErrored(false)
+    setExplainFailure(null)
     // A request already in flight for the part just left behind must not
     // leave this part's own button stuck showing a spinner it never started.
     setExplainLoading(false)
@@ -149,15 +166,17 @@ export function LessonDetail() {
   const handleExplain = async () => {
     const request = explainRequestRef.current
     setExplainLoading(true)
-    setExplainErrored(false)
+    setExplainFailure(null)
     try {
       const section = lesson.sections[activeIndex]
       const text = await explainSection(t(section.heading), t(section.body), lang)
       if (request !== explainRequestRef.current) return
       setExplainText(text)
-    } catch {
+    } catch (error) {
+      // Reported like the persona chat's failures, so an outage leaves a trace.
+      report('ai.explain', error)
       if (request !== explainRequestRef.current) return
-      setExplainErrored(true)
+      setExplainFailure(error instanceof AiError ? error.reason : 'network')
     } finally {
       if (request === explainRequestRef.current) {
         setExplainLoading(false)
@@ -341,7 +360,9 @@ export function LessonDetail() {
                             </button>
                           </div>
                           <p className="text-[14.5px] leading-relaxed text-ink">
-                            {explainErrored ? t(s.lesson.explainError) : explainText}
+                            {explainFailure
+                              ? `${t(explainFailureLines[explainFailure])}. ${t(s.lesson.explainError)}`
+                              : explainText}
                           </p>
                         </div>
                       </motion.div>
@@ -393,11 +414,6 @@ export function LessonDetail() {
                       )}
                     </button>
                   </div>
-
-                  <p className="mt-5 flex items-start gap-2 text-[14px] leading-relaxed text-ink-soft">
-                    <BookOpen className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
-                    {t(s.lesson.sourceNote)}
-                  </p>
                 </>
               )}
 

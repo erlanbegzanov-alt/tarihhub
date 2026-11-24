@@ -20,12 +20,13 @@ import { shuffled } from './shuffle'
  *     № 16–20  CONTEXT 2 — five questions on another stimulus
  *
  * The specification also fixes the difficulty mix at A 50 % / B 30 % / C 20 %
- * (§4.4). Our bank is nowhere near it: 76 of its 98 questions are level A and
- * exactly one is level C. So `buildExamVariant` aims at the proportion, takes
- * the scarcest band first, and then states in `shortfall` what it could not
- * fill. Quietly serving ten A-level questions and calling the result a ҰБТ
- * mock is the one failure mode that actually misleads a student about where
- * their score would land.
+ * (§4.4). The bank's 122 standalone questions are A 76 / B 21 / C 25, and the
+ * blocks bring C of their own, so a drawn variant reaches the C share; the
+ * thin part now is the small pool of blocks itself. `buildExamVariant` aims
+ * at the proportion, takes the scarcest band first, and then states in
+ * `shortfall` what it could not fill. Quietly serving ten A-level questions
+ * and calling the result a ҰБТ mock is the one failure mode that actually
+ * misleads a student about where their score would land.
  */
 
 /** № 1–10 of the variant. */

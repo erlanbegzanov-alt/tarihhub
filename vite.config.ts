@@ -23,11 +23,7 @@ export default defineConfig(({ mode }) => {
   // production install would download the unfinished screens anyway.
   const isTest = env.VITE_APP_ENV === 'test'
   const teamBattleOn = isTest || env.VITE_FEATURE_TEAM_BATTLE === '1'
-  const examMockOn = isTest || env.VITE_FEATURE_EXAM_MOCK === '1'
-  const unfinishedChunks = [
-    ...(teamBattleOn ? [] : ['**/Friends-*.js', '**/TeamBattle-*.js']),
-    ...(examMockOn ? [] : ['**/ExamMock-*.js']),
-  ]
+  const unfinishedChunks = teamBattleOn ? [] : ['**/Friends-*.js', '**/TeamBattle-*.js']
   return {
     build: {
       rolldownOptions: {
@@ -125,8 +121,10 @@ export default defineConfig(({ mode }) => {
           // They still land in the cache the first time a lesson or quiz is
           // opened, via the same-origin `app-shell-cache` script rule below,
           // so offline-after-first-visit is unchanged; only the up-front
-          // install download shrinks.
-          globIgnores: ['**/lessons-*.js', '**/quiz-*.js', ...unfinishedChunks],
+          // install download shrinks. The ҰБТ mock's chunk (~410 kB: the
+          // screen with every booklet and context block) is left out the same
+          // way, flag on or off — most visitors never open `/exam`.
+          globIgnores: ['**/lessons-*.js', '**/quiz-*.js', '**/ExamMock-*.js', ...unfinishedChunks],
           runtimeCaching: [
             {
               // Portrait images (`public/portraits/*.webp`) keep a stable filename even

@@ -59,10 +59,12 @@ export const FEATURE_TEAM_BATTLE =
  * must not drag the other out with it.
  *
  * Deliberately not on in production yet. The screen works and its data is
- * tested, but the bank behind it is still short of the specification's
- * difficulty mix (76 of 98 questions are level A, exactly one is level C), so
- * a score here would sit above the same student's real ҰБТ. It goes live with
- * `VITE_FEATURE_EXAM_MOCK=1` once that gap is closed.
+ * tested, and the bank now meets the specification's level-C share (122
+ * standalone questions: A 76, B 21, C 25). What is still thin is the pool of
+ * context blocks the two stimuli are drawn from: back-to-back mocks keep
+ * meeting the same passages, which is why the forecast counts only mocks
+ * whose blocks are new to the student. It goes live with
+ * `VITE_FEATURE_EXAM_MOCK=1`.
  */
 export const FEATURE_EXAM_MOCK =
   IS_TEST_CONTOUR || import.meta.env.VITE_FEATURE_EXAM_MOCK === '1'

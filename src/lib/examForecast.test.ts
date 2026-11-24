@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { bestByVariant, daysUntilExam, forecastExam } from './examForecast'
+import { schoolVariants } from '../data/schoolVariants'
+import { bestByVariant, daysUntilExam, forecastExam, stimulusId } from './examForecast'
 
-const at = (day: string, correct: number) => ({ day, correct, total: 20 })
+/** A drawn variant whose two blocks no earlier paper had. */
+let fresh = 0
+const at = (day: string, correct: number) => ({
+  day,
+  correct,
+  total: 20,
+  blocks: [`new-${++fresh}`, `new-${++fresh}`],
+})
+const drawn = (day: string, correct: number, blocks: string[]) => ({ day, correct, total: 20, blocks })
+const width = (b: { low: number; high: number } | null) => b!.high - b!.low
 
 describe('forecastExam', () => {
   it('says nothing with no mock at all', () => {
@@ -40,6 +50,131 @@ describe('forecastExam', () => {
     const f = forecastExam([at('2026-09-01', 14), at('2026-09-15', 17), at('2026-10-01', 20)])
     expect(f.ahead!.score).toBeLessThanOrEqual(20)
     expect(f.ahead!.low).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('the band (Wilson, 95 %)', () => {
+  it('stays open at 0 of 20 — one paper is not a certain zero', () => {
+    const f = forecastExam([at('2026-11-01', 0)])
+    expect(f.now).toBe(0)
+    expect(f.nowBand!.low).toBe(0)
+    expect(f.nowBand!.high).toBeCloseTo(3.22, 1)
+  })
+
+  it('stays open at 20 of 20', () => {
+    const f = forecastExam([at('2026-11-01', 20)])
+    expect(f.now).toBe(20)
+    expect(f.nowBand!.high).toBe(20)
+    expect(f.nowBand!.low).toBeCloseTo(16.78, 1)
+  })
+
+  it('holds the reading and narrows as papers add up', () => {
+    const one = forecastExam([at('2026-11-01', 12)])
+    const many = forecastExam(
+      Array.from({ length: 8 }, (_, i) => at(i < 4 ? '2026-11-01' : '2026-11-02', 12)),
+    )
+    expect(many.counted).toBe(8)
+    for (const f of [one, many]) {
+      expect(f.now).toBe(12)
+      expect(f.nowBand!.low).toBeLessThan(12)
+      expect(f.nowBand!.high).toBeGreaterThan(12)
+    }
+    // Eight times the tasks: close to √8 narrower.
+    expect(width(many.nowBand)).toBeLessThan(width(one.nowBand) / 2)
+  })
+
+  it('keeps a width once there is a line, even through perfect papers', () => {
+    const f = forecastExam([at('2026-10-01', 20), at('2026-10-08', 20), at('2026-10-15', 20)])
+    expect(f.now).toBe(20)
+    expect(width(f.nowBand)).toBeGreaterThan(0)
+    expect(f.ahead!.low).toBeLessThan(20)
+  })
+})
+
+describe('contexts already read', () => {
+  /** A booklet that carries a bank block under its own ids, and that block's bank id. */
+  const reuse = schoolVariants
+    .flatMap((v) => v.blocks.map((b) => ({ booklet: v.id, bank: stimulusId(b), own: b.id })))
+    .find((r) => r.bank !== r.own)!
+
+  it('leave out a drawn variant that repeats a block of any earlier mock', () => {
+    const f = forecastExam([
+      drawn('2026-11-01', 8, ['ctx-1822', 'ctx-1916']),
+      drawn('2026-11-02', 15, ['ctx-1916', 'ctx-tyn']),
+      // ctx-tyn came in a mock that was itself left out — it was still read.
+      drawn('2026-11-03', 16, ['ctx-tyn', 'ctx-zhargy']),
+    ])
+    expect(f.recorded).toBe(3)
+    expect(f.counted).toBe(1)
+    expect(f.days).toBe(1)
+    expect(f.now).toBe(8)
+  })
+
+  it('count drawn variants whose blocks are all new', () => {
+    const f = forecastExam([
+      drawn('2026-11-01', 8, ['ctx-1822', 'ctx-1916']),
+      drawn('2026-11-02', 10, ['ctx-tyn', 'ctx-zhargy']),
+    ])
+    expect(f.counted).toBe(2)
+    expect(f.now).toBe(9)
+  })
+
+  it('match a booklet block re-stamped with its own ids to the bank block it copies', () => {
+    expect(reuse).toBeDefined()
+    const booklet = schoolVariants.find((v) => v.id === reuse.booklet)!
+    const block = booklet.blocks.find((b) => b.id === reuse.own)!
+    expect(stimulusId({ ...block, id: 'renamed' })).toBe(reuse.bank)
+    // A booklet's own text is not in the bank and keeps whatever id it has.
+    const own = schoolVariants
+      .flatMap((v) => v.blocks)
+      .find((b) => b.id.startsWith('sch-') && stimulusId(b) === b.id)!
+    expect(stimulusId({ ...own, id: 'renamed' })).toBe('renamed')
+  })
+
+  it('treat a booklet sharing a bank block as a repeat, in either order', () => {
+    const booklet = { day: '2026-11-02', correct: 18, total: 20, variant: reuse.booklet }
+    const after = forecastExam([drawn('2026-11-01', 8, [reuse.bank, 'other']), booklet])
+    expect(after.counted).toBe(1)
+    expect(after.now).toBe(8)
+    const before = forecastExam([
+      { ...booklet, day: '2026-11-01', correct: 8 },
+      drawn('2026-11-02', 18, [reuse.bank, 'other']),
+    ])
+    expect(before.counted).toBe(1)
+    expect(before.now).toBe(8)
+  })
+})
+
+describe('records from before blocks were stored', () => {
+  it('count a drawn variant only as the first on record, and mark nothing read', () => {
+    const f = forecastExam([
+      { day: '2026-11-01', correct: 8, total: 20 },
+      { day: '2026-11-02', correct: 15, total: 20 },
+      drawn('2026-11-03', 10, ['ctx-1822', 'ctx-1916']),
+    ])
+    expect(f.recorded).toBe(3)
+    expect(f.counted).toBe(2)
+    expect(f.now).toBe(9)
+  })
+
+  it('still show a reading whenever any mock is on record', () => {
+    const f = forecastExam([
+      { day: '2026-11-01', correct: 8, total: 20 },
+      { day: '2026-11-02', correct: 15, total: 20 },
+    ])
+    expect(f.counted).toBe(1)
+    expect(f.now).toBe(8)
+  })
+
+  it('read a booklet’s blocks off the booklet itself', () => {
+    const [v] = schoolVariants
+    const seen = stimulusId(v.blocks[0])
+    const f = forecastExam([
+      { day: '2026-11-01', correct: 8, total: 20, variant: v.id },
+      drawn('2026-11-02', 18, [seen, 'other']),
+    ])
+    expect(f.counted).toBe(1)
+    expect(f.now).toBe(8)
   })
 })
 
