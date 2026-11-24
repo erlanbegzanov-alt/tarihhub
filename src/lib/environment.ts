@@ -58,16 +58,15 @@ export const FEATURE_TEAM_BATTLE =
  * features are unrelated and will not be ready on the same day. Shipping one
  * must not drag the other out with it.
  *
- * Deliberately not on in production yet. The screen works and its data is
- * tested, and the bank now meets the specification's level-C share (122
- * standalone questions: A 76, B 21, C 25). What is still thin is the pool of
- * context blocks the two stimuli are drawn from: back-to-back mocks keep
- * meeting the same passages, which is why the forecast counts only mocks
- * whose blocks are new to the student. It goes live with
- * `VITE_FEATURE_EXAM_MOCK=1`.
+ * Live in production since 2026-11-24, on Erlan's call («перенеси как есть»).
+ * Set here rather than through `VITE_FEATURE_EXAM_MOCK` so the switch is in
+ * git history and does not depend on a dashboard setting. What is still thin
+ * is the pool of context blocks the two stimuli are drawn from: back-to-back
+ * mocks keep meeting the same passages, which is why the forecast counts only
+ * mocks whose blocks are new to the student. To take it down again, put back
+ * `IS_TEST_CONTOUR || import.meta.env.VITE_FEATURE_EXAM_MOCK === '1'`.
  */
-export const FEATURE_EXAM_MOCK =
-  IS_TEST_CONTOUR || import.meta.env.VITE_FEATURE_EXAM_MOCK === '1'
+export const FEATURE_EXAM_MOCK = true
 
 /**
  * The Firestore project this bundle talks to. Read straight from the env
